@@ -1,0 +1,7 @@
+to edallbtn
+  ; EDALLBTN is what run when you press the Edall button.
+  ; By default, it runs EDALL.
+  edall
+end
+
+bury "edallbtn

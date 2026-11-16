@@ -1,0 +1,80 @@
+; Calls the win32 function SetClipboardData.
+; This is a programmatic way to paste to the clipboard.
+; This takes care of opening the clipboard and closing it afterward.
+; Throws an error if it fails.
+TO SETCLIPBOARDDATA :uFormat :hMem
+   IF :hMem = 0 [
+      (THROW "ERROR [Delayed Rendering is not supported by FMSLogo])
+   ]
+
+   ; OpenClipboard(0)
+   DLLLOAD "user32.dll
+   DLLCALL [V OpenClipboard L 0]
+
+   ; EmptyClipboard();
+   DLLCALL [V EmptyClipboard]
+
+   ; BOOL rval = SetClipboardData(uFormat, hMem);
+   LOCAL "rval
+   MAKE "rval DLLCALL (LIST "L "SetClipboardData "L :hMem "L :uFormat)
+
+   ; CloseClipboard();
+   DLLCALL [V CloseClipboard]
+   (DLLFREE "user32.dll)
+
+   IF :rval = [0] [ (THROW "ERROR [SetClipboardData failed]) ]
+
+END
+
+; Calls several win32 functions to allocate a HANDLE to global
+; memory using GlobalAlloc that is :size bytes long and initialized
+; to the data within :data.
+; The :data is copied as an array of WCHAR (UTF16LE characters).
+;
+; Throws an error if the allocation fails.
+;
+; If you're trying to initialize memory that has a specific byte
+; layout (instead of an LPWSTR), remember that each WCHAR is two
+; bytes and the low byte of a UTF16LE character comes pysically
+; before the high byte.
+;
+; GlobalAlloc is only useful for DDE, the clipboard, and OLE data
+; objects.
+;
+TO GLOBALALLOC :data :size
+   LOCAL [GMEM_MOVABLE hMem buffer]
+
+   DLLLOAD "kernel32.dll
+
+   ; HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, size);
+   MAKE "GMEM_MOVABLE   2
+   MAKE "hMem DLLCALL (LIST "L "GlobalAlloc "L :size "L :GMEM_MOVABLE)
+
+   IF :hMem = [0] [
+      ; GlobalAlloc returned NULL
+      (DLLFREE "kernel32.dll)
+      (THROW "ERROR [GlobalAlloc returned NULL])
+   ]
+
+   ; PVOID buffer = GlobalLock(hMem);
+   MAKE "buffer DLLCALL (LIST "L "GlobalLock "L :hMem)
+
+   ; memcpy(buffer, data, bufferLength);
+   DLLLOAD "msvcrt.dll
+   DLLCALL (LIST "V "memcpy "L :size "U :data "L :buffer)
+   (DLLFREE "msvcrt.dll)
+
+   ; GlobalUnlock(hMem);
+   DLLCALL (LIST "V "GlobalUnlock "L :hMem)
+   (DLLFREE "kernel32.dll)
+
+   OUTPUT :hMem
+END
+
+; Calls GlobalFree to free a handle that was returned by GlobalAlloc.
+TO GLOBALFREE :hMem
+   ; GlobalFree(hMem);
+   DLLLOAD "kernel32.dll
+   DLLCALL (LIST "V "GlobalFree "L :hMem)
+   (DLLFREE "kernel32.dll)
+END

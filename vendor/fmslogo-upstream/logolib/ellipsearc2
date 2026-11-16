@@ -1,0 +1,81 @@
+to .ellipsearc2.compute.t :angle
+    ; Outputs a value "t" as used in the standard parameterized
+    ; equations for the points of an ellipse:
+    ;
+    ;   (x,y) = (a * cos(angle), b * sin(angle) )
+    ;
+
+    if :x.semiaxis = 0 [ output :angle ]
+    if :y.semiaxis = 0 [ output :angle ]
+
+    output (arctan product abs :x.semiaxis cos :angle
+                   product abs :y.semiaxis sin :angle)
+end
+
+to .ellipsearc2.tangent.heading :x :y :angle
+    ; Outputs the heading of a turtle needed to be tangent to
+    ; a point (:x, :y) on an ellipse centered at (0,0) with
+    ; x-radius :x.semiaxis and y-radius :y.semiaxis.
+    ;
+    ; :angle is output if arctan would be undefined.
+    ;
+
+    if :x.semiaxis = 0 [ output :angle ]
+    if :y.semiaxis = 0 [ output :angle ]
+
+    output (arctan (:y * power :x.semiaxis 2)
+                   (:x * power :y.semiaxis 2))
+end
+
+to ellipsearc2 :arc.angle :x.semiaxis :y.semiaxis :start.angle
+    ; implementation of ELLIPSEARC2 rewritten by Francesco Simone Carta
+
+    local [pendown? t start.x start.y start.slope end.x end.y end.slope]
+
+    ; remember status of the pen
+    make "pendown? pendown?
+
+    ; avoid drawing anything during the movements
+    penup
+
+    make "t           .ellipsearc2.compute.t :start.angle
+    make "start.x     :x.semiaxis * sin :t
+    make "start.y     :y.semiaxis * cos :t
+    make "start.slope .ellipsearc2.tangent.heading :start.x :start.y :t
+
+    ; neutralize tangent slope to align to negative :y.semiaxis of ellipse.
+    left :start.slope
+
+    ; move to the center of the ellipse
+    right 90
+    forward :start.y
+    right 90
+    forward :start.x
+
+    left 90 ; ellipsearc treats start.angle=0 as behind the turtle
+
+    ; draw effective arc with the primitive
+    if :pendown? [ pendown ]
+    ellipsearc :arc.angle :x.semiaxis :y.semiaxis :start.angle
+    penup
+
+    left 90 ; face positive :x.semiaxis of ellipse
+
+    make "t         .ellipsearc2.compute.t :start.angle + :arc.angle
+    make "end.x     :x.semiaxis * sin :t
+    make "end.y     :y.semiaxis * cos :t
+    make "end.slope .ellipsearc2.tangent.heading :end.x :end.y :t
+
+    ; move turtle to the arc's ending point
+    forward :end.x
+    left 90
+    forward :end.y
+    right 90
+
+    ; apply final rotation
+    right :end.slope
+
+    if :pendown? [ pendown ]
+end
+
+bury [ellipsearc2 .ellipsearc2.compute.t .ellipsearc2.tangent.heading]

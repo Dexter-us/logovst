@@ -1,0 +1,115 @@
+LOAD "testlib.lgo
+
+TO SETPOSTEST.SMOKETEST
+
+   TRACEINSTRUCTION [ SETPOS [ 0 0 ] ]
+   SIMPLEREPORTTEST [ POS ]  [ 0 0 ]
+
+   TRACEINSTRUCTION [ SETPOS [ 100 -100 ] ]
+   SIMPLEREPORTTEST [ POS ]  [ 100 -100 ]
+
+   TRACEINSTRUCTION [ SETPOS [ -5.5 5.5 ] ]
+   SIMPLEREPORTTEST [ POS ]  [ -5.5 5.5 ]
+
+   TRACEINSTRUCTION [ SETPOS [ 0.1 -0.2 ] ]
+   SIMPLEREPORTTEST [ POS ]  [ 0.1 -0.2 ]
+
+   ; Strings that are converted to numbers.
+   TRACEINSTRUCTION [ SETPOS (LIST "10 "1e2) ]
+   SIMPLEREPORTTEST [ POS ]  [ 10 100 ]
+
+END
+
+TO SETPOSTEST.LARGENUMBERS
+   ; Set the mode to WINDOW so that we can set the position
+   ; outside the drawing surface.
+   TRACEINSTRUCTION [ WINDOW ]
+
+   TRACEINSTRUCTION [ SETPOS [ 2000 2000 ] ]
+   SIMPLEREPORTTEST [ POS ]  [ 2000 2000 ]
+
+   TRACEINSTRUCTION [ SETPOS [ -1e3   -1e5   ] ]
+   SIMPLEREPORTTEST [ POS ]  [ -1000 -100000 ]
+
+   ; Restore the default mode (wrap)
+   TRACEINSTRUCTION [ WRAP ]
+END
+
+TO SETPOSTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   TRACEINSTRUCTION [ SETPOS [ 51 -52 ] ]
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(SETPOS)]
+   RUNTOOMANYINPUTSTEST   [(SETPOS [0 0] "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [ SETPOS {10 10}   ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS "10       ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS []        ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [1]       ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [ 1 2 3 ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [1a   2 ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [[1]  2 ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [{1}  2 ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [ 1   2a] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [ 1  [2]] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOS [ 1  {2}] ]
+
+   ; None of the bad input should have changed the position.
+   SIMPLEREPORTTEST [ POS ] [ 51 -52 ]
+END
+
+TO SETPOSTEST.BADINPUT.RECOVERABLE
+
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ SETPOS [ 10 20 ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      SETPOS [1]   ; list must have two elements
+   ] [
+      [ 1 2 3 ]  ; list has too many elements
+      {10 10}    ; must be a list (not an array)
+      10         ; must be a list (not a word)
+      []         ; can't be the empty list
+      [1a  2  ] ; first element must be number
+      [[1] 2  ] ; first element can't be a list
+      [{1} 2  ] ; first element can't be an array
+      [ 1  2a ] ; second element must be number
+      [ 1 [2] ] ; second element can't be a list
+      [ 1 {2} ] ; second element can't be an array
+      [ 1 ]     ; list has too few elements (again) 
+      [ 1 2 3 ] ; list has too many elements (again)
+      {10 10}   ; an array (again)
+      10        ; a word (again)
+      []        ; can't be the empty list (again)
+      [1a  2  ] ; first element must be number (again)
+      [[1] 2  ] ; first element can't be a list (again)
+      [{1} 2  ] ; first element can't be an array (again)
+      [ 1  2a ] ; second element must be number (again)
+      [ 1 [2] ] ; second element can't be a list (again)
+      [ 1 {2} ] ; second element can't be an array (again)
+      [ 1 2   ] ; legal
+   ] []
+
+   ; Confirm that the legal position was accepted.
+   SIMPLEREPORTTEST [ POS ] [ 1 2 ]
+
+
+   ; Test that SETPOS accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST "10 "20) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETPOS [] ]
+   SIMPLEREPORTTEST [ POS ] [ 10 20 ]
+
+END
+
+TO SETPOSTEST
+   SETPOSTEST.SMOKETEST
+   SETPOSTEST.LARGENUMBERS
+   SETPOSTEST.BADINPUT
+   SETPOSTEST.BADINPUT.RECOVERABLE
+END

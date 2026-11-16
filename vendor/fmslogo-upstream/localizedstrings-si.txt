@@ -1,0 +1,1404 @@
+﻿//
+// Copyright (C) 2006 by David Costanzo
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 2 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+//
+
+/////////////////////////////////////////////////////////////////////////////
+// This file contains localized strings for Slovene by Jelko Urbancic
+/////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////
+// Localization Instructions:
+//
+// This file a C++ header file, so if you are familiar with how C++ works, it
+// will help.
+//
+// Each localized string is a line that takes the following form:
+//
+//      #define <TOKEN> "<quoted-string>" //<status>
+//
+//   #define         - is part of C++.  Do not change this.
+//   <TOKEN>         - is how the FMSLogo source code refers to the string.
+//                     This must not change, regardless of the locale.
+//   <quoted-string> - is what fmslogo.exe will use whenever it refers
+//                     to <TOKEN>.  This is bit that must be translated.
+//   <status>        - This is some information on whether or not the
+//                     string has been localized yet.  For example, is
+//                     someone has localized FMSLogo into French, then I add
+//                     a new string, I will append //NOT_YET_LOCALIZED as a
+//                     reminder that we need to localized just this one string.
+//
+// To localize FMSLogo, you must to translate the phrases in <quoted-string>
+// from English to your language.  Once you have localized a string, please
+// remove the //<status> comment at the end of the line.
+//
+// If you think that a string should *NOT* be translated (for example "FMSLogo"),
+// then just delete the //<status> comment to indicate that you have decided
+// not to translate the string.  If you are not sure how to translate a string
+// please leave the //<status> comment so that that someone else may investigate
+// it.
+//
+//
+// For quoted strings that refer to commands, please refer to the command
+// in your language, then put the English form in parentheses.  For example:
+//
+//   "Can't use TO inside a procedure"
+//
+// is translated into French as:
+//
+//   "Impossible d'utiliser POUR (TO) dans une procédure"
+//
+//
+// Please note that some of the quoted strings embed a <TOKEN> within them.
+// For example, the phrase:
+//
+//   "I like FMSLogo, do you?"
+//
+// Might appear as:
+//
+//   "I like "LOCALIZED_GENERAL_PRODUCTNAME", do you?"
+//
+// When fmslogo.exe is built, the LOCALIZED_GENERAL_PRODUCTNAME will be
+// replaced with the localized form of FMSLogo and will look like the
+// original phrase.  Please only translate the "I like " and ", do you?".
+//
+// Some of the quoted strings (the ones that appear in menus and buttons)
+// have ampersands "&" characters in them.  For example the word "File"
+// may appear as "&File".  This tells Windows that ALT+F should take the
+// user straight to this option.
+//
+// Some of the quoted strings have "%p", "%s", or "%ls" in them.  For example,
+// the error message for when you give bad input looks like this:
+//
+//    "%p doesn't like %s as input"
+//
+// The "%p" and "%s" are replaced with the procedure name and the input
+// that it doesn't like.  You must NOT add any "%" characters to any string,
+// nor can you change the order in which the %p and %s occur.
+//
+// There are some special characters that you can add to a string with a
+// special "escape sequence", which begins with a backslash "\".
+//
+//             +--------------------------------------+
+//             | Special Character | Escape Sequence  |
+//             +--------------------------------------+
+//             |  Tab              |        \t        |
+//             |  Newline          |        \n        |
+//             |  Backslash        |        \\        |
+//             |  DoubleQuote      |        \"        |
+//             +--------------------------------------+
+//
+/////////////////////////////////////////////////////////////////////////////
+
+//
+// Localized "alternate" spellings of Logo reserved words
+//
+#define LOCALIZED_ALTERNATE_TRUE     "true" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FALSE    "false" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_END      "end" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TOPLEVEL "toplevel" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SYSTEM   "system" // NO_LOCALIZATION
+
+//
+// Localized "alternate" names of Logo special variables
+//
+#define LOCALIZED_ALTERNATE_CASEIGNOREDP    "caseignoredp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ERRACT          "erract" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STARTUP         "startup" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_REDEFP          "redefp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PRINTWIDTHLIMIT "printwidthlimit" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PRINTDEPTHLIMIT "printdepthlimit" // NO_LOCALIZATION
+
+
+//
+// Localized "alternate" spellings of Logo primitives.
+// These become the perferred name of the primitives.  For example,
+// when you press the "reset" button, FMSLogo will write the value of
+// LOCALIZED_ALTERNATE_CLEARSCREEN to the commander.
+//
+// Furthermore, if one of the LOCALIZED_ALTERNATE names uses the same text
+// as the English counterpart, then the localized name will be used.
+// For example, in the English version, "ct" is short for "CLEARTEXT".
+// In the French version, "ct" is short for "CACHETORTUE" (HIDETURTLE).
+// So in the French FMSLogo, running "ct" will hide the turtle.
+//
+// That said, it is strongly recommended that you do not choose names
+// that match the long English name of any command.  If you do, you may
+// find that some programs won't run on the localized version of FMSLogo.
+//
+// If you don't know how to translate a particular command, leave it
+// as the English name and it will be ignored.
+//
+#define LOCALIZED_ALTERNATE__DEFMACRO              ".defmacro" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE__EQ                    ".eq" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE__MACRO                 ".macro" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE__MAYBEOUTPUT           ".maybeoutput" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE__SETBF                 ".setbf" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE__SETFIRST              ".setfirst" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE__SETITEM               ".setitem" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ACTIVEAREA             "activearea" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ALLOPEN                "allopen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_AND                    "and" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_APPLY                  "apply" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ARCCOS                 "arccos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ARCSIN                 "arcsin" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ARCTAN                 "arctan" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ARITY                  "arity" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ARRAY                  "array" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ARRAYP                 "arrayp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ARRAY_                 "array?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ASCII                  "ascii" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ASHIFT                 "ashift" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BACK                   "back" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BACKSLASHEDP           "backslashedp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BACKSLASHED_           "backslashed?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BEFOREP                "beforep" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BEFORE_                "before?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BF                     "bf" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BFS                    "bfs" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITAND                 "bitand" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITBLOCK               "bitblock" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITCOPY                "bitcopy" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITCUT                 "bitcut" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITFIT                 "bitfit" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITINDEX               "bitindex" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITLOAD                "bitload" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITLOADSIZE            "bitloadsize" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITSIZE                "bitsize" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITMAPTURTLE           "bitmapturtle" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITMODE                "bitmode" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITNOT                 "bitnot" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITOR                  "bitor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITPASTE               "bitpaste" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITPASTETOINDEX        "bitpastetoindex" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITSAVE                "bitsave" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BITXOR                 "bitxor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BK                     "bk" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BL                     "bl" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BURIED                 "buried" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BURY                   "bury" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTFIRST               "butfirst" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTFIRSTS              "butfirsts" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTLAST                "butlast" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTTONCREATE           "buttoncreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTTONDELETE           "buttondelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTTONENABLE           "buttonenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTTONUPDATE           "buttonupdate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTTONP                "buttonp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BUTTON_                "button?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_BYE                    "bye" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CATCH                  "catch" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CHAR                   "char" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CHDIR                  "chdir" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CHECKBOXCREATE         "checkboxcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CHECKBOXDELETE         "checkboxdelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CHECKBOXENABLE         "checkboxenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CHECKBOXGET            "checkboxget" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CHECKBOXSET            "checkboxset" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CLEAN                  "clean" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CLEARPALETTE           "clearpalette" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CLEARSCREEN            "clearscreen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CLEARTEXT              "cleartext" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CLEARTIMER             "cleartimer" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CLOSE                  "close" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CLOSEALL               "closeall" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CO                     "co" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COMBOBOXADDSTRING      "comboboxaddstring" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COMBOBOXCREATE         "comboboxcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COMBOBOXDELETE         "comboboxdelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COMBOBOXENABLE         "comboboxenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COMBOBOXDELETESTRING   "comboboxdeletestring" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COMBOBOXGETTEXT        "comboboxgettext" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COMBOBOXSETTEXT        "comboboxsettext" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CONTENTS               "contents" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CONTINUE               "continue" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COPYDEF                "copydef" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COS                    "cos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_COUNT                  "count" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CS                     "cs" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CT                     "ct" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_CURSOR                 "cursor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DEBUGWINDOWS           "debugwindows" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DEFINE                 "define" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DEFINEDP               "definedp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DEFINED_               "defined?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DIALOGCREATE           "dialogcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DIALOGENABLE           "dialogenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DIALOGDELETE           "dialogdelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DIALOGFILEOPEN         "dialogfileopen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DIALOGFILESAVE         "dialogfilesave" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DIFFERENCE             "difference" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DIRECTORIES            "directories" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DLLCALL                "dllcall" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DLLFREE                "dllfree" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DLLLOAD                "dllload" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DOWN                   "down" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DOWNPITCH              "downpitch" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_DRIBBLE                "dribble" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ED                     "ed" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EDIT                   "edit" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ELLIPSEARC             "ellipsearc" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EMPTYP                 "emptyp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EMPTY_                 "empty?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EOFP                   "eofp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EOF_                   "eof?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EQUALP                 "equalp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EQUAL_                 "equal?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ER                     "er" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ERASE                  "erase" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ERASEFILE              "erasefile" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ERF                    "erf" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ERROR                  "error" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EVENTCHECK             "eventcheck" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_EXP                    "exp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FD                     "fd" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FENCE                  "fence" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FILL                   "fill" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FILES                  "files" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FIRST                  "first" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FIRSTS                 "firsts" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FLOODCOLOR             "floodcolor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FONTFACENAMES          "fontfacenames" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FOREVER                "forever" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FORM                   "form" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FORWARD                "forward" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FPUT                   "fput" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FS                     "fs" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FULLSCREEN             "fullscreen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_FULLTEXT               "fulltext" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GETFOCUS               "getfocus" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GOTO                   "goto" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GIFLOAD                "gifload" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GIFSIZE                "gifsize" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GIFSAVE                "gifsave" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GPROP                  "gprop" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GREATEREQUALP          "greaterequalp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GREATEREQUAL_          "greaterequal?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GREATERP               "greaterp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GREATER_               "greater?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GROUPBOXCREATE         "groupboxcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_GROUPBOXDELETE         "groupboxdelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HALT                   "halt" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HASOWNPENP             "hasownpenp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HASOWNPEN_             "hasownpen?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HEADING                "heading" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HELP                   "help" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HIDETURTLE             "hideturtle" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HOME                   "home" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_HT                     "ht" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_IF                     "if" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_IFELSE                 "ifelse" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_IFF                    "iff" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_IFFALSE                "iffalse" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_IFT                    "ift" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_IFTRUE                 "iftrue" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_INGAMEPORT             "ingameport" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_INPORT                 "inport" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_INPORTB                "inportb" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_INT                    "int" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ITEM                   "item" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_KEYBOARDOFF            "keyboardoff" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_KEYBOARDON             "keyboardon" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_KEYBOARDVALUE          "keyboardvalue" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_KEYP                   "keyp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_KEY_                   "key?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LABEL                  "label" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LABELFONT              "labelfont" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LABELSIZE              "labelsize" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LAST                   "last" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LEFT                   "left" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LEFTROLL               "leftroll" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LESSEQUALP             "lessequalp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LESSEQUAL_             "lessequal?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LESSP                  "lessp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LESS_                  "less?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LIGHT                  "light" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LIST                   "list" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LISTBOXADDSTRING       "listboxaddstring" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LISTBOXCREATE          "listboxcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LISTBOXENABLE          "listboxenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LISTBOXDELETE          "listboxdelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LISTBOXDELETESTRING    "listboxdeletestring" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LISTBOXGETSELECT       "listboxgetselect" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LISTP                  "listp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LIST_                  "list?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LN                     "ln" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LOAD                   "load" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LOCAL                  "local" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LOG10                  "log10" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LOGOVERSION            "logoversion" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LOWERCASE              "lowercase" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LPUT                   "lput" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LR                     "lr" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LSHIFT                 "lshift" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_LT                     "lt" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MACHINE                "machine" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MACROP                 "macrop" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MACRO_                 "macro?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MAKE                   "Make" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MCI                    "mci" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MEMBER                 "member" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MEMBERP                "memberp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MEMBER_                "member?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MESSAGEBOX             "messagebox" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MIDICLOSE              "midiclose" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MIDIMESSAGE            "midimessage" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MIDIOPEN               "midiopen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MINUS                  "minus" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MKDIR                  "mkdir" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MODULO                 "modulo" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MOUSEOFF               "mouseoff" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MOUSEON                "mouseon" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_MOUSEPOS               "mousepos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NAMEP                  "namep" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NAME_                  "name?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NAMES                  "names" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETACCEPTOFF           "netacceptoff" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETACCEPTON            "netaccepton" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETACCEPTRECEIVEVALUE  "netacceptreceivevalue" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETACCEPTSENDVALUE     "netacceptsendvalue" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETCONNECTOFF          "netconnectoff" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETCONNECTON           "netconnecton" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETCONNECTRECEIVEVALUE "netconnectreceivevalue" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETCONNECTSENDVALUE    "netconnectsendvalue" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETSHUTDOWN            "netshutdown" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NETSTARTUP             "netstartup" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NOBITMAPTURTLE         "nobitmapturtle" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NODES                  "nodes" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NODRIBBLE              "nodribble" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NOSTATUS               "nostatus" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NOT                    "not" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NOTEQUALP              "notequalp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NOTEQUAL_              "notequal?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NOYIELD                "noyield" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NUMBERP                "numberp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_NUMBER_                "number?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OP                     "op" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OPENAPPEND             "openappend" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OPENREAD               "openread" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OPENUPDATE             "openupdate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OPENWRITE              "openwrite" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OR                     "or" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OUTPORT                "outport" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OUTPORTB               "outportb" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_OUTPUT                 "output" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PARSE                  "parse" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PAUSE                  "pause" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PC                     "pc" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PD                     "pd" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PE                     "pe" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENCOLOR               "pencolor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENDOWN                "pendown" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENDOWNP               "pendownp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENDOWN_               "pendown?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENERASE               "penerase" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENMODE                "penmode" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENPAINT               "penpaint" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENPATTERN             "penpattern" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENREVERSE             "penreverse" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENSIZE                "pensize" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PENUP                  "penup" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PERSPECTIVE            "perspective" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PITCH                  "pitch" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PIXEL                  "pixel" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PLAYWAVE               "playwave" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PLIST                  "Plist" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PLISTS                 "plists" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PO                     "po" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POPDIR                 "popdir" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POLYSTART              "polystart" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POLYEND                "polyend" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POLYVIEW               "polyview" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTCLOSE              "portclose" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTFLUSH              "portflush" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTMODE               "portmode" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTOPEN               "portopen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTREADARRAY          "portreadarray" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTREADCHAR           "portreadchar" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTWRITEARRAY         "portwritearray" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PORTWRITECHAR          "portwritechar" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POS                    "pos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POSXYZ                 "posxyz" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POT                    "pot" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_POWER                  "power" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PPROP                  "Pprop" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PPT                    "ppt" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PR                     "pr" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PRIMITIVEP             "primitivep" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PRIMITIVE_             "primitive?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PRINT                  "print" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PROCEDUREP             "procedurep" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PROCEDURE_             "procedure?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PROPLISTP              "proplistp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PROPLIST_              "proplist?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PROCEDURES             "procedures" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PRODUCT                "product" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PU                     "pu" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_PX                     "px" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_QUESTIONBOX            "questionbox" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_QUOTIENT               "quotient" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADARCCOS              "radarccos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADARCSIN              "radarcsin" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADARCTAN              "radarctan" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADCOS                 "radcos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADIOBUTTONCREATE      "radiobuttoncreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADIOBUTTONENABLE      "radiobuttonenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADIOBUTTONDELETE      "radiobuttondelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADIOBUTTONGET         "radiobuttonget" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADIOBUTTONSET         "radiobuttonset" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADSIN                 "radsin" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RADTAN                 "radtan" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RANDOM                 "random" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RAWASCII               "rawascii" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RC                     "rc" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RCS                    "rcs" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_READCHAR               "readchar" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_READCHARS              "readchars" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_READER                 "reader" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_READLIST               "readlist" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_READPOS                "readpos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_READRAWLINE            "readrawline" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_READWORD               "readword" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_REMAINDER              "remainder" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_REMPROP                "remprop" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_REPCOUNT               "repcount" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_REPEAT                 "repeat" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RERANDOM               "rerandom" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RIGHT                  "right" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RIGHTROLL              "rightroll" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RL                     "rl" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RMDIR                  "rmdir" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ROLL                   "roll" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ROUND                  "round" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RR                     "rr" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RT                     "rt" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RUN                    "run" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RUNPARSE               "runparse" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RUNRESULT              "runresult" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_RW                     "rw" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SAVE                   "save" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCREENCOLOR            "screencolor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCROLLBARCREATE        "scrollbarcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCROLLBARENABLE        "scrollbarenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCROLLBARDELETE        "scrollbardelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCROLLBARGET           "scrollbarget" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCROLLBARSET           "scrollbarset" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCROLLX                "scrollx" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCROLLY                "scrolly" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SCRUNCH                "scrunch" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SE                     "se" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SELECTBOX              "selectbox" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SENTENCE               "sentence" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETACTIVEAREA          "setactivearea" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETBITINDEX            "setbitindex" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETBITMODE             "setbitmode" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETCLIP                "setclip" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETCURSOR              "setcursor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETCURSORNOWAIT        "setcursornowait" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETCURSORWAIT          "setcursorwait" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETFC                  "setfc" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETFLOODCOLOR          "setfloodcolor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETFOCUS               "setfocus" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETH                   "seth" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETHEADING             "setheading" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETITEM                "setitem" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETLABELFONT           "setlabelfont" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETLIGHT               "setlight" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETMARGINS             "setmargins" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPC                  "setpc" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPENCOLOR            "setpencolor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPENPATTERN          "setpenpattern" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPENSIZE             "setpensize" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPITCH               "setpitch" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPIXEL               "setpixel" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPOS                 "setpos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETPOSXYZ              "setposxyz" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETREAD                "setread" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETREADPOS             "setreadpos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETROLL                "setroll" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETSC                  "setsc" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETSCREENCOLOR         "setscreencolor" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETSCRUNCH             "setscrunch" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETTIMER               "settimer" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETTURTLE              "setturtle" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETTURTLEMODE          "setturtlemode" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETWRITE               "setwrite" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETWRITEPOS            "setwritepos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETX                   "setx" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETXY                  "setxy" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETXYZ                 "setxyz" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETY                   "sety" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SETZ                   "setz" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SHELL                  "shell" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SHOW                   "show" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SHOWNP                 "shownp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SHOWN_                 "shown?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SHOWTURTLE             "showturtle" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SIN                    "sin" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SOUND                  "sound" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SPLITSCREEN            "splitscreen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SQRT                   "sqrt" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SS                     "ss" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ST                     "st" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STANDOUT               "standout" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STATICCREATE           "staticcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STATICDELETE           "staticdelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STATICUPDATE           "staticupdate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STATUS                 "status" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STEP                   "step" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STEPPED                "stepped" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_STOP                   "stop" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SUBSTRINGP             "substringp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SUBSTRING_             "substring?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_SUM                    "sum" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TAG                    "tag" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TAN                    "tan" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TEST                   "test" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TEXT                   "text" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TEXTSCREEN             "textscreen" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_THING                  "thing" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_THROW                  "throw" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TIME                   "time" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TIMEMILLI              "timemilli" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TO                     "to" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TONE                   "tone" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TOWARDS                "towards" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TOWARDSXYZ             "towardsxyz" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TRACE                  "trace" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TRACED                 "traced" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TS                     "ts" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TURTLE                 "turtle" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TURTLEMODE             "turtlemode" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TURTLES                "turtles" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_TYPE                   "type" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_UNBURY                 "unbury" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_UNSTEP                 "unstep" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_UNTRACE                "untrace" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_UP                     "up" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_UPPERCASE              "uppercase" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_UPPITCH                "uppitch" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WAIT                   "wait" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WINDOW                 "window" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WINDOWCREATE           "windowcreate" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WINDOWENABLE           "windowenable" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WINDOWDELETE           "windowdelete" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WINDOWFILEEDIT         "windowfileedit" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WINDOWSET              "windowset" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WINHELP                "winhelp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WORD                   "word" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WORDP                  "wordp" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WORD_                  "word?" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WRAP                   "wrap" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WRITEPOS               "writepos" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_WRITER                 "writer" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_YESNOBOX               "yesnobox" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_YIELD                  "yield" // NO_LOCALIZATION
+#define LOCALIZED_ALTERNATE_ZOOM                   "zoom" // NO_LOCALIZATION
+
+//
+// General localized strings
+//
+#define LOCALIZED_GENERAL_OKBUTTON      "V redu" // DONE
+#define LOCALIZED_GENERAL_CANCELBUTTON  "Prekliči" // DONE
+#define LOCALIZED_GENERAL_APPLYBUTTON   "Uporabi" // DONE
+
+#define LOCALIZED_GENERAL_PRODUCTNAME   "FMSLogo" // NO_LOCALIZATION
+
+// Embedded description of fmslogo.exe
+#define LOCALIZED_FMSLOGO_FILE_DESCRIPTION  "Programsko okolje FMSLogo" // DONE
+
+//
+// The menu options on the main window
+//
+#define LOCALIZED_FILE                  "&Datoteka" // DONE
+#define LOCALIZED_FILE_NEW              "&Na novo\t(zbriše vsebino)" // DONE
+#define LOCALIZED_FILE_LOAD             "Naloži...\t(združi z dosedanjo vsebino)" // DONE
+#define LOCALIZED_FILE_OPEN             "&Odpri...\t(nadomesti dosedanjo vsebino)"  // DONE
+#define LOCALIZED_FILE_SAVE             "&Shrani"  // DONE
+#define LOCALIZED_FILE_SAVEAS           "Shrani kot..." // DONE
+#define LOCALIZED_FILE_SETASSCREENSAVER "Nas&tavi kot ohranjevalnik zaslona" // DONE
+#define LOCALIZED_FILE_EDIT             "Ur&edi..." // DONE
+#define LOCALIZED_FILE_ERASE            "Zb&riši..." // DONE
+#define LOCALIZED_FILE_EXIT             "&Izhod" // DONE
+
+#define LOCALIZED_BITMAP               "&Bitna slika" // DONE
+#define LOCALIZED_BITMAP_NEW           "&Nova" // DONE
+#define LOCALIZED_BITMAP_LOAD          "na&loži..." // DONE
+#define LOCALIZED_BITMAP_SAVE          "&Shrani" // DONE
+#define LOCALIZED_BITMAP_SAVEAS        "Shrani kot..." // DONE
+#define LOCALIZED_BITMAP_PRINT         "Natisni..." // DONE
+#define LOCALIZED_BITMAP_PRINTERSETUP  "Nastavitve tiskalnika..." // DONE
+#define LOCALIZED_BITMAP_ACTIVEAREA    "Območje slike..." // DONE
+
+#define LOCALIZED_SET                  "Na&stavitve" // DONE
+#define LOCALIZED_SET_PENSIZE          "Debelina peresa..." // DONE
+#define LOCALIZED_SET_LABELFONT        "Pisava napisov (&Label)..." // DONE
+#define LOCALIZED_SET_COMMANDERFONT    "Pisava ukazov..." // DONE
+#define LOCALIZED_SET_PENCOLOR         "Barva &peresa..." // DONE
+#define LOCALIZED_SET_FLOODCOLOR       "Barva polnila..." // DONE
+#define LOCALIZED_SET_SCREENCOLOR      "Barva podlage..." // DONE
+
+#define LOCALIZED_ZOOM                 "Povečava"  // DONE
+#define LOCALIZED_ZOOM_IN              "&Večje" // DONE
+#define LOCALIZED_ZOOM_OUT             "&Manjše" // DONE
+#define LOCALIZED_ZOOM_NORMAL          "&Običajno" // DONE
+
+#define LOCALIZED_HELP                 "&Pomoč"  // DONE
+#define LOCALIZED_HELP_INDEX           "&Kazalo (angl.)" // DONE
+#define LOCALIZED_HELP_TUTORIAL        "&Priročnik (angl.)" // DONE
+#define LOCALIZED_HELP_DEMO            "Predstavitev (angl.)"  // DONE
+#define LOCALIZED_HELP_EXAMPLE         "Primeri (angl.) " // DONE
+#define LOCALIZED_HELP_RELEASENOTES    "Izkaznica te verzije programa" // DONE
+#define LOCALIZED_HELP_ABOUTFMSLOGO    "&O " LOCALIZED_GENERAL_PRODUCTNAME "..." // DONE
+#define LOCALIZED_HELP_MS              "O MS..." // DONE
+// The following two help options display tables for translating to/from English
+// These tables are built from the LOCALIZED_ALTERNATE_* macros above and the
+// and startup-xxxx.logoscript file.
+#define LOCALIZED_HELP_LANGTOENGLISH   "LANGUAGE to English" // NO_LOCALIZATION
+#define LOCALIZED_HELP_ENGLISHTOLANG   "English to LANGUAGE" // NO_LOCALIZATION
+
+// The "Set Active Area" dialog box
+#define LOCALIZED_SELECTACTIVEAREA              "Izberi območje slike" // DONE
+#define LOCALIZED_SELECTACTIVEAREA_EFFECT       "To ima vpliv na odtisnjene in shranjene bitne slike" // DONE
+#define LOCALIZED_SELECTACTIVEAREA_YHIGH        "Y-do" // DONE
+#define LOCALIZED_SELECTACTIVEAREA_YLOW         "Y-od"  // DONE
+#define LOCALIZED_SELECTACTIVEAREA_XHIGH        "X-do" // DONE
+#define LOCALIZED_SELECTACTIVEAREA_XLOW         "X-od" // DONE
+#define LOCALIZED_SELECTACTIVEAREA_STEPSPERINCH "Število korakov želve na colo:" // DONE
+#define LOCALIZED_SELECTACTIVEAREA_RESET        "&Privzeto"  // DONE
+#define LOCALIZED_SELECTACTIVEAREA_OK           LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SELECTACTIVEAREA_CANCEL       LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+
+// The screensaver strings
+#define LOCALIZED_SCREENSAVER_NAME              LOCALIZED_GENERAL_PRODUCTNAME // NO_LOCALIZATION
+#define LOCALIZED_SCREENSAVER_DESCRIPTION       "FMSLogo ohranjevalnik zaslona" // DONE
+#define LOCALIZED_SCREENSAVER_SETTINGS_TITLE    "FMSLogo ohranjevalnik zaslona - nastavitve" // DONE
+#define LOCALIZED_SCREENSAVER_LOCATE            "&Najdi..."  // DONE
+#define LOCALIZED_SCREENSAVER_FILE              "Logo &datoteka:"  // DONE
+#define LOCALIZED_SCREENSAVER_OK                LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SCREENSAVER_CANCEL            LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+
+// The dialog box for selecting a Startup procedure
+#define LOCALIZED_SELECTSTARTUP_CAPTION               "Nastavi vsebino ukaza " LOCALIZED_ALTERNATE_STARTUP // DONE
+#define LOCALIZED_SELECTSTARTUP_EXPLAINTEXT_UNDEFINED "Tvoj program nima zapisano, kaj naj se izvede pri ukazu " LOCALIZED_ALTERNATE_STARTUP " .\nOb zagonu ohranjevalca zaslona se ne bo zgodilo nič.\nProsim, povej, kaj naj se zgodi, ko je datoteka naložena." // DONE
+#define LOCALIZED_SELECTSTARTUP_EXPLAINTEXT_NOTLIST   "Podatek ukaza " LOCALIZED_ALTERNATE_STARTUP " ni seznam (list).\nOb zagonu ohranjevalca zaslona se ne bo zgodilo nič.\nProsim, povej v obliki seznama, kaj naj se zgodi, ko je datoteka naložena." // DONE
+#define LOCALIZED_SELECTSTARTUP_EXPLAINTEXT_EMPTY     "seznam ukazov, ki naj se izvede pri " LOCALIZED_ALTERNATE_STARTUP " je prazen\nOb zagonu ohranjevalca zaslona se ne bo zgodilo nič.\nProsim, povej v obliki seznama, kaj naj se zgodi, ko je datoteka naložena." // DONE
+#define LOCALIZED_SELECTSTARTUP_NOPROCEDURESDEFINED   "Noben ukaz ni naveden" // DONE
+
+// The warning dialog box when the user saves an empty workspace
+#define LOCALIZED_EMPTYWORKSPACE_TITLE                LOCALIZED_GENERAL_PRODUCTNAME // NO_LOCALIZATION
+#define LOCALIZED_EMPTYWORKSPACE_MESSAGE              "Ni pripravljene nobene vsebine (ukazi, podatki...) tako,\nda bo datoteka s shranjeno vsebino prazna.\n\nAli jo želiš vseeno shraniti?" // DONE
+
+//
+// Menu options in the popup menu
+//
+#define LOCALIZED_POPUP_COPY                     "Kopiraj" // DONE
+#define LOCALIZED_POPUP_CUT                      "Izreži" // DONE
+#define LOCALIZED_POPUP_PASTE                    "Prilepi" // DONE
+#define LOCALIZED_POPUP_DELETE                   "Izbriši" // DONE
+#define LOCALIZED_POPUP_UNDO                     "Razveljavi" // DONE
+#define LOCALIZED_POPUP_REDO                     "Znova uveljavi" // DONE
+#define LOCALIZED_POPUP_SELECTALL                "Izberi vse" // DONE
+#define LOCALIZED_POPUP_HELP                     "Pomoč po tematikah" // DONE
+#define LOCALIZED_POPUP_REMOVELINES              "Odstrani izbrane vrstice" // DONE
+
+//
+// The menu options on the editor
+//
+#define LOCALIZED_EDITOR_TITLE                   "Urejevalnik" // DONE
+
+#define LOCALIZED_EDITOR_FILE                    "&Datoteka" // DONE
+#define LOCALIZED_EDITOR_FILE_SAVEANDEXIT        "&Shrani in končaj\tCtrl+D" // DONE
+#define LOCALIZED_EDITOR_FILE_SAVETOWORKSPACE    "Shrani med vsebino programa" // DONE
+#define LOCALIZED_EDITOR_FILE_PRINT              "Natisni..."  // DONE
+#define LOCALIZED_EDITOR_FILE_EXIT               "Izhod"  // DONE
+
+#define LOCALIZED_EDITOR_EDIT                    "Uredi" // DONE
+#define LOCALIZED_EDITOR_EDIT_UNDO               "Razveljavi\tCtrl+Z" // DONE
+#define LOCALIZED_EDITOR_EDIT_REDO               "Znova uveljavi\tCtrl+Y" // DONE
+#define LOCALIZED_EDITOR_EDIT_CUT                "Izreži\tCtrl+X" // DONE
+#define LOCALIZED_EDITOR_EDIT_COPY               "K&opiraj\tCtrl+C" // DONE
+#define LOCALIZED_EDITOR_EDIT_PASTE              "&Prilepi\tCtrl+V" // DONE
+#define LOCALIZED_EDITOR_EDIT_DELETE             "Izbriši\tDel" // DONE
+#define LOCALIZED_EDITOR_EDIT_CLEARALL           "Izbriši vse\tCtrl+Del" // DONE
+#define LOCALIZED_EDITOR_EDIT_SELECTALL          "Izberi vse\tCtrl+A" // DONE
+
+#define LOCALIZED_EDITOR_SEARCH                  "Najdi" // DONE
+#define LOCALIZED_EDITOR_SEARCH_FIND             "Najdi...\tCtrl+F" // DONE
+#define LOCALIZED_EDITOR_SEARCH_REPLACE          "Zamenjaj...\tCtrl+H"  // DONE
+#define LOCALIZED_EDITOR_SEARCH_NEXT             "Nadaljuj iskanje\tF3"  // DONE
+
+#define LOCALIZED_EDITOR_SET                     "Nas&tavitve"  // DONE
+#define LOCALIZED_EDITOR_SET_FONT                "pisava..."  // DONE
+
+#define LOCALIZED_EDITOR_TEST                    "Preizkus" // DONE
+#define LOCALIZED_EDITOR_TEST_RUN_SELECTION      "Izvedi izbrano\tCtrl+R" // DONE
+
+#define LOCALIZED_EDITOR_HELP                    "&Pomoč"  // DONE
+#define LOCALIZED_EDITOR_HELP_INDEX              "&Kazalo" // DONE
+#define LOCALIZED_EDITOR_HELP_EDITOR             "&Urejevalnik" // DONE
+#define LOCALIZED_EDITOR_HELP_TOPICSEARCH        "Pomoč po tematikah\tF1" // DONE
+
+
+//
+// The strings in the "You have unsaved changes" dialog
+//
+#define LOCALIZED_UNSAVEDCHANGES                LOCALIZED_YOUHAVEUNSAVEDCHANGES // NO_LOCALIZATION
+#define LOCALIZED_UNSAVEDCHANGES_SAVEANDEXIT    "&Shrani in končaj" // DONE
+#define LOCALIZED_UNSAVEDCHANGES_DONTSAVE       "&Ne shrani" // DONE
+#define LOCALIZED_UNSAVEDCHANGES_CANCEL         LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+#define LOCALIZED_UNSAVEDCHANGES_MESSAGE1       "V delovnem prostoru so neshranjene spremembe. Če jih ne boš shranil, bodo za vedno izgubljene." // DONE
+#define LOCALIZED_UNSAVEDCHANGES_MESSAGE2       "Ali želiš shraniti spremembe pred izhodom?"  // DONE
+
+
+//
+// Strings on the Commander window
+//
+#define LOCALIZED_COMMANDER                     "Nadzorno okno" // DONE
+#define LOCALIZED_COMMANDER_HALT                "Ustavi" // DONE
+#define LOCALIZED_COMMANDER_TRACE               "Sledi" // DONE
+#define LOCALIZED_COMMANDER_NOTRACE             "Ne sledi" // DONE
+#define LOCALIZED_COMMANDER_PAUSE               "Prekini" // DONE
+#define LOCALIZED_COMMANDER_STATUS              "Podrobnosti" // DONE
+#define LOCALIZED_COMMANDER_NOSTATUS            "Skrij" // DONE
+#define LOCALIZED_COMMANDER_STEP                "Po korakih" // DONE
+#define LOCALIZED_COMMANDER_UNSTEP              "Tekoče" // DONE
+#define LOCALIZED_COMMANDER_RESET               "Reset" // DONE
+#define LOCALIZED_COMMANDER_EXECUTE             "Izvedi" // DONE
+#define LOCALIZED_COMMANDER_EDALL               "Uredi vse" // DONE
+
+//
+// Strings on the Status window
+//
+#define LOCALIZED_STATUS                        "Podrobnosti" // DONE
+#define LOCALIZED_STATUS_PEN                    "Pero" // DONE
+#define LOCALIZED_STATUS_CONTACT                "Stanje:" // DONE
+#define LOCALIZED_STATUS_WIDTH                  "Debelina:" // DONE
+#define LOCALIZED_STATUS_STYLE                  "Način" // DONE
+#define LOCALIZED_STATUS_ORIENTATION            "Orientacija" // DONE
+#define LOCALIZED_STATUS_PITCH                  "Pitch:" // NOT_YET_LOCALIZED
+#define LOCALIZED_STATUS_HEADING                "Heading:" // NOT_YET_LOCALIZED
+#define LOCALIZED_STATUS_ROLL                   "Roll:" // NOT_YET_LOCALIZED
+#define LOCALIZED_STATUS_TURTLE                 "Želva" // DONE
+#define LOCALIZED_STATUS_POSITION               "Položaj(XYZ):" // DONE
+#define LOCALIZED_STATUS_WHICH                  "Which:" // NOT_YET_LOCALIZED
+#define LOCALIZED_STATUS_VISIBILITY             "Vidnost:" // DONE
+#define LOCALIZED_STATUS_COLOR                  "Barva" // DONE
+#define LOCALIZED_STATUS_PENCOLOR               "Pero(RGB):" // DONE
+#define LOCALIZED_STATUS_FLOODCOLOR             "Polnilo(RGB):" // DONE
+#define LOCALIZED_STATUS_SCREENCOLOR            "Podlaga(RGB):" // DONE
+#define LOCALIZED_STATUS_KERNEL                 "Jedro-sistem" // DONE
+#define LOCALIZED_STATUS_CALLS                  "Klici:" // DONE
+#define LOCALIZED_STATUS_PEAKMEMORY             "Pomnilnik:" // DONE
+
+#define LOCALIZED_STATUS_PENREVERSE     "Obrnjeno" // DONE
+#define LOCALIZED_STATUS_PENNORMAL      "Normalno" // DONE
+#define LOCALIZED_STATUS_PENERASE       "Brisanje" // DONE
+#define LOCALIZED_STATUS_PENUP          "Dvignjeno" // DONE
+#define LOCALIZED_STATUS_PENDOWN        "Spuščeno" // DONE
+#define LOCALIZED_STATUS_PENSHOWN       "Vidno" // DONE
+#define LOCALIZED_STATUS_PENHIDDEN      "Skrito" // DONE
+#define LOCALIZED_STATUS_POLYGONS       "Poligoni:" // DONE
+#define LOCALIZED_STATUS_VECTORS        "Vektorji:" // DONE
+#define LOCALIZED_STATUS_NODES          "Enot" // DONE
+#define LOCALIZED_STATUS_NOT_APPLICABLE "Ni na voljo" // DONE
+
+//
+// Strings on the Erase|Edit Procedure dialog box
+//
+#define LOCALIZED_SELECTPROCEDURE_OK            LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SELECTPROCEDURE_CANCEL        LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SELECTPROCEDURE_ALL           "Vse" // DONE
+#define LOCALIZED_ERASEPROCEDURE                "Zbriši ukaz" // DONE
+#define LOCALIZED_EDITPROCEDURE                 "Urejaj ukaz" // DONE
+
+
+//
+// Strings on the Color Picker Dialog box
+//
+#define LOCALIZED_SETCOLOR                     "Izbira barve" // DONE
+#define LOCALIZED_SETCOLOR_PENCOLOR            "Barva peresa" // DONE
+#define LOCALIZED_SETCOLOR_FLOODCOLOR          "Barva polnila" // DONE
+#define LOCALIZED_SETCOLOR_SCREENCOLOR         "Barva podlage" // DONE
+#define LOCALIZED_SETCOLOR_RED                 "Rdeča" // DONE
+#define LOCALIZED_SETCOLOR_GREEN               "Zelena" // DONE
+#define LOCALIZED_SETCOLOR_BLUE                "Modra" // DONE
+#define LOCALIZED_SETCOLOR_OK                  LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SETCOLOR_CANCEL              LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SETCOLOR_APPLY               LOCALIZED_GENERAL_APPLYBUTTON // NO_LOCALIZATION
+
+//
+// Strings on the Pen Size Picker Dialog box
+//
+#define LOCALIZED_SETPENSIZE                   "Debelina peresa" // DONE
+#define LOCALIZED_SETPENSIZE_SIZE              "Debelina" // DONE
+#define LOCALIZED_SETPENSIZE_OK                LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SETPENSIZE_CANCEL            LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SETPENSIZE_APPLY             LOCALIZED_GENERAL_APPLYBUTTON // NO_LOCALIZATION
+
+
+//
+// Strings on the "About FMSLogo" Dialog box
+//
+#define LOCALIZED_ABOUTFMS                     "O " LOCALIZED_GENERAL_PRODUCTNAME // DONE
+#define LOCALIZED_ABOUTFMS_VERSION             "Verzija" // DONE
+#define LOCALIZED_ABOUTFMS_GUI                 "GUI by George Mills, Softronics, Inc." // NO_LOCALIZATION
+#define LOCALIZED_ABOUTFMS_CORE                "Core by Brian Harvey\nUniversity of California Berkeley" // NO_LOCALIZATION
+#define LOCALIZED_ABOUTFMS_INSTALLER           "Installer based on Nullsoft Scriptable Install System" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTFMS_ADVENTURE           "The Great Logo Adventure (ISBN 0-9651934-6-2)\nWritten and donated by Jim Muller, available at" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTFMS_ADVENTURE_URL       "https://www.softronix.com/logo.html" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTFMS_SPECIALTHANKS       "Special thanks to Yehuda Katz and Erich Neuwirth" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTFMS_GPL                 LOCALIZED_GENERAL_PRODUCTNAME " prostokodni program\nGlej GNU General Public License" // DONE
+#define LOCALIZED_ABOUTFMS_PARTICIPATE         "Participate in FMSLogo community discussions at" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTFMS_PARTICIPATE_URL     "https://sourceforge.net/p/fmslogo/discussion/500407" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTFMS_MULTIMEDIALOGIC     "To learn the internals of computers,\ntry MultiMedia Logic from Softronics, Inc." // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTFMS_OK                  LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+
+
+//
+// Strings on the "About FMS" Dialog box
+//
+#define LOCALIZED_ABOUTMS                      "O FMS" // DONE
+#define LOCALIZED_ABOUTMS_FMS                  "FMS podpira boj proti Multipli sklerozi." // DONE
+#define LOCALIZED_ABOUTMS_CONSIDERDONATING     "Please consider donating to the National Multiple Sclerosis Society." // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTMS_PHONE                "1-800-FIGHT-MS" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTMS_URL                  "https://www.nationalmssociety.org/" // NOT_YET_LOCALIZED
+#define LOCALIZED_ABOUTMS_OK                   LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+
+
+//
+// Strings on the SELECTBOX Dialog box
+//
+#define LOCALIZED_SELECTBOX_OK                 LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+#define LOCALIZED_SELECTBOX_CANCEL             LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+
+//
+// Strings on the QUESTIONBOX dialog box
+//
+#define LOCALIZED_QUESTIONBOX_OK               LOCALIZED_GENERAL_OKBUTTON // NO_LOCALIZATION
+#define LOCALIZED_QUESTIONBOX_CANCEL           LOCALIZED_GENERAL_CANCELBUTTON // NO_LOCALIZATION
+
+
+//
+// Strings in various other dialog boxes
+//
+
+#define LOCALIZED_CHANGESINEDITORMAYBELOST  "Spremembe pri urejanju programa bodo izgubljene.\n\nAli res želiš zapreti " LOCALIZED_GENERAL_PRODUCTNAME "?" // DONE
+#define LOCALIZED_EDITSESSIONISRUNNING      "Urejanje je v teku" // DONE
+
+#define LOCALIZED_COULDNOTWRITEBMP            "Ne morem zapisati .bmp" // DONE
+#define LOCALIZED_COULDNOTOPENBMP             "Ne morem odpreti .bmp" // DONE
+#define LOCALIZED_COULDNOTCREATEBMP           "Ne morem kreirati Windows 3.0 bitmap" // DONE
+#define LOCALIZED_NOTVALIDBMP                 "Ni pravi Windows 3.0 bitmap" // DONE
+
+#define LOCALIZED_YOUHAVEUNSAVEDCHANGES         "Program ni shranjen na disk" // DONE
+#define LOCALIZED_FILENEWWILLERASEWORKSPACE     "Vsa dosedanja vsebina programa bo izbrisana.\n\nŽeliš vseeno nadaljevati z ukazom Na novo?" // DONE
+#define LOCALIZED_FILELOADMAYOVERWRITEWORKSPACE "Naloženi program se bo združil z obstoječo vsebino\nin lahko prekrije shranjene spremembe.\n\nŽeliš vseeno nadaljevati z ukazom Naloži?" // DONE
+#define LOCALIZED_FILEOPENWILLERASEWORKSPACE    "Vsa vsebina, ki ni shranjena, bo izbrisana.\n\nŽeliš vseeno nadaljevati z ukazom Odpri?" // DONE
+
+#define LOCALIZED_EDITORISOPEN                  "Ali se zavedaš da imaš odprt urejevalnik?\n\nSpremembe od zadnjega shranjevanja bodo izgubljene." // DONE
+
+#define LOCALIZED_ERROR_CANTREADFILE            "Ne morem prebrati datoteke \"%ls\" iz diska" // DONE
+#define LOCALIZED_ERROR_CANTWRITEFILE           "Ne morem zapisati datoteke \"%ls\" na disk" // DONE
+
+#define LOCALIZED_SAVETOWORKSPACE                "Vključi v vsebino programa" // DONE
+#define LOCALIZED_CONTENTSCHANGED                "Vsebina spremenjena" // DONE
+#define LOCALIZED_SAVECHANGEDCONTENTSTOWORKSPACE "Napravljene so bile spremembe.\nAli jih želiš vključiti v vsebino programa?" // DONE
+
+
+
+#define LOCALIZED_CURSORISATLASTGOODDEFINITION  "Med vključevanjem sprememb v vsebino programa smo naleteli na napako. Kurzor bo postavljen za zadnjo uspešno vsebino.\n\nPreveri morebitna sporočila v nadzornem oknu." // DONE
+#define LOCALIZED_RETURNTOEDIT                  "Naj se vrnem v urejevalnik?" // DONE
+
+#define LOCALIZED_EDITFAILEDTOLOAD              LOCALIZED_SAVETOWORKSPACE // NO_LOCALIZATION
+
+#define LOCALIZED_ERRORINFILETITLE              "Napaka v datoteki" // DONE
+#define LOCALIZED_ERRORINFILEMESSAGE            "Pri branju datoteke \"%ls\" je prišlo do napake.\n\nPreveri morebitna sporočila v nadzornem oknu.\n\nAli želiš odpreti datoteko v urejevalniku in pregledati težavo?" // DONE
+
+#define LOCALIZED_CANNOTALLOCATESCREEN          "Ni mogoče zagotoviti dovolj pomnilnika za delovno okno. Morda sta višina in širina okna preveliki za razpoložljivo količino pomnilnika (RAM).\n\n" LOCALIZED_GENERAL_PRODUCTNAME " ne more delovati." // DONE
+
+
+//
+//  Strings used in the File-Open filters
+//
+#define LOCALIZED_FILE_LOAD_DIALOG_TITLE    "Naloži Logo program (združi z dosedanjo vsebino programa)" // DONE
+#define LOCALIZED_FILE_OPEN_DIALOG_TITLE    "Odpri Logo program (nadomesti dosedanjo vsebino programa)" // DONE
+#define LOCALIZED_FILE_SAVE_DIALOG_TITLE    "Shrani vsebino programa v datoteko" // DONE
+#define LOCALIZED_BITMAP_OPEN_DIALOG_TITLE  "Naloži bitno sliko iz datoteke" // DONE
+#define LOCALIZED_BITMAP_SAVE_DIALOG_TITLE  "Shrani območje slike v datoteko" // DONE
+
+#define LOCALIZED_LOGO_FILE_EXTENSION "lgo" // NO_LOCALIZATION
+#define LOCALIZED_FILEFILTER_ALLFILES "Vse datoteke (*.*)|*.*" // DONE
+#define LOCALIZED_FILEFILTER_LOGO     "Logo datoteke (*.lgo)|*.lgo|" LOCALIZED_FILEFILTER_ALLFILES // DONE
+#define LOCALIZED_FILEFILTER_IMAGE    "Slikovne datoteke (*.bmp)|*.bmp|GIF Files (*.gif)|*.gif|" LOCALIZED_FILEFILTER_ALLFILES // DONE
+
+
+
+//
+// strings seen when tracing is enabled
+//
+#define LOCALIZED_TRACING_STOPS             " stops\n" // NOT_YET_LOCALIZED
+#define LOCALIZED_TRACING_OUTPUTS           " outputs %s\n" // NOT_YET_LOCALIZED
+#define LOCALIZED_TRACING_MAKE              "Make %s %s" // NOT_YET_LOCALIZED
+#define LOCALIZED_TRACING_PPROP             "Pprop %s %s %s" // NOT_YET_LOCALIZED
+#define LOCALIZED_TRACING_LOCATION          " in %s\n%s" // NOT_YET_LOCALIZED
+
+//
+// strings seen when single-stepping execution
+//
+#define LOCALIZED_STEPPING                  "Posamezni korak" // DONE
+
+//
+// Notification when defining a procedure with TO in the commander
+//
+#define LOCALIZED_PROCEDUREDEFINED  "%s je določen\n" // DONE
+
+
+//
+// Words that represent the pen's mode
+//
+#define LOCALIZED_PENMODE_ERASE    "radirka" // DONE
+#define LOCALIZED_PENMODE_REVERSE  "obratno" // DONE
+#define LOCALIZED_PENMODE_PAINT    "pisalo" // DONE
+
+//
+// Error message thrown by Logo
+//
+#define LOCALIZED_ERROR_FATALINTERNAL          "Logo: Fatalna interna napaka" // DONE
+#define LOCALIZED_ERROR_OUTOFMEMORYUNREC       "Logo: Prekoračen obseg pomnilnika" // DONE
+#define LOCALIZED_ERROR_OUTOFMEMORY            "Prekoračen obseg pomnilnika" // DONE
+#define LOCALIZED_ERROR_STACKOVERFLOW          "Prekoračen obseg sklada" // DONE
+#define LOCALIZED_ERROR_TURTLEOUTOFBOUNDS      "Želva izven meja" // DONE
+#define LOCALIZED_ERROR_BADGRAPHINIT           "Inicializacija grafike ni uspela" // DONE
+#define LOCALIZED_ERROR_BADDATA                "Vhod (predalček) %s ni ustrezen pri ukazu %p" // DONE
+#define LOCALIZED_ERROR_DIDNTOUTPUT            "%p didn't output to %p" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NOTENOUGHINPUTS        "Pri ukazu %p ni dovolj vhodov (predalčkov)" // DONE
+#define LOCALIZED_ERROR_TOOMUCH                "Preveč vsebine znotraj ()" // DONE
+#define LOCALIZED_ERROR_DONTSAYWHATTODOWITH    "Ni jasno kaj storiti s/z %s" // DONE
+#define LOCALIZED_ERROR_PARENMISMATCH          "Preveč '('" // DONE
+#define LOCALIZED_ERROR_NOVALUE                "%s nima nastavljene vrednosti ali vsebine" // DONE
+#define LOCALIZED_ERROR_UNEXPECTEDPAREN        "nepričakovan ')'" // DONE
+#define LOCALIZED_ERROR_UNEXPECTEDBRACKET      "nepričakovan ']'" // DONE
+#define LOCALIZED_ERROR_UNEXPECTEDBRACE        "nepričakovan '}'" // DONE
+#define LOCALIZED_ERROR_DONTKNOWHOWTO          "Ne vem kaj storiti z izrazom %p" // DONE
+#define LOCALIZED_ERROR_NOCATCHTAG             "Can't find catch tag for %p" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_ALREADYDEFINED         "%p je že uporabljen" // DONE
+#define LOCALIZED_ERROR_STOPPING               "Zaustavljam..." // DONE
+#define LOCALIZED_ERROR_ALREADYDRIBBLING       "Already dribbling" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_FILESYSTEM                   "Napaka datotečnega sistema: %p" // DONE
+#define LOCALIZED_ERROR_FILESYSTEM_CANTOPEN          "Ne morem odpreti datoteke" // DONE
+#define LOCALIZED_ERROR_FILESYSTEM_CANTOPEN2         "Ne morem odpreti datoteke: %t" // DONE
+#define LOCALIZED_ERROR_FILESYSTEM_ALREADYOPEN       "Datoteka je že odprta" // DONE
+#define LOCALIZED_ERROR_FILESYSTEM_NOTOPEN           "Datoteka ni odprta" // DONE
+#define LOCALIZED_ERROR_FILESYSTEM_CANTCREATEEDITOR  "Ne morem napraviti datoteke" // DONE
+#define LOCALIZED_ERROR_FILESYSTEM_CANTSTARTEDITOR   "Ne morem pognati urejevalnika"  // DONE
+#define LOCALIZED_ERROR_FILESYSTEM_CANTREADEDITOR    "Ne morem prebrati datoteke"  // DONE
+#define LOCALIZED_ERROR_IFWARNING              "Privzamem, da je mišljen IFELSE, ne IF" // DONE
+#define LOCALIZED_ERROR_SHADOWWARNING          "%p shadowed by local in procedure call" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_USER                   "Throw \"Error" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_ISPRIMITIVE            "%p is a primitive" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_TONOTINSIDE            "Uporaba TO znotraj drugega ukaza ni možna" // DONE
+#define LOCALIZED_ERROR_ATTOPLEVEL             "Uporaba %p je možna le znotraj ukaza" // DONE
+#define LOCALIZED_ERROR_ATTOPLEVEL2            "Uporaba OUTPUT or STOP je možna le znotraj ukaza" // DONE
+#define LOCALIZED_ERROR_NOTEST                 "%p brez TEST" // DONE
+#define LOCALIZED_ERROR_BADMACROOUTPUT         "Makro izhod %s namesto seznama" // DONE
+#define LOCALIZED_ERROR_DEEPEND                "END znotraj več vrstičnega ukaza" // DONE
+#define LOCALIZED_ERROR_DEEPENDIN              "END znotraj več vrstičnega ukaza v %p" // DONE
+#define LOCALIZED_ERROR_UNKNOWN                "Neznana interna napaka." // DONE
+#define LOCALIZED_PAUSING                      "Prekinjam..." // DONE
+
+
+// FMSLogo-specific error messages.
+#define LOCALIZED_ERROR_INVALIDSTATEFORINSTRUCTION "Invalid state for instruction: %p" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_MODE_ON_SPRITE             "cannot set the mode of a turtle with a rotating bitmap" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_BITMAPSPECIALTURTLE        "cannot make a special turtle use a rotating bitmap" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_BITMAPCLIPBOARD            "cannot use the clipboard as a rotating bitmap" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_SPECIALFORM                "%p doesn't like %p as input because it has a special form" // NOT_YET_LOCALIZED
+
+//
+// Error messages displayed in Message Boxes.
+//
+#define LOCALIZED_ERROR                      "Napaka" // DONE
+#define LOCALIZED_ERROR_BADINPUT             "Nepravilni vhod ali vnos" // DONE
+
+#define LOCALIZED_ERROR_CANTOPENPORT         "Vrat ni možno odpreti" // DONE
+#define LOCALIZED_ERROR_CANTFLUSHPORT        "Vrat ni možno izprazniti (flush)" // DONE
+#define LOCALIZED_ERROR_CANTDCBONPORT        "Na vratih ni možno zgraditi 'dcb'" // DONE
+#define LOCALIZED_ERROR_CANTSETPORT          "Ni možno opraviti nastavitev vrat" // DONE
+#define LOCALIZED_ERROR_PORTALREADYOPEN      "Vrata so že odprta" // DONE
+#define LOCALIZED_ERROR_PORTNOTOPEN          "Vrata niso odprta" // DONE
+
+#define LOCALIZED_ERROR_WINDOWALREADYEXISTS   "%s že obstaja" // DONE
+#define LOCALIZED_ERROR_WINDOWDOESNOTEXIST    "%s ne obstaja" // DONE
+
+#define LOCALIZED_ERROR_DLLNOTLOADED          "DLL ni naložen" // DONE
+#define LOCALIZED_ERROR_DLLLOADFAILED         "Nalaganje DLL ni bilo uspešno" // DONE
+#define LOCALIZED_ERROR_DLLINVALIDDATATYPE    "Tip podatka na vhodu ni pravilen" // DONE
+#define LOCALIZED_ERROR_DLLINVALIDOUTPUTTYPE  "Tip podatka na izhodu ni pravilen" // DONE
+#define LOCALIZED_ERROR_DLLFUNCTIONNOTFOUND   "Nismo našli funkcije v DLL" // DONE
+#define LOCALIZED_ERROR_DLLTYPEDATANOTPAIRED  "Niso vsi tipi / vhodi po parih" // DONE
+
+#define LOCALIZED_ERROR_NETWORK                "Napaka na omrežju: %s"
+#define LOCALIZED_ERROR_NETWORKNOTSTARTED      "Napaka na omrežju: omrežje ni začelo delovati"
+#define LOCALIZED_ERROR_NETWORKALREADYSTARTED  "Omrežje že deluje" // DONE
+#define LOCALIZED_ERROR_NETWORKCLIENTALREADYON "Napaka na omrežju pri oddajanju: Omrežje je že v stanju 'on'"
+#define LOCALIZED_ERROR_NETWORKSERVERALREADYON "Napaka na omrežju pri sprejemanju: Omrežje je že v stanju 'on'"
+#define LOCALIZED_ERROR_NETWORKSHUTDOWN        "Nepričakovana napaka, morda omrežje ne deluje\n" // DONE
+
+// The rest of the network errors shouldn't really be seen -- may be okay not to localize
+#define LOCALIZED_ERROR_NETWORKNAMETOOLONG         "Name too long" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNOTINITIALIZED      "Not initialized" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKSYSTEMNOTREADY      "System not ready" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKVERSIONNOTSUPPORTED "Version is not supported" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKSENDAFTERSHUTDOWN   "Can't send after socket shutdown" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKINTERRUPTED         "Interrupted system call" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKHOSTNOTFOUNDAUTH    "Authoritative Answer: Host not found" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKHOSTNOTFOUNDNONAUTH "Non-Authoritative: Host not found. See NETSTARTUP" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNOTRECOVERABLE      "Non-recoverable error" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNODATA              "No data record available" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKBADFILENUMBER       "Bad file number" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKWOULDBLOCK          "Operation would block" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNOWINPROGRESS       "Operation now in progress" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKALREADYINPROGRESS   "Operation already in progress" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKBADADDRESS          "Bad address" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNEEDDESTADDRESS     "Destination address required" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKMESSAGETOOLONG      "Message too long" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKPFNOTSUPPORTED      "Protocol family not supported" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKDIRNOTEMPTY         "Directory not empty" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKAPPLIMITREACHED     "Application limit has been reached" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKDISKQUOTA           "Disk quota exceeded" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKINVALIDARGUMENTS    LOCALIZED_ERROR_BADINPUT // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKTOOMANYFILES        "Too many open files" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKACCESSDENIED        "Access denied" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNOTASOCKET          "Socket operation on non-socket" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKADDRNOTAVAILABLE    "Can't assign requested address" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKADDRINUSE           "Address already in use" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKAFNOTSUPPORTED      "Address family not supported by protocol family" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKTIMEDOUT            "Connection timed out" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKTYPENOTSUPPORTED    "Socket type not supported" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKPROTONOTSUPPORTED   "Protocol not supported" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNOBUFFER            "No space in buffer" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKALREADYCONNECTED    "Socket is already connected" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKNOTCONNECTED        "Socket is not connected" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKBADPROTOOPT         "Bad protocol option" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKCONNECTIONRESET     "Connection reset by peer" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKCONNECTIONABORT     "Software caused connection abort" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKISDOWN              "Network is down" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKRESET               "Network was reset" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKCONNECTIONREFUSED   "Connection refused" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKHOSTISDOWN          "Host is down" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKHOSTISUNREACHABLE   "Host is unreachable" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKBADPROTOTYPE        "Protocol is wrong type for socket" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKBADOPNOTSUPPORTED   "Operation not supported on socket" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKUNREACHABLE         "No path to remote host was found" // NOT_YET_LOCALIZED
+#define LOCALIZED_ERROR_NETWORKTOOMANYREFS         "Too many references" // NOT_YET_LOCALIZED
+
+#define LOCALIZED_ERROR_POLYSTARTALREADYSTARTED "PolyStart je že v funkciji" // DONE
+#define LOCALIZED_ERROR_POLYENDNOTSTARTED       "nisi uporabil ukaza PolyStart" // DONE
+#define LOCALIZED_ERROR_POLYENDNEED3VECTORS     "za poligon moraš imeti vsaj 3 vektorje (črte)" // DONE
+
+#define LOCALIZED_ERROR_MIDIGENERAL           "MIDI napaka: %s" // DONE
+#define LOCALIZED_ERROR_MIDIINVALIDDEVICE     "MIDI napaka: Neustrezna MIDI naprava" // DONE
+#define LOCALIZED_ERROR_MIDIALREADYOPEN       "MIDI naprava je že odprta" // DONE
+#define LOCALIZED_ERROR_MIDINOTOPEN           "MIDI naprava ni odprta" // DONE
+
+#define LOCALIZED_ERROR_CLIPBOARDISEMPTY      "Odložišče je prazno" // DONE
+
+#define LOCALIZED_ERROR_MCI                   "Napaka v zvezi z MCI napravo: %s" // DONE
+
+#define LOCALIZED_ERROR_TIMERNOTFOUND         "Timer ni bil zaznan" // DONE
+
+#define LOCALIZED_ERROR_HHCTRLNOTLOADED       "Sprotna pomoč ni na voljo, ker sistemska datoteka hhctrl.ocx ni naložena."  // DONE
+
+#define LOCALIZED_ERROR_BADCOMMANDLINE        "Nepravilna ukazna vrstica"  // DONE
+
+#define LOCALIZED_ERROR_GIFSAVEFAILED         "Problem pri shranjevanju GIF, preveri stanje pomnilnika in diska" // DONE
+#define LOCALIZED_ERROR_GIFREADFAILED         "Problem pri branju GIF, preveri stanje pomnilnika in diska" // DONE
+
+#define LOCALIZED_ERROR_BITMAPINDEXOUTOFRANGE  "BitMap Index je izven dovoljenega intervala" // DONE
+#define LOCALIZED_ERROR_BITMAPCUTFAILED        "Izrezovanje slike ni uspelo, morda ni dovolj pomnilnika" // DONE
+
+#define LOCALIZED_ERROR_BITMAPNOTHINGTOPASTE    "Ničesar ni za prilepiti"  // DONE
+#define LOCALIZED_ERROR_BITMAPINDEXISNOTBITMAP  "BitMap at Index must be initialized with a bitmap" // NOT_YET_LOCALIZED
+
+#define LOCALIZED_ERROR_TURTLEHASNOPICTURE      "Želva %d nima grafike\n" // DONE
+
+#define LOCALIZED_ERROR_FONTNOTFOUND            "Ne najdem pisave imenovane %ls. Izberi eno izmed naslednjih:\n" // DONE
+
+#define LOCALIZED_ERROR_PRINTERCANTSCALE        "Gonilnik tiskalnika ne podpira te funkcionalnosti"  // DONE
+#define LOCALIZED_ERROR_CANTDRAWIMAGE           "Ne morem narisati slike" // DONE
+#define LOCALIZED_ERROR_CANTEXTRACTIMAGE        "Ne morem izločiti slike" // DONE
+#define LOCALIZED_ERROR_SUBCODE                 "Sub Code" // NOT_YET_LOCALIZED
+
+//
+// Strings in the dialog box for reading from "stdin"
+//
+#define LOCALIZED_INPUT         "Vnesi:" // DONE
+#define LOCALIZED_PROMPT_TO     "To način (za konec pritisni esc)" // DONE
+#define LOCALIZED_PROMPT_LIST   "List način (za preklic pritisni esc)" // DONE
+#define LOCALIZED_PROMPT_INPUT  "Vnosni način (za preklic pritisni esc)" // DONE
+
+//
+// Messages shown by the Pause Mode dialog box (when PAUSE is run).
+//
+// The button text for CONTINUE and HALT must be Logo instructions.
+// A single amperand (&) can be added to create a shortcut key and
+// this ampersand will be removed before the instruction is executed.
+//
+#define LOCALIZED_PAUSE_MODE_TITLE          "Premor (za nadaljevanje pritisni esc)" // DONE
+#define LOCALIZED_PAUSE_MODE_EXPLAIN_TEXT   "The currently running program has been paused.  When " LOCALIZED_GENERAL_PRODUCTNAME " is paused, you can execute any instruction that you like, including instructions to inspect the value of local variables, resume execution, or halt the program completely." // NOT_YET_LOCALIZED
+#define LOCALIZED_PAUSE_MODE_EXECUTE_BUTTON LOCALIZED_COMMANDER_EXECUTE // NOT_YET_LOCALIZED
+
+#define LOCALIZED_PAUSE_MODE_CONTINUE_EXPLAIN_TEXT  "Resume execution just after the PAUSE instruction" // NOT_YET_LOCALIZED
+#define LOCALIZED_PAUSE_MODE_CONTINUE_BUTTON        "&Continue" // NOT_YET_LOCALIZED
+
+#define LOCALIZED_PAUSE_MODE_HALT_EXPLAIN_TEXT  "Halt the program completely" // NOT_YET_LOCALIZED
+#define LOCALIZED_PAUSE_MODE_HALT_BUTTON        "&Throw \"TopLevel" // NOT_YET_LOCALIZED
+
+
+//
+// Messages shown by the FILE API.
+//
+#define LOCALIZED_FILE_CHDIRSUCCEEDED      "Changed to \"%ls\"" // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_CHDIRFAILED         "Could not chdir to directory \"%ls\"" // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_POPPEDTO            "Popped to \"%ls\"" // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_MKDIRSUCCEEDED      "Now in newly created directory \"%ls\"" // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_MKDIRFAILED         "Failed to create directory \"%ls\"" // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_RMDIRSUCCEEDED      "Removed directory \"%ls\"" // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_RMDIRFAILED         "Failed to remove directory \"%ls\"" // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_RMDIRFAILEDNOEXIST  "The directory does not exist." // NOT_YET_LOCALIZED
+#define LOCALIZED_FILE_RMDIRFAILEDNOTEMPTY "Make sure the directory is empty before trying to remove it." // NOT_YET_LOCALIZED
+
+
+//
+// The default title of a Logo picture when it is printed
+//
+#define LOCALIZED_BITMAPPRINTOUTTITLE       "Logo slika" // DONE
+
+//
+// Other strings
+//
+#define LOCALIZED_ACTIVEAREA    "Območje slike" // DONE
+#define LOCALIZED_INFORMATION   "Informacija" // DONE
+#define LOCALIZED_WARNING       "Opozorilo" // DONE
+#define LOCALIZED_UNTITLED      "Brez naslova" // DONE
+#define LOCALIZED_UNKNOWN       "Neznan" // DONE
+
+// The text which is shown when the Unbound node is formatted.
+// This happens when a macro outputs nothing (instead of a list)
+#define LOCALIZED_UNBOUND       "Ničesar" // DONE
+
+// The title of the Editor's Find/Replace dialog box
+#define LOCALIZED_EDITOR_TITLE_FIND     "Najdi" // DONE
+#define LOCALIZED_EDITOR_TITLE_REPLACE  "Zamenjaj"  // DONE
+
+//
+// The text that's displayed when the Editor's Search->Find fails.
+//
+#define LOCALIZED_STRINGTABLE_CANNOTFINDSTRING "Ne najdem %ls" // DONE
+
+
+//
+// The words that describe color vectors.
+// These words were selected from a de facto HTML standard, so you may
+// be able to find translations for the entire set on the Web.
+//
+// As with the procedure names, these are part of the programming language,
+// so once they are translated, they cannot be changed without breaking
+// compatibility with older programs that may use the old name.
+//
+// Note that the colors have no spaces in their names.  This makes them
+// easier to use, as the programmer doesn't have to escape the space
+// when providing them as a literal word, as in:
+//
+//  SETPENCOLOR "AliceBlue
+//
+// In absense of the space, The PascalCase makes it easier to see the word
+// separation in the documentation.
+//
+#define LOCALIZED_COLOR_ALICEBLUE             "AliceBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_ANTIQUEWHITE          "AntiqueWhite" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_AQUA                  "Aqua" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_AQUAMARINE            "Aquamarine" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_AZURE                 "Azure" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BEIGE                 "Beige" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BISQUE                "Bisque" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BLACK                 "Black" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BLANCHEDALMOND        "BlanchedAlmond" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BLUE                  "Blue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BLUEVIOLET            "BlueViolet" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BROWN                 "Brown" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_BURLYWOOD             "BurlyWood" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CADETBLUE             "CadetBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CHARTREUSE            "Chartreuse" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CHOCOLATE             "Chocolate" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CORAL                 "Coral" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CORNFLOWERBLUE        "CornflowerBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CORNSILK              "Cornsilk" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CRIMSON               "Crimson" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_CYAN                  "Cyan" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKBLUE              "DarkBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKCYAN              "DarkCyan" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKGOLDENROD         "DarkGoldenRod" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKGRAY              "DarkGray" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKGREEN             "DarkGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKGREY              "DarkGrey" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKKHAKI             "DarkKhaki" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKMAGENTA           "DarkMagenta" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKOLIVEGREEN        "DarkOliveGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKORANGE            "DarkOrange" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKORCHID            "DarkOrchid" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKRED               "DarkRed" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKSALMON            "DarkSalmon" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKSEAGREEN          "DarkSeaGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKSLATEBLUE         "DarkSlateBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKSLATEGRAY         "DarkSlateGray" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKSLATEGREY         "DarkSlateGrey" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKTURQUOISE         "DarkTurquoise" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DARKVIOLET            "DarkViolet" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DEEPPINK              "DeepPink" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DEEPSKYBLUE           "DeepSkyBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DIMGRAY               "DimGray" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DIMGREY               "DimGrey" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_DODGERBLUE            "DodgerBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_FIREBRICK             "FireBrick" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_FLORALWHITE           "FloralWhite" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_FORESTGREEN           "ForestGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_FUCHSIA               "Fuchsia" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GAINSBORO             "Gainsboro" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GHOSTWHITE            "GhostWhite" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GOLD                  "Gold" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GOLDENROD             "GoldenRod" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GRAY                  "Gray" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GREEN                 "Green" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GREENYELLOW           "GreenYellow" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_GREY                  "Grey" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_HONEYDEW              "HoneyDew" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_HOTPINK               "HotPink" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_INDIANRED             "IndianRed" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_INDIGO                "Indigo" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_IVORY                 "Ivory" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_KHAKI                 "Khaki" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LAVENDER              "Lavender" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LAVENDERBLUSH         "LavenderBlush" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LAWNGREEN             "LawnGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LEMONCHIFFON          "LemonChiffon" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTBLUE             "LightBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTCORAL            "LightCoral" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTCYAN             "LightCyan" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTGOLDENRODYELLOW  "LightGoldenRodYellow" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTGRAY             "LightGray" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTGREEN            "LightGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTGREY             "LightGrey" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTPINK             "LightPink" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTSALMON           "LightSalmon" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTSEAGREEN         "LightSeaGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTSKYBLUE          "LightSkyBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTSLATEGRAY        "LightSlateGray" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTSLATEGREY        "LightSlateGrey" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTSTEELBLUE        "LightSteelBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIGHTYELLOW           "LightYellow" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIME                  "Lime" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LIMEGREEN             "LimeGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_LINEN                 "Linen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MAGENTA               "Magenta" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MAROON                "Maroon" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMAQUAMARINE      "MediumAquaMarine" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMBLUE            "MediumBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMORCHID          "MediumOrchid" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMPURPLE          "MediumPurple" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMSEAGREEN        "MediumSeaGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMSLATEBLUE       "MediumSlateBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMSPRINGGREEN     "MediumSpringGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMTURQUOISE       "MediumTurquoise" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MEDIUMVIOLETRED       "MediumVioletRed" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MIDNIGHTBLUE          "MidnightBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MINTCREAM             "MintCream" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MISTYROSE             "MistyRose" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_MOCCASIN              "Moccasin" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_NAVAJOWHITE           "NavajoWhite" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_NAVY                  "Navy" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_OLDLACE               "OldLace" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_OLIVE                 "Olive" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_OLIVEDRAB             "OliveDrab" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_ORANGE                "Orange" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_ORANGERED             "OrangeRed" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_ORCHID                "Orchid" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PALEGOLDENROD         "PaleGoldenRod" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PALEGREEN             "PaleGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PALETURQUOISE         "PaleTurquoise" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PALEVIOLETRED         "PaleVioletRed" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PAPAYAWHIP            "PapayaWhip" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PEACHPUFF             "PeachPuff" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PERU                  "Peru" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PINK                  "Pink" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PLUM                  "Plum" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_POWDERBLUE            "PowderBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_PURPLE                "Purple" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_RED                   "Red" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_ROSYBROWN             "RosyBrown" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_ROYALBLUE             "RoyalBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SADDLEBROWN           "SaddleBrown" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SALMON                "Salmon" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SANDYBROWN            "SandyBrown" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SEAGREEN              "SeaGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SEASHELL              "SeaShell" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SIENNA                "Sienna" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SILVER                "Silver" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SKYBLUE               "SkyBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SLATEBLUE             "SlateBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SLATEGRAY             "SlateGray" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SLATEGREY             "SlateGrey" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SNOW                  "Snow" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_SPRINGGREEN           "SpringGreen" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_STEELBLUE             "SteelBlue" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_TAN                   "Tan" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_TEAL                  "Teal" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_THISTLE               "Thistle" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_TOMATO                "Tomato" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_TURQUOISE             "Turquoise" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_VIOLET                "Violet" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_WHEAT                 "Wheat" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_WHITE                 "White" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_WHITESMOKE            "WhiteSmoke" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_YELLOW                "Yellow" // NOT_YET_LOCALIZED
+#define LOCALIZED_COLOR_YELLOWGREEN           "YellowGreen" // NOT_YET_LOCALIZED
+
+//
+// The name of each "window class" that DEBUGWINDOWS prints.
+// These should match the corresponding terms that is used
+// in the  LOCALIZED_ALTERNATE_*CREATE procedures.
+//
+#define LOCALIZED_WINDOWCLASSNAME_WINDOW       "Window" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_STATIC       "Static" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_LISTBOX      "ListBox" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_COMBOBOX     "ComboBox" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_BUTTON       "Button" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_SCROLLBAR    "ScrollBar" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_GROUPBOX     "GroupBox" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_RADIOBUTTON  "RadioButton" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_CHECKBOX     "CheckBox" // NOT_YET_LOCALIZED
+#define LOCALIZED_WINDOWCLASSNAME_DIALOG       "Dialog" // NOT_YET_LOCALIZED
+
+
+//
+// The name of the default font face name.
+// This should only be translated if the given font face doesn't include glyphs
+// for characters in your language.  The specified font face name must be part
+// of all Windows versions from Windows XP onward that would support your
+// language.
+//
+#define LOCALIZED_DEFAULT_FONT_FACE "Courier New" // NO_LOCALIZATION

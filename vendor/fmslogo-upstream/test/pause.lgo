@@ -1,0 +1,153 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO PAUSETEST.SMOKETEST
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   UIAUTOMATION.INITIALIZE
+
+   LOCAL [title x]
+
+   MAKE "title "|Pause Mode|
+
+   CATCH "ERROR [
+
+     ; Press [Continue] without executing any instructions.
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "&Continue
+     TRACEINSTRUCTION [ PAUSE ]
+
+    ; Run an instruction to change the value of :x, then press "Continue
+    UIAUTOMATION.POSTSTRINGTOWINDOW :title "Edit "|Make "x 123|
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Execute  
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "&Continue
+    TRACEINSTRUCTION [ PAUSE ]
+
+    ; Confirm that the instruction was run.
+    SIMPLEREPORTTEST [:x] 123
+
+    ; Note: We are unable to press [Throw "TopLevel] because
+    ; that halts the test automation.
+
+
+    ; Test that (CONTINUE VAL) causes pause to output VAL
+    UIAUTOMATION.POSTSTRINGTOWINDOW :title "Edit "|CO [continue input]|
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Execute
+    SIMPLEREPORTTEST [PAUSE] [continue input]
+  ]
+
+  IGNORE FAILIFERROR "PAUSETEST.SMOKETEST
+
+  UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO PAUSETEST.DOUBLEPAUSE
+  ; Tests running PAUSE in pause mode.
+
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  UIAUTOMATION.INITIALIZE
+
+  LOCAL [title x]
+
+  MAKE "title "|Pause Mode|
+
+  CATCH "ERROR [
+
+    ; Run a PAUSE instruction from PAUSE mode.
+    ; Note that PAUSE is expected to output something.
+    UIAUTOMATION.POSTSTRINGTOWINDOW :title "Edit "|Make "x PAUSE|
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Execute
+
+    ; While in the inner PAUSE, return a value.
+    UIAUTOMATION.POSTSTRINGTOWINDOW :title "Edit "|Continue "\|second pause\||
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Execute
+
+    ; Now back in the outer pause, return a different value.
+    UIAUTOMATION.POSTSTRINGTOWINDOW :title "Edit "|Continue "\|first pause\||
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Execute
+
+    ; Start the test by entering pause mode.
+    ; This should output "first pause
+    SIMPLEREPORTTEST [ PAUSE ] "|first pause|
+    SIMPLEREPORTTEST [ :x    ] "|second pause|
+  ]
+
+  IGNORE FAILIFERROR "PAUSETEST.DOUBLEPAUSE
+
+  UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO PAUSETEST.ERROR
+  ; Tests running an error when in pause mode.
+  ; This should be caught and not exit pause mode.
+
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  UIAUTOMATION.INITIALIZE
+
+  LOCAL [title]
+
+  MAKE "title "|Pause Mode|
+
+  CATCH "ERROR [
+
+    ; Run a malformed instruction from PAUSE mode.
+    ; The error should be caught and printed to the commander history.
+    ; WORD "missing throws a "Not enough inputs" error.
+    UIAUTOMATION.POSTSTRINGTOWINDOW :title "Edit "|WORD "missing|
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Execute
+
+    ; The error above should be ignored.  Now continue.
+    UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "&Continue
+
+    TRACEINSTRUCTION [ PAUSE ]
+  ]
+
+  IGNORE FAILIFERROR "PAUSETEST.ERROR
+
+  UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO PAUSETEST.ESCAPE
+  ; Tests pressing "Esc" when in pause mode.
+  ; This should cause "Continue" to be run.
+
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  UIAUTOMATION.INITIALIZE
+
+  LOCAL [title]
+
+  MAKE "title "|Pause Mode|
+
+  CATCH "ERROR [
+
+    ; Pressing "Esc" can't be automated, so this code prompts
+    ; the person running the tests to press it.
+    UIAUTOMATION.POSTSTRINGTOWINDOW :title "Edit "|Press The "Esc" key|
+    TRACEINSTRUCTION [ PAUSE ]
+  ]
+
+  IGNORE FAILIFERROR "PAUSETEST.ESC
+
+  UIAUTOMATION.UNINITIALIZE
+
+END
+
+
+TO PAUSETEST.BADINPUT
+   RUNTOOMANYINPUTSTEST [ (PAUSE "toomany) ]
+END
+
+TO PAUSETEST
+  PAUSETEST.SMOKETEST
+  PAUSETEST.DOUBLEPAUSE
+  PAUSETEST.ERROR
+  PAUSETEST.ESCAPE
+
+
+  PAUSETEST.BADINPUT
+END

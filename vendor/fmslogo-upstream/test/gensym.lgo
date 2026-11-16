@@ -1,0 +1,30 @@
+LOAD "testlib.lgo
+
+TO GENSYM.SMOKETEST
+   LOCAL [symbol1 symbol2]
+
+   ; GENSYM uses an global variable to hold the number of the symbol.
+   ; By erasing it, we can reset it.
+   TRACEINSTRUCTION [ ERASE  [ [GENSYM] [gensym.number] ] ]
+   TRACEINSTRUCTION [ UNBURY [ [GENSYM] [gensym.number] ] ]
+
+   ; Invoke GENSYM twice.  The first time should create gensym.number
+   SIMPLEREPORTTEST [ GENSYM ] "g1
+   SIMPLEREPORTTEST [ :gensym.number ] 1
+
+   SIMPLEREPORTTEST [ GENSYM ] "g2
+   SIMPLEREPORTTEST [ :gensym.number ] 2
+
+   ; Both the procedure and the variable should be buried.
+   FAILIFNOTTRUE [ MEMBER? "GENSYM        ITEM 1 BURIED ]
+   FAILIFNOTTRUE [ MEMBER? "gensym.number ITEM 2 BURIED ]
+END
+
+TO GENSYM.BADINPUT
+   RUNTOOMANYINPUTSTEST [(GENSYM "toomany)]
+END
+
+TO GENSYMTEST
+   GENSYM.SMOKETEST
+   GENSYM.BADINPUT
+END

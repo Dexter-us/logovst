@@ -1,0 +1,101 @@
+TO AUTOCOMPLETE.TEST
+   ; This procedure contains some manual tests for auto-completion.
+   ; It cannot be run, but if you position the cursor in the locations
+   ; indicated by the "X" cross-hair and press Ctrl+Space, you should
+   ; see the expected popups.
+
+   ; \/                    +---------+
+   FOR   ; should complete |FOR      |
+   ; /\                    |FOREACH  |
+   ;                       |FOREVER  |
+   ;                       |FORM     |
+   ;                       |FORWARD  |
+   ;                       +---------+
+
+   ;  \/ 
+   FOR     ; should auto-complete all procedure names
+   ;  /\
+
+
+   ; \/                    +---------+
+   for   ; should complete |for      |
+   ; /\                    |foreach  |
+   ;                       |forever  |
+   ;                       |form     |
+   ;                       |forward  |
+   ;                       +---------+
+
+   ; \/                    +---------+
+   For   ; should complete |For      |
+   ; /\                    |Foreach  |
+   ;                       |Forever  |
+   ;                       |Form     |
+   ;                       |Forward  |
+   ;                       +---------+
+
+   ;\/
+    X     ; should auto-complete to XCOR (only one completion)
+   ;/\
+
+   ; \/
+    XY    ; should have no auto-complete suggestions
+   ; /\
+
+   ;\/
+          ; should auto-complete all procedure names
+   ;/\
+
+
+   ;  \/
+   .SET   ; should complete [.SETBF .SETFIRST .SETITEM]
+   ;  /\
+
+   ;   \/                    +-----------------+
+   :PRINX  ; should complete |:PRINTDEPTHLIMIT |
+   ;   /\                    |:PRINTWIDTHLIMIT |
+   ;                         +-----------------+
+
+   ;   \/                    +-----------------+
+   :prin   ; should complete |:printdepthlimit |
+   ;   /\                    |:printwidthlimit |
+   ;                         +-----------------+
+
+   ;  \/                     +------------------+
+      :    ; should complete |:AUTOCOMPLETETEST |
+   ;  /\                     |:CASEIGNOREDP     |
+   ;                         |:ERRACT           |
+   ;                         |:PRINTDEPTHLIMIT  |
+   ;                         |:PRINTWIDTHLIMIT  |
+   ;                         |:REDEFP           |
+   ;                         |:STARTUP          |
+   ;                         +------------------+
+
+   ;  \/                     +------------------+
+      :var ; should complete |:AUTOCOMPLETETEST |
+   ;  /\                     |:CASEIGNOREDP     |
+   ;                         |:ERRACT           |
+   ;                         |:PRINTDEPTHLIMIT  |
+   ;                         |:PRINTWIDTHLIMIT  |
+   ;                         |:REDEFP           |
+   ;                         |:STARTUP          |
+   ;                         +------------------+
+   ; selecting should replace "var"
+
+   ;  \/
+   "for    ; should complete nothing (it's text)
+   ;  /\
+
+
+   F~
+O~
+RE
+;/\ Should complete   +---------+
+;                     |FOREACH  |
+;                     |FOREVER  |
+;                     +---------+
+
+
+END
+
+; Define a variable to assist with testing auto-completion in AUTOCOMPLETE.TEST
+MAKE "autocompletetest []

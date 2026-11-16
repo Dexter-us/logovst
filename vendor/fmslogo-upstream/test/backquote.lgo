@@ -1,0 +1,146 @@
+LOAD "testlib.lgo
+
+TO BACKQUOTETEST.SMOKETEST
+
+   ; empty list
+   SIMPLEREPORTTEST [`[]]  []
+
+   ; no substitution or splicing
+   SIMPLEREPORTTEST [`[a b c]] [a b c]
+
+   ; simple substitution
+   SIMPLEREPORTTEST [ `[,[FIRST [a b]] ,[BUTFIRST [x y z]] ]  ] [a [y z]]
+
+   ; simple splicing
+   SIMPLEREPORTTEST [ `[,@[FIRST [a b]]  ,@[BUTFIRST [x y z]]] ] [a y z]
+
+   ; substituted numbers are treated literally
+   SIMPLEREPORTTEST [`[1 ,[2] ,[3]]]   [1 2 3]
+
+   ; spliced numbers are treated literally
+   SIMPLEREPORTTEST [`[1 ,@[2] ,@[3]]] [1 2 3]
+
+   LOCAL [word]
+   TRACEINSTRUCTION [MAKE "word "abc ]
+
+   ; quote-comma substitution
+   SIMPLEREPORTTEST [ `[ ",:word ]     ]   [ "abc ]
+   SIMPLEREPORTTEST [ `[ ",[:word]   ] ]   [ "abc ]
+   SIMPLEREPORTTEST [ `[ ",[ :word ] ] ]   [ "abc ]
+
+   ; colon-comma substitution
+   SIMPLEREPORTTEST [ `[ :,:word  ]    ]   [ :abc ]
+   SIMPLEREPORTTEST [ `[ :,[:word ] ]  ]   [ :abc ]
+   SIMPLEREPORTTEST [ `[ :,[ :word ] ] ]   [ :abc ]
+
+
+   ; multiple splices are supported (Bug #377)
+   LOCAL [name1 name2]
+   TRACEINSTRUCTION [MAKE "name1 "x]
+   TRACEINSTRUCTION [MAKE "name2 "y]
+   SIMPLEREPORTTEST [ `[,:name1 ,:name2] ] [x y]
+
+   ; lists don't get removed unexpectedly when the FIRST member is a comma
+   SIMPLEREPORTTEST [ `[   , :name1   ] ]   [x]
+   SIMPLEREPORTTEST [ `[ [ , :name1 ] ] ]  [[x]] 
+
+END
+
+TO BACKQUOTETEST.EXAMPLESFROMMANUAL
+
+   ;
+   ; Examples from the UCBLogo manual
+   ;
+   SIMPLEREPORTTEST [`[foo baz ,[BUTFIRST [a b c]] garply ,@[BUTFIRST [a b c]]]] ~
+                      [foo baz         [b c]       garply        b c]
+
+   SIMPLEREPORTTEST [ `[a  `[b ,[1+2]  ,[foo ,[1+3] d] e] f] ] ~
+                       [a ` [b , [1+2] , [foo 4 d]     e] f]
+
+   LOCAL [name1 name2]
+   TRACEINSTRUCTION [MAKE "name1 "x]
+   TRACEINSTRUCTION [MAKE "name2 "y]
+   SIMPLEREPORTTEST [ `[a `[b ,:,:name1 ,",:name2 d] e] ] ~
+                       [a  ` [b , [:x]    , ["y]  d] e]
+
+
+   ;
+   ; Examples from the FMSLogo manual
+   ;
+   SIMPLEREPORTTEST [ `[ ,[1*10] `[ ,[2*10 ,[3*10]]  `[ ,[4*10 ,[5*10 ,[6*10]]] ] ] ] ] ~
+                       [10 ` [, [2*10 30] ` [, [4*10 , [5*10 60]]]]]
+
+
+
+   SIMPLEREPORTTEST [ `[a b ,[BUTFIRST [1 2 3]] c ,@[BUTFIRST [1 2 3]] d]  ] ~
+                       [a b [2 3] c 2 3 d]
+
+
+   TRACEINSTRUCTION [ SETPOS [111 222] ]
+   SIMPLEREPORTTEST [ `[ PENUP SETPOS ,[ LIST XCOR YCOR ] PENDOWN ] ] ~
+                      [PENUP SETPOS [111 222] PENDOWN]
+   TRACEINSTRUCTION [ CLEARSCREEN ]
+
+END
+
+TO BACKQUOTETEST.WORDSHORTHAND
+
+   ; substituted word
+   LOCAL "foo
+   TRACEINSTRUCTION [make "foo [a b c]]
+
+   ; ,:foo is equivalent to ,[:foo]
+   SIMPLEREPORTTEST [ `[ ,:foo   ] ]   [[a b c]] 
+   SIMPLEREPORTTEST [ `[ ,[:foo] ] ]   [[a b c]] 
+
+   ; ,@:foo is equivalent to ,@[:foo]
+   SIMPLEREPORTTEST [ ` [ ,@:foo]   ]   [a b c]
+   SIMPLEREPORTTEST [ ` [ ,@[:foo]] ]   [a b c]
+
+   ; ,1+2 is equivalent to ,[ 1 + 2 ]
+   SIMPLEREPORTTEST [ `[ ,1+2     ]   ]  [3]
+   SIMPLEREPORTTEST [ `[ ,[ 1 + 2 ] ] ]  [3]
+
+   ; define a function that simply outputs [a b c] for the next two tests
+   TRACEINSTRUCTION [ DEFINE "BACKQUOTETEST.OUTPUTABC [[] [OUTPUT [a b c]] ] ]
+
+   ; ,func is equivalent to ,[func]
+   SIMPLEREPORTTEST [` [,BACKQUOTETEST.OUTPUTABC ]]   [[a b c]]
+
+   ; ,@func is equivalent to ,@[func]
+   SIMPLEREPORTTEST [` [,@BACKQUOTETEST.OUTPUTABC ]]   [a b c]
+
+END
+
+
+TO BACKQUOTETEST.BADINPUT
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(`)]
+   RUNTOOMANYINPUTSTEST   [(` [1 2 3] "toomany)]
+
+   ; bad inputs
+   RUNNONRECOVERABLEDOESNTLIKEINPUTTEST [` 123              ]
+   RUNNONRECOVERABLEDOESNTLIKEINPUTTEST [` {1 2 3}          ]
+
+   ; bad substitution expression (error when evaluating substitution)
+   RUNHASNOVALUETEST [ ` [,:doesnotexist] ]
+
+   ; bad substitution expression (quote-comma and colon-comma with two item list)
+   RUNYOUDONTSAYWHATTODOWITHTEST [ `[ :,[ 1 2 ] ] ]
+   RUNYOUDONTSAYWHATTODOWITHTEST [ `[ ",[ 1 2 ] ] ]
+
+   ; bad substitution expression (quote-comma and colon-comma with non-word item)
+   RUNDOESNTLIKEINPUTTEST        [ `[ ",[ [abc] ] ] ]
+   RUNDOESNTLIKEINPUTTEST        [ `[ ",[ {abc} ] ] ]
+
+END
+
+TO BACKQUOTETEST
+
+   BACKQUOTETEST.SMOKETEST
+   BACKQUOTETEST.EXAMPLESFROMMANUAL
+   BACKQUOTETEST.WORDSHORTHAND
+   BACKQUOTETEST.BADINPUT
+
+END

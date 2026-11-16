@@ -1,0 +1,116 @@
+LOAD "testlib.lgo
+
+TO FORMTEST.BADINPUT
+
+  ; bad input tests
+  RUNDOESNTLIKEINPUTTEST [FORM "string 10   10]
+  RUNDOESNTLIKEINPUTTEST [FORM [123.1] 10   10]
+  RUNDOESNTLIKEINPUTTEST [FORM {123.1} 10   10]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   -1   10]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   12.3 10]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   {10} 10]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   [10] 10]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1  "ten  10]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   10   12.3]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   10   [1]]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   10   {1}]
+  RUNDOESNTLIKEINPUTTEST [FORM 123.1   10  "ten]
+
+  RUNNOTENOUGHINPUTSTEST [(FORM)]
+  RUNNOTENOUGHINPUTSTEST [(FORM 123.1)]
+  RUNNOTENOUGHINPUTSTEST [(FORM 123.1 10)]
+  RUNTOOMANYINPUTSTEST   [(FORM 123.1 10 10 10)]
+
+END
+
+TO FORMTEST.BADINPUT.RECOVERABLE
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first set of inputs are bad.
+   RUNRECOVERABLEERRORTEST [
+      FORM "bad1 "bad2 "bad3  ; no numbers
+   ](LIST
+      "||        ; first input can't be empty word
+      []         ; first input can't be the empty list
+      [123]      ; first input can't be a list
+      {123}      ; first input can't be an array
+      "12b       ; first input must be convertable to a number (again)
+      "||        ; first input can't be empty word (again)
+      []         ; first input can't be the empty list (again)
+      [123]      ; first input can't be a list (again)
+      {123}      ; first input can't be an array (again)
+      "1.234     ; valid first input
+      "||        ; second input can't be empty word
+      []         ; second input can't be the empty list
+      [1]        ; second input can't be a list
+      {1}        ; second input can't be an array
+      -1         ; second input can't be negative
+      "1.2       ; second input must be convertiable to an integer (again)
+      "||        ; second input can't be empty word (again)
+      []         ; second input can't be the empty list (again)
+      [0]        ; second input can't be a list (again)
+      {0}        ; second input can't be an array (again)
+      -2         ; second input can't be negative (again)
+      5          ; valid second input
+      "||        ; third input can't be empty word
+      []         ; third input can't be the empty list
+      [1]        ; third input can't be a list
+      {1}        ; third input can't be an array
+      "+1        ; third input must be convertiable to an integer (again)
+      "||        ; third input can't be empty word (again)
+      []         ; third input can't be the empty list (again)
+      [0]        ; third input can't be a list (again)
+      {0}        ; third input can't be an array (again)
+      2          ; valid third input
+   ) ~
+   [ "| 0.12| ] ; FORM 1.234 5 2
+
+   ; Test that FORM accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "1 ". "0) ] ]
+   SIMPLEREPORTTESTNOCATCH [ FORM [] [] [] ] "1.0
+
+END
+
+TO FORMTEST.BUG4
+
+  IGNORE FORM 123.1 10000 10
+  REPORTTESTPASSED (sentence "|'FORM 123.1 10000 10' did not crash|)
+
+  IGNORE FORM 123.1 10 1000000
+  REPORTTESTPASSED (sentence "|'FORM 123.1 10 10000' did not crash|)
+
+  ; regression test for Bug #4
+  RUNBADINPUTTEST [FORM -1 -1 "%s%s]
+  REPORTTESTPASSED (sentence "|'FORM -1 -1 "%s%s' did not crash|)
+
+END
+
+
+TO FORMTEST.SMOKETEST
+
+  ; extend the number to fill all 10 slots
+  SIMPLEREPORTTEST [FORM 123.456 10 10] "123.4560000000
+
+  ; test when the width is smaller than precision
+  SIMPLEREPORTTEST [FORM 123.456 0 10] "123.4560000000
+  SIMPLEREPORTTEST [FORM 123.456 1 10] "123.4560000000
+
+  ; test prepending spaces to fill width
+  SIMPLEREPORTTEST [FORM 123.456 10 1] "|     123.5|
+  SIMPLEREPORTTEST [FORM 123.456 10 0] "|       123|
+  SIMPLEREPORTTEST [FORM 123.567 10 0] "|       124|
+
+  ; Can handle string inputs
+  SIMPLEREPORTTEST [FORM "123.456 "10 "10] "123.4560000000
+
+  ; Can handle integer inputs
+  SIMPLEREPORTTEST [FORM 123 3 4] "123.0000
+
+END
+
+TO FORMTEST
+  FORMTEST.SMOKETEST
+  FORMTEST.BADINPUT
+  FORMTEST.BADINPUT.RECOVERABLE
+  FORMTEST.BUG4
+END

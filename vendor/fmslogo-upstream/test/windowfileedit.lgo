@@ -1,0 +1,333 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO WINDOWFILEEDITTEST.LETCALLBACKRUN
+  ; Coax FMSLogo into checking its internal event queue
+  ; so that it runs the callback of WINDOWFILEEDIT
+  SETTIMER 31 0 [ ]
+  WAIT 20
+  CLEARTIMER 31
+END
+
+
+TO WINDOWFILEEDITTEST.ASCIIFILE.CALLBACK
+   LOCAL [oldreader offset expectedChar actualChar]
+
+   MAKE "oldreader READER
+
+   ; Open the file in binary mode.
+   (OPENREAD "windowfileedittest.asciifile.lgo "true)
+   SETREAD "windowfileedittest.asciifile.lgo
+
+   ; Confirm that the file contents match what was written.
+   REPEAT 10*127 [
+     MAKE "offset       REPCOUNT - 1
+     MAKE "expectedChar SUM 1 MODULO :offset 127
+     MAKE "actualChar   READCHAR
+
+     IF NOTEQUAL? :actualChar :expectedChar [
+        REPORTTESTFAILED (WORD
+           "|Found unexpected character in windowfileedittest.asciifile.lgo at offset |
+           :offset "|.  Expected=| :expectedChar "|.  Actual=| :actualChar ".
+        )
+
+        ; Cleanup and exit to avoid excessive failure messages
+        SETREAD   :oldreader
+        CLOSE     "windowfileedittest.asciifile.lgo
+        ERASEFILE "windowfileedittest.asciifile.lgo
+        STOP
+      ]
+   ]
+
+   ; A CRLF is appended (I don't know why)
+   SIMPLEREPORTTEST READCHAR 13  ; CR
+   SIMPLEREPORTTEST READCHAR 10  ; LF
+
+   IF NOT EOF? [
+      REPORTTESTFAILED (WORD 
+         "|Found more data in windowfileedittest.asciifile.lgo than expected.  |
+         "|First unexpected byte=| READCHAR
+      )
+   ]
+ 
+   ; cleanup
+   SETREAD   :oldreader
+   CLOSE     "windowfileedittest.asciifile.lgo
+   ERASEFILE "windowfileedittest.asciifile.lgo
+END
+
+
+TO WINDOWFILEEDITTEST.ASCIIFILE
+  ; This is a regression test for bug #560.
+  ; The bug is that the WINDOWFILEEDIT added a UTF-8 BOM to the file
+  ; even when it only contained ASCII character.
+
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  ; Note that the callback is a separate procedure because of the
+  ; of the maximum length of the callback.
+  WINDOWFILEEDIT "windowfileedittest.asciifile.lgo [
+    WINDOWFILEEDITTEST.ASCIIFILE.CALLBACK
+  ]
+
+  WAIT 12 ; wait 200 ms for the editor to appear
+
+  UIAUTOMATION.INITIALIZE
+
+  CATCH "ERROR [
+    ; Write some text that contains all ASCII characters.
+    ; This does not need to be a syntactically correct FMSLogo file.
+
+    ; Write all ASCII characters except NUL.
+    LOCAL "ascii
+    MAKE "ascii "||    
+    REPEAT 127 [ MAKE "ascii WORD :ascii CHAR REPCOUNT ]
+
+    ; Write more than 1024 characters (the internal BLOCK_SIZE)
+    REPEAT 10 [
+       UIAUTOMATION.SENDSTRINGTOWINDOW "windowfileedittest.asciifile.lgo "wxWindowNR :ascii
+    ]
+
+    ; File -> Save and Exit.
+    LOCALMAKE "wxID_HIGHEST       5999          ; from defs.h
+    LOCALMAKE "ID_FILESAVEANDEXIT :wxID_HIGHEST ; workspaceeditor.cpp
+    UIAUTOMATION.SENDMENUCOMMANDTOWINDOW "windowfileedittest.asciifile.lgo :ID_FILESAVEANDEXIT
+  ]
+
+  IGNORE FAILIFERROR "WINDOWFILEEDITTEST.ASCIIFILE
+
+  UIAUTOMATION.UNINITIALIZE
+
+  ; Coax FMSLogo into running the callback.
+  WINDOWFILEEDITTEST.LETCALLBACKRUN
+
+  ; Make sure the callback was run.
+  FAILIFNOTFALSE [ FILEEXISTS "windowfileedittest.asciifile.lgo ]
+
+END
+
+
+TO WINDOWFILEEDITTEST.UNICODEFILE.CALLBACK
+   LOCAL [oldreader]
+
+   MAKE "oldreader READER
+
+   ; Open the file in binary mode.
+   (OPENREAD "windowfileedittest.unicodefile.lgo "true)
+   SETREAD "windowfileedittest.unicodefile.lgo
+
+   ; Confirm that the three bytes are a UTF-8 BOM.
+   SIMPLEREPORTTEST READCHAR 239
+   SIMPLEREPORTTEST READCHAR 187
+   SIMPLEREPORTTEST READCHAR 191
+
+   ; The rest of the text should follow
+   SIMPLEREPORTTEST READCHAR ASCII "A
+   SIMPLEREPORTTEST READCHAR 194 ; CHAR 128 (byte 1)
+   SIMPLEREPORTTEST READCHAR 128 ; CHAR 128 (byte 2)
+
+   ; A CRLF is appended (I don't know why)
+   SIMPLEREPORTTEST READCHAR 13  ; CR
+   SIMPLEREPORTTEST READCHAR 10  ; LF
+
+   IF NOT EOF? [
+      REPORTTESTFAILED (WORD 
+         "|Found more data in windowfileedittest.unicodefile.lgo than expected.  |
+         "|First unexpected byte=| READCHAR
+      )
+   ]
+
+   ; cleanup
+   SETREAD   :oldreader
+   CLOSE     "windowfileedittest.unicodefile.lgo
+   ERASEFILE "windowfileedittest.unicodefile.lgo
+END
+
+
+TO WINDOWFILEEDITTEST.UNICODEFILE
+  ; Tests that that WINDOWFILEEDIT encodes a file in UTF-8.
+
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  ; Note that the callback is a separate procedure because of the
+  ; of the maximum length of the callback.
+  WINDOWFILEEDIT "windowfileedittest.unicodefile.lgo [
+    WINDOWFILEEDITTEST.UNICODEFILE.CALLBACK
+  ]
+
+  WAIT 12 ; wait 200 ms for the editor to appear
+
+  UIAUTOMATION.INITIALIZE
+
+  CATCH "ERROR [
+    ; Write some text that contains non-ASCII characters.
+    ; This does not need to be a syntactically correct FMSLogo file.
+
+    UIAUTOMATION.SENDSTRINGTOWINDOW "windowfileedittest.unicodefile.lgo "wxWindowNR WORD "A CHAR 128
+
+    ; File -> Save and Exit.
+    LOCALMAKE "wxID_HIGHEST       5999          ; from defs.h
+    LOCALMAKE "ID_FILESAVEANDEXIT :wxID_HIGHEST ; workspaceeditor.cpp
+    UIAUTOMATION.SENDMENUCOMMANDTOWINDOW "windowfileedittest.unicodefile.lgo :ID_FILESAVEANDEXIT
+  ]
+
+  IGNORE FAILIFERROR "WINDOWFILEEDITTEST.UNICODEFILE
+
+  UIAUTOMATION.UNINITIALIZE
+
+  ; Coax FMSLogo into running the callback.
+  WINDOWFILEEDITTEST.LETCALLBACKRUN
+
+  ; Make sure the callback was run.
+  FAILIFNOTFALSE [ FILEEXISTS "windowfileedittest.unicodefile.lgo ]
+
+END
+
+
+
+TO WINDOWFILEEDITTEST.BUG20.CALLBACK
+   LOCALMAKE "oldreader READER
+
+   ; Open the file in binary mode.
+   (OPENREAD "windowfileedittest.bug20.lgo "true)
+   SETREAD "windowfileedittest.bug20.lgo
+
+   ; Testing Bug #20 requires that some text be written to the editor before
+   ; it is closed, otherwise it doesn't save.
+   IF EOFP [ REPORTTESTBUG "|Nothing was written to the editor.| ]
+
+   ; Confirm that no NUL bytes were written
+   WHILE [NOT EOFP] [
+     IF READCHAR = 0 [
+       REPORTTESTFAILED "|BUG#20 not fixed; WINDOWFILEDIT wrote a NUL byte into the file.|
+     ]
+   ]
+
+   ; cleanup
+   SETREAD   :oldreader
+   CLOSE     "windowfileedittest.bug20.lgo
+   ERASEFILE "windowfileedittest.bug20.lgo
+
+END
+
+TO WINDOWFILEEDITTEST.BUG20
+  ; This is a regression test for bug #20.
+  ; The bug is that the WINDOWFILEEDIT appened NUL-NUL-CR-LF to the
+  ; end of the text file.
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  ; Note that the callback is a separate procedure because of the
+  ; of the maximum length of the callback.
+  WINDOWFILEEDIT "windowfileedittest.bug20.lgo [
+    WINDOWFILEEDITTEST.BUG20.CALLBACK
+  ]
+
+  WAIT 12 ; wait 200 ms for the editor to appear
+
+  UIAUTOMATION.INITIALIZE
+
+  CATCH "ERROR [
+    ; Write some text into the editor.
+    UIAUTOMATION.SENDSTRINGTOWINDOW "windowfileedittest.bug20.lgo "wxWindowNR (WORD
+      "|TO SQUARE|                            CHAR 10
+      "|  REPEAT 4 [ FORWARD 100 RIGHT 90 ]|  CHAR 10
+      "|END|                                  CHAR 10
+    )
+
+    ; File -> Save and Exit.
+    LOCALMAKE "wxID_HIGHEST       5999          ; from defs.h
+    LOCALMAKE "ID_FILESAVEANDEXIT :wxID_HIGHEST ; workspaceeditor.cpp
+    UIAUTOMATION.SENDMENUCOMMANDTOWINDOW "windowfileedittest.bug20.lgo :ID_FILESAVEANDEXIT
+  ]
+
+  IGNORE FAILIFERROR "WINDOWFILEEDITTEST.BUG20
+
+  UIAUTOMATION.UNINITIALIZE
+
+  ; Coax FMSLogo into running the callback.
+  WINDOWFILEEDITTEST.LETCALLBACKRUN
+
+  ; Make sure the callback was run.
+  FAILIFNOTFALSE [ FILEEXISTS "windowfileedittest.bug20.lgo ]
+
+END
+
+
+TO WINDOWFILEEDITTEST.LONGFILENAME
+  ; This is a regression test for bug #142.
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  ; Create a file with a long name.
+  LOCALMAKE "longfilename REPEATWORD "A 100
+  OPENWRITE :longfilename
+  CLOSE     :longfilename
+
+  TRACEINSTRUCTION [ 
+    WINDOWFILEEDIT :longfilename (LIST
+       "REPORTTESTPASSED [WINDOWFILEEDIT did not crash on a long filename] 
+       "ERASEFILE QUOTED :longfilename
+    )
+  ]
+
+  WAIT 12 ; wait 200 ms for the editor to appear
+
+  UIAUTOMATION.INITIALIZE
+
+  CATCH "ERROR [
+    ; Write some text into the editor.
+    UIAUTOMATION.SENDSTRINGTOWINDOW :longfilename "wxWindowNR "CLEARSCREEN
+
+    ; File -> Save and Exit.
+    LOCALMAKE "wxID_HIGHEST       5999          ; from defs.h
+    LOCALMAKE "ID_FILESAVEANDEXIT :wxID_HIGHEST ; workspaceeditor.cpp
+    UIAUTOMATION.SENDMENUCOMMANDTOWINDOW :longfilename :ID_FILESAVEANDEXIT
+  ]
+
+  IGNORE FAILIFERROR "WINDOWFILEEDITTEST.LONGFILENAME
+
+  UIAUTOMATION.UNINITIALIZE
+
+  ; Coax FMSLogo into running the callback.
+  WINDOWFILEEDITTEST.LETCALLBACKRUN
+
+  ; Make sure the callback was run.
+  FAILIFNOTFALSE [ FILEEXISTS :longfilename ]
+END
+
+
+TO WINDOWFILEEDITTEST.BADINPUT.CALLBACK
+  REPORTTESTFAILED "|WINDOWFILEDIT called callback when given a bad filename|
+END
+
+TO WINDOWFILEEDITTEST.BADINPUT
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  ; Standard bad input tests
+  RUNNOTENOUGHINPUTSTEST [(WINDOWFILEEDIT "myfile.lgo)]
+  RUNTOOMANYINPUTSTEST   [(WINDOWFILEEDIT "myfile.lgo [WINDOWFILEEDITTEST.BADINPUT.CALLBACK] "toomany)]
+
+  ; Call WINDOWFILEEDIT with a filename that can't be opened
+  ; for writing by the editor because it's invalid for some reason.
+  ; This is a regression test for bug #382.
+
+  ; The root directory is not a valid file.
+  RUNFILESYSTEMERRORTEST [ WINDOWFILEEDIT "|\\| [ WINDOWFILEEDITTEST.BADINPUT.CALLBACK ] ]
+
+  ; Windows filenames cannot have double-quotes
+  RUNFILESYSTEMERRORTEST [ WINDOWFILEEDIT "|file"name| [ WINDOWFILEEDITTEST.BADINPUT.CALLBACK ] ]
+
+  ; The empty string is not a legal file name
+  RUNFILESYSTEMERRORTEST [ WINDOWFILEEDIT "|| [ WINDOWFILEEDITTEST.BADINPUT.CALLBACK ] ]
+
+  ; None of the above should have created the file.
+  FAILIFNOTFALSE [ FILEEXISTS "myfile.lgo ]
+
+END
+
+TO WINDOWFILEEDITTEST
+  WINDOWFILEEDITTEST.ASCIIFILE
+  WINDOWFILEEDITTEST.UNICODEFILE
+  WINDOWFILEEDITTEST.BUG20
+  WINDOWFILEEDITTEST.LONGFILENAME
+  WINDOWFILEEDITTEST.BADINPUT
+END

@@ -1,0 +1,31 @@
+; Calls the win32 function GetTempPathW.
+; Outputs the temporary path as a word.
+; Outputs [] on error.
+TO GETTEMPPATH
+  LOCAL [rval temppath size buffer codepoint]
+
+  DLLLOAD "kernel32.dll
+
+  MAKE "rval (DLLCALL [L GetTempPathW B 261 L 261] "kernel32.dll)
+  IFELSE EQUAL? 0 ITEM 1 :rval [
+    MAKE "temppath [] ; error
+  ][
+    ; Convert from WCHAR* to a Logo word.
+    MAKE "size   ITEM 1 :rval
+    MAKE "buffer ITEM 2 :rval
+
+    MAKE "temppath "||
+    REPEAT :size [
+      ; Determine the code point of the REPCOUNTth character.
+      MAKE "codepoint (SUM
+        ASCII ITEM (2*REPCOUNT-1) :buffer         ; low byte comes first
+        LSHIFT ASCII ITEM (2*REPCOUNT) :buffer 8) ; high byte comes second
+
+      ; Append the REPCOUNTth character to the value.
+      MAKE "temppath WORD :temppath CHAR :codepoint
+    ]
+  ]
+
+  (DLLFREE "kernel32.dll)
+  OUTPUT :temppath
+END

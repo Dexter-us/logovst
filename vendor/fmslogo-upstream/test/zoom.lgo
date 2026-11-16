@@ -1,0 +1,118 @@
+LOAD "testlib.lgo
+
+TO ZOOMTEST.ZOOMSTAYSCENTERED
+
+  ;
+  ; This is a regression test for bug #236
+  ;
+
+  CLEARSCREEN
+  SCROLLX 0
+  SCROLLY 0
+
+  ; draw a pattern with an obvious center
+  SETPIXEL PENCOLOR
+  REPEAT 50 [ CIRCLE REPCOUNT * 10 ]
+
+  ; repeatedly zoom
+  REPEAT 50 [ ZOOM 1 ZOOM 16 ]
+
+  ; ask the tester to verify the fix
+  LOCALMAKE "isok YESNOBOX [Question] [Is the screen zoomed to the center of the circles?]
+  IFELSE :isok [
+    REPORTTESTPASSED [Bug #236 is fixed.  ZOOM did not change scrollbar positions.]
+  ] [
+    REPORTTESTFAILED [Bug #236 is NOT fixed.  ZOOM changed scrollbar positions.]
+  ]
+
+  ; restore the default zoom
+  ZOOM 1
+END
+
+
+TO ZOOMTEST.SMOKETEST
+
+  CLEARSCREEN
+  ZOOM 1
+  REPEAT 4 [ FD 100 RT 90 ]
+
+  TRACEINSTRUCTION [ ZOOM 1 ] ; setting to the current zoom level shouldn't affect anything
+
+  ; TODO: what is the best way to verify that ZOOM is working?
+
+  ; zoom in (string node)
+  TRACEINSTRUCTION [ ZOOM "10 ]
+
+  ; zoom out
+  TRACEINSTRUCTION [ ZOOM 0.5 ]
+
+  ; zoom very far in (This hangs.  See Bug #237)
+  ; TRACEINSTRUCTION [ ZOOM 1e20 ]
+
+  ; zoom very far out
+  TRACEINSTRUCTION [ ZOOM 1e-20 ]
+
+  ; restore the default zoom
+  ZOOM 1
+
+END
+
+
+TO ZOOMTEST.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [(ZOOM)]
+   RUNTOOMANYINPUTSTEST   [(ZOOM 1 "toomany)]
+
+   ; bad input
+   RUNDOESNTLIKEINPUTTEST [ ZOOM "five   ]
+   RUNDOESNTLIKEINPUTTEST [ ZOOM -1      ]
+   RUNDOESNTLIKEINPUTTEST [ ZOOM 0       ]
+   RUNDOESNTLIKEINPUTTEST [ ZOOM [1]     ]
+   RUNDOESNTLIKEINPUTTEST [ ZOOM {5}     ]
+
+END
+
+TO ZOOMTEST.BADINPUT.RECOVERABLE
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      ZOOM []   ; can't be the empty list
+   ][
+      10a        ; can't be a word
+      {10}       ; can't be an array
+      [10]       ; can't be a list
+      []         ; can't be the empty list (again)
+      -1         ; can't be negative
+      0          ; can't be zero
+      10a        ; can't be a word (again)
+      {10}       ; can't be an array (again)
+      [10]       ; can't be a list (again)
+      -1         ; can't be negative (again)
+      0          ; can't be zero (again)
+      10         ;legal
+   ] ~
+   [] ; ZOOM doesn't output anything
+
+
+   ; Test that ZOOM accepts ownership of any node :erract provides.
+   ; Note that this can't call TRACEINSTRUCTIONOCATCH because that
+   ; uses RUNRESULT, which will want WAIT to output a value and get
+   ; it from :erract when WAIT doesn't provide one.  This is not part
+   ; of the test.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "1 ". "0) ] ]
+   UNLIMITEDPRINT "|CALL: ZOOM []|
+   ZOOM []
+
+END
+
+
+TO ZOOMTEST
+
+  ZOOMTEST.SMOKETEST
+  ZOOMTEST.ZOOMSTAYSCENTERED
+  ZOOMTEST.BADINPUT
+  ZOOMTEST.BADINPUT.RECOVERABLE
+
+END

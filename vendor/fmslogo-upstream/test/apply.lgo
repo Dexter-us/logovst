@@ -1,0 +1,341 @@
+LOAD "testlib.lgo
+
+TO APPLYTEST.NONPRIMITIVE :A :B
+   OUTPUT SUM :A :B
+END
+
+TO APPLYTEST.NOOUTPUT
+   STOP
+END
+
+TO APPLYTEST.APPLYOUTPUT
+  APPLY [OUTPUT ?] [3]
+  MAKE "variable [not run]
+END
+
+TO APPLYTEST.BUG174
+  ; Bug #174 -- this used to leak memory
+  ; When used in an explicit slot template, OUTPUT is run in the caller's context.
+  LOCAL "variable
+  MAKE "variable "before
+  SIMPLEREPORTTEST [ APPLYTEST.APPLYOUTPUT ] 3
+  SIMPLEREPORTTEST [ :variable ] "before ; the instruction after APPLY didn't run.
+END
+
+TO APPLYTEST.BUG594
+  ; Bug #594: "(? - 1)" was parsed as "(? -1)" instead of "(DIFFERENCE ? 1).
+  ; The "(? -1)" interpretation throws a "? don't like -1 as input" error.
+  ; While (? -1) is logical, it's probably not what the programmer intended
+  ; and is not compatible with UCBLogo or older version of FMSLogo.
+
+  SIMPLEREPORTTEST [ APPLY [  ? - 1   ]    [10]  ] 9
+  SIMPLEREPORTTEST [ APPLY [ (? - 1)  ]    [10]  ] 9  ; this is the bug
+  SIMPLEREPORTTEST [ APPLY [ (?1 - 1) ]    [10]  ] 9  ; this was a work-around
+  SIMPLEREPORTTEST [ APPLY [ 2 * (? - 1) ] [10]  ] 18 ; motivation for fixing the bug
+
+END
+
+TO APPLYTEST.BUG620
+  ; Bug #620 is a leak when running named slot templates.
+  ; The functional aspects are not part of the test.
+  RUNIDONTKNOWHOWTOTEST [ APPLY [ [] [unknown] ] [] ]
+  SIMPLEREPORTTEST [ APPLY (LIST [] (LIST "OUTPUT 1) ) [] ] 1
+END
+
+TO APPLYTEST.SMOKETEST
+
+   ; apply a primitive
+   SIMPLEREPORTTEST [APPLY "SUM [123]      ] 123
+   SIMPLEREPORTTEST [APPLY "SUM [100 20 3] ] 123
+
+   ; apply a non-primitive procedure that has already been defined
+   SIMPLEREPORTTEST [APPLY "APPLYTEST.NONPRIMITIVE [120 3] ] 123
+
+   ; apply a library procedure that must get loaded
+   TRACEINSTRUCTION [ERASE "ARRAYTOLIST]
+   SIMPLEREPORTTEST [APPLY "ARRAYTOLIST [{1 2 3}] ] [1 2 3]
+
+   ; apply a procedure in the current directory that must get loaded
+   TRACEINSTRUCTION [ERASE "procedureinworkingdirectory]
+   SIMPLEREPORTTEST [APPLY "procedureinworkingdirectory [] ] 123
+
+   TRACEINSTRUCTION [APPLY "APPLYTEST.NOOUTPUT [] ]
+
+   ; this is legal for some reason
+   SIMPLEREPORTTEST [APPLY [1] []] 1
+
+   ; There's a special case to do nothing with an empty list template.
+   TRACEINSTRUCTION [APPLY [] []     ]
+   TRACEINSTRUCTION [APPLY [] [1 2 3]]
+
+   ; apply can be nested
+   SIMPLEREPORTTEST [APPLY "APPLY [SUM [100 20 3]]] 123
+END
+
+
+TO APPLYTEST.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [(APPLY "SUM)]
+   RUNTOOMANYINPUTSTEST   [(APPLY "SUM [1 2 3] "toomany)]
+
+   RUNNONRECOVERABLEIDONTKNOWHOWTOTEST  [APPLY "NONEXISTENT [1 2 3]]
+   RUNNONRECOVERABLEIDONTKNOWHOWTOTEST  [APPLY "TO          []]
+   RUNNONRECOVERABLEIDONTKNOWHOWTOTEST  [APPLY 1            []]
+
+   RUNAPPLYDOESNTLIKETEST         [APPLY {1 2 3} [1 2 3]]
+   RUNYOUDONTSAYWHATTODOWITHTEST  [APPLY [1 2 3] [1 2 3]]
+   RUNAPPLYDOESNTLIKETEST         [APPLY "SUM    {1 2 3}]
+
+   ; Second argument is not a list
+   RUNAPPLYDOESNTLIKETEST  [ APPLY [[x] :x]  1   ] ; Crashes UCBLogo 6.2.5
+   RUNAPPLYDOESNTLIKETEST  [ APPLY [[x] :x] {1}  ]
+   RUNAPPLYDOESNTLIKETEST  [ APPLY [[x] :x] "arg ]
+
+   ; the function being called has bad inputs.
+   RUNNOTENOUGHINPUTSTEST [APPLY "APPLYTEST.NONPRIMITIVE [1]]
+   RUNTOOMANYINPUTSTEST   [APPLY "APPLYTEST.NONPRIMITIVE [1 2 3]]
+   RUNNOTENOUGHINPUTSTEST [APPLY "DIFFERENCE [1]     ] ; primitive
+   RUNTOOMANYINPUTSTEST   [APPLY "DIFFERENCE [1 2 3] ]
+   RUNDOESNTLIKEINPUTTEST [APPLY "DIFFERENCE [a b] ]
+
+   ; lambda template has bad inputs
+   RUNNOTENOUGHINPUTSTEST [APPLY [[x] IGNORE :x]      []    ]
+   RUNTOOMANYINPUTSTEST   [APPLY [[x] IGNORE :x]      [1 2] ]
+   RUNNOTENOUGHINPUTSTEST [APPLY [[x] (IGNORE) ]      [1]   ]
+   RUNTOOMANYINPUTSTEST   [APPLY [[x] (IGNORE :x 2) ] [1]   ]
+
+   ; procedure text template has bad inputs
+   RUNNOTENOUGHINPUTSTEST [APPLY [[x]     [IGNORE :x]]     []    ]
+   RUNTOOMANYINPUTSTEST   [APPLY [[x]     [IGNORE :x]]     [1 2] ]
+   RUNNOTENOUGHINPUTSTEST [APPLY [[x]     [(IGNORE) ]]     [1]   ]
+   RUNTOOMANYINPUTSTEST   [APPLY [[x]     [(IGNORE :x 2)]] [1]   ]
+   RUNAPPLYDOESNTLIKETEST [APPLY [[{x}]   [IGNORE :x]]     [1]   ]
+   RUNAPPLYDOESNTLIKETEST [APPLY [[x {y}] [LIST :x :y]]    [1 2] ]
+   RUNAPPLYDOESNTLIKETEST [APPLY [[x [y]] [LIST :x :y]]    [1 2] ]
+   RUNAPPLYDOESNTLIKETEST [APPLY [[x [y]] [LIST :x :y]]    [1 2] ]
+
+   ; questionmark template has bad inputs
+   RUNNONRECOVERABLEDOESNTLIKEINPUTTEST [APPLY [IGNORE ?2]       [1] ]
+   RUNNOTENOUGHINPUTSTEST               [APPLY [(IGNORE)]        [1] ]
+   RUNTOOMANYINPUTSTEST                 [APPLY [(IGNORE ?1 2 3)] [1] ]
+
+   ; ?0 should return a bad input error (Bug #350)
+   RUNDOESNTLIKEINPUTTEST [APPLY [SHOW ?0] [a b c]]
+
+   ; fill the questionmark list
+   TRACEINSTRUCTION [ APPLY [] [1 2 3 4 5] ]
+
+   ; Make sure the questionmark list is empty.
+   (RUNNONRECOVERABLEDOESNTLIKEINPUTTEST [ SHOW ? ] "|? doesn't like 1 as input|)
+
+   ; Error treeifying in middle of instruction list.
+   RUNTOOMANYINPUTSTEST [APPLY [[x] [IGNORE 1] [(IGNORE 1 2)]   [IGNORE 3]] [1] ]
+
+   ; Malformed instructions for procedure text form (Bug #605). 
+   RUNAPPLYDOESNTLIKETEST [APPLY [[x] [IGNORE 1] word [IGNORE 3]] [1] ]
+   RUNAPPLYDOESNTLIKETEST [APPLY [[x] [IGNORE 1] {array} [IGNORE 3]] [1] ]
+END
+
+TO APPLYTEST.LAMBDATEMPLATE.NEWSCOPETEST
+
+   ; Tests that APPLY properly creates a local variable scope
+   ; for the lambda template.
+
+   LOCALMAKE "input        5
+   LOCALMAKE "input.before 5
+
+   APPLY [[input ignored]
+          FAILIFNOTTRUE    [NAME? "ignored]
+          SIMPLEREPORTTEST [:input] :input.before + 1
+   ] (LIST :input + 1 1234)
+
+   FAILIFNOTFALSE   [NAME? "ignored]
+   SIMPLEREPORTTEST [:input.before]  :input
+END
+
+TO APPLYTEST.PROCEDURETEXTTEMPLATE.NEWSCOPETEST
+
+   ; Tests that APPLY properly creates a local variable scope
+   ; for the procedure text template.
+
+   LOCALMAKE "input        5
+   LOCALMAKE "input.before 5
+   APPLY [[input ignored] 
+          [FAILIFNOTTRUE    [NAME? "ignored]                   ]
+          [SIMPLEREPORTTEST [:input]         :input.before + 1 ]
+   ] (LIST :input + 1 1234)
+
+   FAILIFNOTFALSE   [NAME? "ignored]
+   SIMPLEREPORTTEST [:input.before] :input
+END
+
+
+TO APPLYTEST.LAMBDATEMPLATE
+
+   LOCAL [lambda.function.ran]
+
+   ;
+   ; lambda form template
+   ;
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran 0]
+   TRACEINSTRUCTION  [APPLY [[] MAKE "lambda.function.ran 1] [] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] 1
+
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran 0]
+   TRACEINSTRUCTION  [APPLY [[A] MAKE "lambda.function.ran :A] [1]]
+   SIMPLEREPORTTEST  [:lambda.function.ran] 1
+
+   SIMPLEREPORTTEST  [APPLY [[A] SUM 1 :A] [2] ] 3
+END
+
+
+TO APPLYTEST.PROCEDURETEXTTEMPLATE
+
+   LOCAL [lambda.function.ran]
+
+   ; applying a template with empty lines used to crash
+   TRACEINSTRUCTION [ APPLY [[][]] [] ]
+
+   ;
+   ; procedure text template
+   ;
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran 0]
+   TRACEINSTRUCTION  [APPLY [[] [MAKE "lambda.function.ran 1]] [] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] 1
+
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran 0]
+   TRACEINSTRUCTION  [APPLY [[A] [MAKE "lambda.function.ran :A]] [1] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] 1
+   FAILIFNOTFALSE    [ NAME? "A ] ; the parameter should not leak into the caller's scope.
+
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran "0]
+   TRACEINSTRUCTION  [APPLY [[A] [] [MAKE "lambda.function.ran :A] []] [1] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] 1
+
+   SIMPLEREPORTTEST  [APPLY [[A] [OUTPUT SUM 1 :A]] [2] ] 3
+
+   ; template has arguments with default values
+   TRACEINSTRUCTION  [APPLY [ [[x "value] 0] [MAKE "lambda.function.ran :x]] []  ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] "value
+   TRACEINSTRUCTION  [APPLY [ [[x "value] 0] [MAKE "lambda.function.ran :x]] [1] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] 1
+
+   ; template has a "rest" argument
+   ;BUG TRACEINSTRUCTION  [APPLY [[x [:rest] 1] [MAKE "lambda.function.ran COUNT :rest] ] [1] ]
+   ;BUG SIMPLEREPORTTEST  [:lambda.function.ran] 0
+   ;BUG TRACEINSTRUCTION  [APPLY [[x [:rest] 1] [MAKE "lambda.function.ran COUNT :rest] ] [1 2 3] ]
+   ;BUG SIMPLEREPORTTEST  [:lambda.function.ran] 3
+
+   ; template chains default values
+   TRACEINSTRUCTION  [
+      APPLY [ [[x 1] [y :x + 1] [z :x + :y * 2] 0 ] [MAKE "lambda.function.ran (LIST :x :y :z)] ]  []
+   ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] [1 2 5]
+
+END
+
+TO APPLYTEST.PROCEDURETEXTTEMPLATE.STOP.INNER
+   ; The first instruction should overwrite variable.
+   ; The second instruction should halt the lambda.
+   ; The third instruction show not be run.
+   MAKE "variable "outer
+   APPLY [ [x] [MAKE "variable "inner] [STOP] [MAKE "variable "unreachable] ] [1]
+   SIMPLEREPORTTEST [:variable] "inner
+
+   ; Overwrite the variable as proof that STOP didn't stop the caller.
+   MAKE "variable "done
+END
+
+TO APPLYTEST.PROCEDURETEXTTEMPLATE.STOP
+   ; Tests that STOP in a procedure text lambda stops the lambda, not the caller.
+   REPORTTESTINFO "|Running APPLYTEST.PROCEDURETEXTTEMPLATE.STOP|
+   LOCAL [variable]
+   APPLYTEST.PROCEDURETEXTTEMPLATE.STOP.INNER
+
+   ; The STOP in the template shouldn't have stopped the procedure,
+   ; so the last instruction sholud have run.
+   SIMPLEREPORTTEST [:variable] "done
+END
+
+
+TO APPLYTEST.QUESTIONMARKTEMPLATE
+
+   LOCAL [lambda.function.ran]
+
+   ;
+   ; question-mark template
+   ;
+
+   ; no inputs
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran "false]
+   TRACEINSTRUCTION  [APPLY [MAKE "lambda.function.ran "true] [] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] "true
+
+   ; one input
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran "false]
+   TRACEINSTRUCTION  [APPLY [MAKE "lambda.function.ran ?] [true] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] "true
+
+   ; nested questionmark
+   TRACEINSTRUCTION  [MAKE "lambda.function.ran "false]
+   TRACEINSTRUCTION  [APPLY [APPLY [MAKE "lambda.function.ran ?] ?] [[true]] ]
+   SIMPLEREPORTTEST  [:lambda.function.ran] "true
+
+   ; questionmark template that outputs
+   SIMPLEREPORTTEST  [APPLY [SUM 1 ?] [2] ] 3
+
+   ; nested questionmark template (outer template list should be restored)
+   ; This is a regression test for bug #199.
+   SIMPLEREPORTTEST [APPLY [ IGNORE APPLY [1] [BAD] ? ] [GOOD] ] "GOOD
+
+END
+
+TO APPLYTEST.NESTEDAPPLY
+  ; this is a regression test for Bug #273
+  SIMPLEREPORTTEST [ APPLY [ APPLY [IGNORE ?1] ? ? ] [[1 2 3]] ] [1 2 3]
+END
+
+TO APPLYTEST.INPUTLIST_IS_IMMUTABLE
+  ; This is a regression test for Bug #602.
+  ;
+  ; APPLY must copy the argument list because primitives can modify them.
+  ; An extreme example is when the :ERRACT value replaces an input.
+  LOCAL [inputlist erract output]
+  TRACEINSTRUCTION [ MAKE "inputlist [bad 2] ]
+  TRACEINSTRUCTION [ MAKE "erract    [1]     ]
+
+  ; SUM doesn't like "bad as input, so it runs :erract to get 1.
+  ; Note that SIMPLEREPORTTEST disables :erract, so we must run it directly.
+  MAKE "output APPLY "SUM :inputlist
+  SIMPLEREPORTTEST.CHECKRESULT [APPLY "SUM :inputlist] :output 3 ; 1 + 2 = 3
+
+  ; The arguments input should not have been modified because lists are immutable.
+  SIMPLEREPORTTEST [ :inputlist ] [bad 2]
+
+  ; Run a similar test using the procedure text template.
+  MAKE "output APPLY [ [x y] [OUTPUT SUM :x :y] ] :inputlist
+  SIMPLEREPORTTEST.CHECKRESULT [APPLY "SUM :inputlist] :output 3 ; 1 + 2 = 3
+  SIMPLEREPORTTEST [ :inputlist ] [bad 2]
+END
+
+TO APPLYTEST
+
+   APPLYTEST.SMOKETEST
+   APPLYTEST.BADINPUT
+   APPLYTEST.BUG174
+   APPLYTEST.BUG594
+   APPLYTEST.BUG620
+
+   APPLYTEST.NESTEDAPPLY
+   APPLYTEST.INPUTLIST_IS_IMMUTABLE
+
+   APPLYTEST.LAMBDATEMPLATE
+   APPLYTEST.LAMBDATEMPLATE.NEWSCOPETEST
+
+   APPLYTEST.PROCEDURETEXTTEMPLATE
+   APPLYTEST.PROCEDURETEXTTEMPLATE.STOP
+   APPLYTEST.PROCEDURETEXTTEMPLATE.NEWSCOPETEST
+
+   APPLYTEST.QUESTIONMARKTEMPLATE
+END
+

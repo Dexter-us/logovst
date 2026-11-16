@@ -1,0 +1,124 @@
+LOAD "testlib.lgo
+
+TO QUEUETEST.SMOKETEST
+
+   LOCAL [testqueue value]
+
+   ; start with an empty queue
+   TRACEINSTRUCTION [ MAKE "testqueue [] ]
+
+   ; push a value on the end of the list
+   TRACEINSTRUCTION [ QUEUE "testqueue 1 ]
+   SIMPLEREPORTTEST [ :testqueue ] [1]
+
+   ; Push another value on the end of the list.
+   ; This time, it's not a word.
+   TRACEINSTRUCTION [ QUEUE "testqueue [2] ]
+   SIMPLEREPORTTEST [ :testqueue ] [1 [2]  ]
+
+   ; remove a value from the head of the list
+   SIMPLEREPORTTEST [ DEQUEUE "testqueue ] 1
+   SIMPLEREPORTTEST [ :testqueue ] [ [2] ]
+
+   ; remove the last remaining value from the list
+   SIMPLEREPORTTEST [ DEQUEUE "testqueue ] [2]
+   SIMPLEREPORTTEST [ :testqueue ] []
+
+   ; Push an array on the end of the list.
+   TRACEINSTRUCTION [ QUEUE "testqueue {a} ]
+   FAILIFNOTTRUE    [ LIST? :testqueue ]
+   FAILIFNOTTRUE    [ ARRAY? ITEM 1 :testqueue ]
+   SIMPLEREPORTTEST [ COUNT  ITEM 1 :testqueue ] 1
+   SIMPLEREPORTTEST [ ITEM 1 ITEM 1 :testqueue ] "a
+
+   ; dequeue the array
+   TRACEINSTRUCTION [ MAKE "value DEQUEUE "testqueue ]
+   FAILIFNOTTRUE    [ ARRAY? :value ]
+   SIMPLEREPORTTEST [ COUNT  :value ] 1
+   SIMPLEREPORTTEST [ ITEM 1 :value ] "a
+END
+
+TO QUEUETEST.CIRCULARTEST
+
+   ; enqueues a queue onto itself to try to make it circular
+   LOCALMAKE "testqueue []
+   TRACEINSTRUCTION [ QUEUE "testqueue :testqueue ]
+   SIMPLEREPORTTEST [ :testqueue ] [[]]
+
+   SIMPLEREPORTTEST [ DEQUEUE "testqueue ] []
+   SIMPLEREPORTTEST [ :testqueue ] []
+
+END
+
+TO QUEUETEST.BUG598
+   ; Create and use a queue named "queue" and an item named "item".
+   ; These are the historical names of the parameters.
+   LOCAL [queue item]
+   TRACEINSTRUCTION [ MAKE "queue []    ]
+   TRACEINSTRUCTION [ MAKE "item  "item ]
+
+   TRACEINSTRUCTION [ QUEUE "queue :item ]
+   SIMPLEREPORTTEST [ :queue ] [item]
+
+   SIMPLEREPORTTEST [ DEQUEUE "queue ] "item
+   SIMPLEREPORTTEST [ :queue ] []
+
+   ; Same test as above, except with :the.queue.name and :the.item.value.
+   ; These are the names of the parameters used in UCBLogo.
+   LOCAL [the.queue.name the.item.value]
+   TRACEINSTRUCTION [ MAKE "the.queue.name  []        ]
+   TRACEINSTRUCTION [ MAKE "the.item.value  "element  ]
+   TRACEINSTRUCTION [ QUEUE "the.queue.name "element  ]
+   SIMPLEREPORTTEST [ :the.queue.name ] [ element ]
+   SIMPLEREPORTTEST [ DEQUEUE "the.queue.name ] "element
+   SIMPLEREPORTTEST [ :the.queue.name ] []
+
+   ; Same test as above, except with the queue strangely named :the.item.value.
+   TRACEINSTRUCTION [ MAKE "the.item.value  []  ]
+   TRACEINSTRUCTION [ MAKE "the.queue.name  [1] ]
+   TRACEINSTRUCTION [ QUEUE "the.item.value [1] ]
+   SIMPLEREPORTTEST [ :the.item.value ] [ [1] ]
+   SIMPLEREPORTTEST [ DEQUEUE "the.item.value ] [1]
+   SIMPLEREPORTTEST [ :the.item.value ] []
+
+   ; Same test as above, but with spaces in the name.
+   ; This confirms that the fix for Bug #598 didn't introduce
+   ; a new problem.
+   LOCAL [ |the queue| |the item| ]
+   TRACEINSTRUCTION [ MAKE "|the queue|  []              ]
+   TRACEINSTRUCTION [ MAKE "|the item|   "|item value|   ]
+   TRACEINSTRUCTION [ QUEUE "|the queue| "|item value|   ]
+   SIMPLEREPORTTEST [ :|the queue| ]     [ |item value|  ]
+   SIMPLEREPORTTEST [ DEQUEUE "|the queue| ] "|item value|
+   SIMPLEREPORTTEST [ :|the queue| ]     []
+
+END
+
+TO QUEUETEST.BADINPUT
+
+   LOCALMAKE "samplequeue []
+
+   RUNNOTENOUGHINPUTSTEST [(DEQUEUE)]
+   RUNTOOMANYINPUTSTEST   [(DEQUEUE "samplequeue "toomany)]
+   RUNBADINPUTTEST        [(DEQUEUE {1 2 3})]
+   RUNBADINPUTTEST        [(DEQUEUE [1 2 3])]
+   RUNHASNOVALUETEST      [(DEQUEUE "queuetest.doesnotexist)]
+   RUNBADINPUTTEST        [(DEQUEUE "samplequeue)]  ; samplequeue is empty
+
+   RUNNOTENOUGHINPUTSTEST [(QUEUE "samplequeue)]
+   RUNTOOMANYINPUTSTEST   [(QUEUE "samplequeue 1 "toomany)]
+   RUNBADINPUTTEST        [(QUEUE {1 2 3} 1)]
+   RUNBADINPUTTEST        [(QUEUE [1 2 3] 1)]
+   RUNHASNOVALUETEST      [(QUEUE "queuetest.doesnotexist 1)]
+END
+
+
+TO QUEUETEST
+
+   QUEUETEST.SMOKETEST
+   QUEUETEST.CIRCULARTEST
+   QUEUETEST.BUG598
+   QUEUETEST.BADINPUT
+
+END
+

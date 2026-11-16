@@ -1,0 +1,14 @@
+; Draw a square and label it; REPEAT and procedures work in CLI and VST.
+TO SQUARE
+  REPEAT 4 [
+    FD 90
+    RT 90
+  ]
+END
+
+CS
+SETSCREENCOLOR [16 24 39]
+SETPC [46 190 210]
+PENSIZE 3
+SQUARE
+LABEL "Hello Logo"

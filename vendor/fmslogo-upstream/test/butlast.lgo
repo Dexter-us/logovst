@@ -1,0 +1,52 @@
+LOAD "testlib.lgo
+
+TO BUTLASTTEST.SMOKETEST
+
+   SIMPLEREPORTTEST [BL      [1 2 3] ] [1 2]
+   SIMPLEREPORTTEST [BUTLAST [1 2 3] ] [1 2]
+   SIMPLEREPORTTEST [BUTLAST [1]     ] []
+   SIMPLEREPORTTEST [BUTLAST "hello  ] "hell
+   SIMPLEREPORTTEST [BUTLAST "h      ] "||
+   SIMPLEREPORTTEST [BUTLAST 1       ] "||
+   SIMPLEREPORTTEST [BUTLAST 123     ] 12
+   SIMPLEREPORTTEST [BUTLAST -1      ] "-
+   SIMPLEREPORTTEST [BUTLAST 0.1     ] 0 ; becomes 0.
+
+END
+
+TO BUTLASTTEST.BADINPUT
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(BUTLAST)]
+   RUNTOOMANYINPUTSTEST   [(BUTLAST "word "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [BUTLAST []  ]
+   RUNDOESNTLIKEINPUTTEST [BUTLAST "|| ]
+   RUNDOESNTLIKEINPUTTEST [BUTLAST {1} ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement.
+   RUNRECOVERABLEERRORTEST [
+      BUTLAST [] ; can't be the empty list
+   ](LIST
+      "||        ; can't be empty word
+      {1}        ; can't be an array
+      []         ; can't be an empty list (again)
+      "||        ; can't be empty word (again)
+      {1 2 3}    ; can't be an array (again)
+      123        ; legal, but must be converted to a string
+   ) ~
+   [12] ; everything except last the digit of 123
+
+
+   ; Test that BUTLAST accepts ownership of any node :erract provides.
+   LOCAL [ erract ]
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST "allocated "in "BUTLASTTEST.BADINPUT) ] ]
+   SIMPLEREPORTTESTNOCATCH [ BUTLAST [] ] [allocated in]
+
+END
+
+TO BUTLASTTEST
+   BUTLASTTEST.SMOKETEST
+   BUTLASTTEST.BADINPUT
+END

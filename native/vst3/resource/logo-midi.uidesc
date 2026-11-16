@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+  <fonts>
+  </fonts>
+  <colors>
+    <color name="Panel" rgba="#101827ff"/>
+    <color name="Canvas Frame" rgba="#31445eff"/>
+    <color name="Text" rgba="#e6edf8ff"/>
+    <color name="Accent" rgba="#f6be52ff"/>
+  </colors>
+  <template class="CViewContainer" background-color="Panel"
+            minSize="880, 600" maxSize="880, 600"
+            name="LogoMidiEditor" origin="0, 0" size="880, 600"
+            transparent="false">
+    <view class="CTextLabel" back-color="Panel" font="~ NormalFontVeryBig"
+          font-color="Text" origin="24, 18" size="520, 34"
+          title="LOGO MIDI  /  TURTLE CANVAS"/>
+    <view class="CTextLabel" back-color="Panel" font="~ NormalFontSmall"
+          font-color="Accent" origin="24, 54" size="420, 20"
+          title="DEXTER U.S.  •  Logo graphics preview"/>
+
+    <view class="CViewContainer" custom-view-name="LogoWorkspace"
+          background-color="Canvas Frame" origin="24, 88" size="832, 400"
+          transparent="false"/>
+
+    <view class="CTextLabel" back-color="Panel" font="~ NormalFontSmall"
+          font-color="Text" origin="24, 510" size="92, 20"
+          title="Pattern"/>
+    <view class="COptionMenu" control-tag="Pattern" font="~ NormalFontSmall"
+          font-color="Text" frame-color="Canvas Frame" origin="24, 532"
+          size="170, 28" menu-popup-style="true" menu-check-style="false"/>
+
+    <view class="CTextLabel" back-color="Panel" font="~ NormalFontSmall"
+          font-color="Text" origin="214, 510" size="126, 20"
+          title="Tempo source"/>
+    <view class="COptionMenu" control-tag="Tempo Source"
+          font="~ NormalFontSmall" font-color="Text"
+          frame-color="Canvas Frame" origin="214, 532" size="170, 28"
+          menu-popup-style="true" menu-check-style="false"/>
+
+    <view class="CTextLabel" back-color="Panel" font="~ NormalFontSmall"
+          font-color="Text" origin="412, 510" size="132, 20"
+          title="Internal tempo"/>
+    <view class="CSlider" control-tag="Internal Tempo" origin="412, 532"
+          size="250, 28" orientation="horizontal" mode="free click"
+          draw-frame="true" draw-back="true" draw-value="true"
+          draw-value-from-center="false" draw-value-inverted="false"
+          draw-value-color="Text" draw-back-color="Canvas Frame"
+          draw-frame-color="Canvas Frame" handle-bitmap=""
+          min-value="0" max-value="1" default-value="0.333333"
+          wheel-inc-value="0.01"/>
+    <view class="CTextLabel" back-color="Panel" font="~ NormalFontSmall"
+          font-color="Text" origin="685, 532" size="170, 28"
+          title="Built from the Logo turtle scene engine"/>
+  </template>
+  <control-tags>
+    <control-tag name="Pattern" tag="100"/>
+    <control-tag name="Tempo Source" tag="101"/>
+    <control-tag name="Internal Tempo" tag="102"/>
+  </control-tags>
+</vstgui-ui-description>

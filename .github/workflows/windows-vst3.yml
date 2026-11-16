@@ -1,0 +1,85 @@
+name: Windows x64 VST3
+
+on:
+  push:
+    paths:
+      - "native/**"
+      - "vendor/fmslogo-upstream/**"
+      - ".github/workflows/windows-vst3.yml"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Get Steinberg VST3 SDK
+        shell: pwsh
+        run: |
+          git clone --depth 1 --recurse-submodules --shallow-submodules `
+            --branch v3.8.1_build_84 `
+            https://github.com/steinbergmedia/vst3sdk.git `
+            "$env:RUNNER_TEMP\vst3sdk"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Configure Windows x64 build
+        shell: pwsh
+        run: |
+          cmake -S native -B "$env:RUNNER_TEMP\logo-vst3-build" `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DLOGO_MIDI_BUILD_TESTS=OFF `
+            -DLOGO_MIDI_BUILD_VST3=ON `
+            "-DVST3_SDK_ROOT=$env:RUNNER_TEMP\vst3sdk" `
+            -DSMTG_RUN_VST_VALIDATOR=ON `
+            -DSMTG_CREATE_PLUGIN_LINK=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build and validate plugin
+        shell: pwsh
+        run: |
+          cmake --build "$env:RUNNER_TEMP\logo-vst3-build" `
+            --config Release --target logo-midi-vst3 --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check vendor and package VST3 bundle
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $env:RUNNER_TEMP `
+            "logo-vst3-build\VST3\Release\logo-midi-vst3.vst3"
+          if (-not (Test-Path -LiteralPath $bundle -PathType Container)) {
+            throw "The Windows VST3 bundle was not created at $bundle"
+          }
+
+          $moduleInfo = Join-Path $bundle "Contents\Resources\moduleinfo.json"
+          if (-not (Test-Path -LiteralPath $moduleInfo -PathType Leaf)) {
+            throw "The VST3 bundle is missing moduleinfo.json"
+          }
+          $metadata = Get-Content -LiteralPath $moduleInfo -Raw
+          if ($metadata -notmatch '"Vendor"\s*:\s*"Dexter U\.S\."') {
+            throw "The VST3 bundle does not identify Dexter U.S. as vendor"
+          }
+
+          $stage = Join-Path $env:RUNNER_TEMP "vst3-artifact"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Copy-Item -LiteralPath $bundle -Destination $stage -Recurse
+          $zip = Join-Path $env:RUNNER_TEMP "logo-midi-vst3-windows-x64.zip"
+          Compress-Archive -Path (Join-Path $stage "logo-midi-vst3.vst3") `
+            -DestinationPath $zip -CompressionLevel Optimal -Force
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) {
+            throw "The downloadable VST3 archive was not created"
+          }
+
+      - name: Upload downloadable VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: logo-midi-vst3-windows-x64
+          path: ${{ runner.temp }}/logo-midi-vst3-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14

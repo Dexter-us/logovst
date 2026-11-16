@@ -1,0 +1,174 @@
+LOAD "testlib.lgo
+
+TO ASCIITEST
+
+  SIMPLEREPORTTEST [ ASCII "a   ] 97
+  SIMPLEREPORTTEST [ ASCII "A   ] 65
+  SIMPLEREPORTTEST [ ASCII 1    ] 49
+  SIMPLEREPORTTEST [ ASCII 1.   ] 49  ; converted to 1
+  SIMPLEREPORTTEST [ ASCII 2e0  ] 50  ; converted to 2
+  SIMPLEREPORTTEST [ ASCII 3.0  ] 51  ; converted to 3
+  SIMPLEREPORTTEST [ ASCII "|(| ] 40  ; unescaped then used
+  SIMPLEREPORTTEST [ ASCII "ÿ   ] 255 ; non-ASCII char (>127)
+
+  RUNNOTENOUGHINPUTSTEST [(ASCII)]
+  RUNTOOMANYINPUTSTEST   [(ASCII "a "b)]
+  RUNDOESNTLIKEINPUTTEST [ASCII [a] ]
+  RUNDOESNTLIKEINPUTTEST [ASCII {a} ]
+  RUNDOESNTLIKEINPUTTEST [ASCII "ab ]
+  RUNDOESNTLIKEINPUTTEST [ASCII 64  ]
+  RUNDOESNTLIKEINPUTTEST [ASCII -1  ]
+  RUNDOESNTLIKEINPUTTEST [ASCII 1.2 ]
+  RUNDOESNTLIKEINPUTTEST [ASCII []  ]
+  RUNDOESNTLIKEINPUTTEST [ASCII "|| ]
+
+
+  ; Confirm that the recoverable errors are really recoverable.
+  ; The first input is bad, as are all but the final replacement
+  RUNRECOVERABLEERRORTEST [
+     ASCII [] ; can't be the empty list
+  ](LIST
+     {}       ; can't be an array
+     [a]      ; can't be list
+     "||      ; can't be the empty string
+     "ab      ; can't be more than one letter
+     12       ; can't be more than one digit
+     []       ; can't be the empty list (again) 
+     {a}      ; can't be an array (again)
+     [a]      ; can't be list (again)
+     "||      ; can't be the empty string (again)
+     "ab      ; can't be more than one letter (again)
+     12       ; can't be more than one digit (again)
+     1        ; legal but must be converted to a string
+  ) ~
+  [49] ; ASCII value of '1'
+
+
+  ; Test that ASCII accepts ownership of any node :erract provides.
+  LOCAL "erract
+  TRACEINSTRUCTION [ MAKE "erract [ (WORD "A) ] ]
+  SIMPLEREPORTTESTNOCATCH [ ASCII [] ] 65 ; ASCII of 'A'
+
+END
+
+TO RAWASCIITEST
+
+  SIMPLEREPORTTEST [ RAWASCII "a   ] 97
+  SIMPLEREPORTTEST [ RAWASCII "A   ] 65
+  SIMPLEREPORTTEST [ RAWASCII 1    ] 49
+  SIMPLEREPORTTEST [ RAWASCII "ÿ   ] 255
+
+  ; Regression test for bug #16
+  SIMPLEREPORTTEST [ RAWASCII CHAR 0   ] 0
+  SIMPLEREPORTTEST [ RAWASCII CHAR 5   ] 5
+  SIMPLEREPORTTEST [ RAWASCII CHAR 192 ] 192
+
+  RUNNOTENOUGHINPUTSTEST [(RAWASCII)]
+  RUNTOOMANYINPUTSTEST   [(RAWASCII "a "b)]
+  RUNDOESNTLIKEINPUTTEST [RAWASCII [a]]
+  RUNDOESNTLIKEINPUTTEST [RAWASCII {a}]
+  RUNDOESNTLIKEINPUTTEST [RAWASCII "ab]
+  RUNDOESNTLIKEINPUTTEST [RAWASCII 64 ]
+  RUNDOESNTLIKEINPUTTEST [RAWASCII 1.2]
+
+END
+
+TO WORDPROCTEST
+
+  SIMPLEREPORTTEST [ WORD "o "k         ] "ok
+  SIMPLEREPORTTEST [ WORD "4 "2         ] 42
+  SIMPLEREPORTTEST [ (WORD)             ] "||
+  SIMPLEREPORTTEST [ (WORD "o)          ] "o
+  SIMPLEREPORTTEST [ (WORD "o "k "ay)   ] "okay
+  SIMPLEREPORTTEST [ (WORD "|| "||)     ] "||
+  SIMPLEREPORTTEST [ (WORD "|| "a  "||) ] "a
+
+  ; special characters
+  SIMPLEREPORTTEST [ WORD "ab  "\(      ] "ab\(
+  SIMPLEREPORTTEST [ WORD "|[| "ab      ] "\[ab
+
+  ; vbarred
+  FAILIFNOTTRUE   [ BACKSLASHEDP (WORD "|[| ) ]
+  FAILIFNOTFALSE  [ BACKSLASHEDP (WORD "\[  ) ]
+  FAILIFNOTFALSE  [ BACKSLASHEDP ITEM 1 (WORD "\[ "|]|) ] ; vbar spreasd
+
+  ; non-ascii
+  LOCAL [nonascii]
+  TRACEINSTRUCTION [ MAKE "nonascii (WORD "cent CHAR 162) ]
+  SIMPLEREPORTTEST [ COUNT :nonascii ] 5
+  SIMPLEREPORTTEST [ ASCII ITEM 5 :nonascii ] 162
+
+  ; Can process binary data (Bug #540)
+  LOCAL [word1 word2]
+  TRACEINSTRUCTION [ MAKE "word1 (WORD "a CHAR 0 "c) ]
+  SIMPLEREPORTTEST [ COUNT :word1  ] 3
+  SIMPLEREPORTTEST [ ITEM 3 :word1 ] "c
+  TRACEINSTRUCTION [ MAKE "word2 (WORD :word1) ]
+  SIMPLEREPORTTEST [ COUNT :word2  ] 3
+  SIMPLEREPORTTEST [ ITEM 3 :word2 ] "c
+  FAILIFNOTTRUE    [ EQUAL? :word1 :word2 ]
+
+  RUNDOESNTLIKEINPUTTEST [WORD [] "a]
+  RUNDOESNTLIKEINPUTTEST [WORD "a []]
+  RUNDOESNTLIKEINPUTTEST [WORD "a {}]
+  RUNDOESNTLIKEINPUTTEST [WORD {} "a]
+
+  ; Confirm that the recoverable errors are really recoverable.
+  ; The first input is bad, as are all but the final replacement
+  RUNRECOVERABLEERRORTEST [
+     WORD [] {}  ; must be a word
+  ][
+      {abc}  ; can't be an array
+      [abc]  ; can't be a list
+      {}     ; can't be an array (again)
+      []     ; can't be a list (again)
+      1      ; legal
+      {abc}  ; can't be an array
+      [abc]  ; can't be a list
+      {}     ; can't be an array (again)
+      []     ; can't be a list (again)
+      23     ; legal
+   ] [123]
+
+   ; Test that WORD accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "allocated "in "WORDPROCTEST) ] ]
+   SIMPLEREPORTTESTNOCATCH [ (WORD []) ] "allocatedinWORDPROCTEST
+
+END
+
+TO CHARTEST
+  ; NOTE: The tests for CHAR were written to test nonnegative_int_arg()
+
+  ; Test that CHAR 0 is a valid input.
+  ; We cannot test the output because there is no way to generate an
+  ; equivalent return value without using CHAR.
+  IGNORE CHAR 0
+  
+  SIMPLEREPORTTEST [CHAR            65  ] "A 
+  SIMPLEREPORTTEST [CHAR (  65536 + 65) ] "A ; CHAR wraps modulo 65536
+  SIMPLEREPORTTEST [CHAR (2*65536 + 65) ] "A ; CHAR wraps modulo 65536
+  SIMPLEREPORTTEST [CHAR (3*65536 + 65) ] "A ; CHAR wraps modulo 65536
+  SIMPLEREPORTTEST [CHAR           65.0 ] "A ; converts FLOAT to INT
+
+  ; The highest value CHAR can convert is MAXINT
+  SIMPLEREPORTTEST [CHAR 2147483647   ] CHAR 65535
+  SIMPLEREPORTTEST [CHAR 2147483647.0 ] CHAR 65535
+
+  ; bad input
+  RUNDOESNTLIKEINPUTTEST [CHAR  "zero       ]
+  RUNDOESNTLIKEINPUTTEST [CHAR  []          ]
+  RUNDOESNTLIKEINPUTTEST [CHAR  [1]         ]
+  RUNDOESNTLIKEINPUTTEST [CHAR  {1}         ]
+  RUNDOESNTLIKEINPUTTEST [CHAR  0.5         ]
+  RUNDOESNTLIKEINPUTTEST [CHAR -0.5         ]
+  RUNDOESNTLIKEINPUTTEST [CHAR 2147483648   ] ; MAXINT + 1
+  RUNDOESNTLIKEINPUTTEST [CHAR 2147483647.1 ] ; MAXINT + 0.1
+END
+
+TO WORDTEST
+  WORDPROCTEST
+  ASCIITEST
+  RAWASCIITEST
+  CHARTEST
+END

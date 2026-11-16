@@ -1,0 +1,121 @@
+; This file tests the DLLCALL samples in the dllcall directory.
+LOAD "dllcall/getenvironmentvariable.lgo
+LOAD "dllcall/getmodulefilename.lgo
+LOAD "dllcall/gettemppath.lgo
+LOAD "dllcall/getworkingdirectory.lgo
+LOAD "dllcall/setclipboarddata.lgo
+LOAD "dllcall/setworkingdirectory.lgo
+LOAD "testlib.lgo
+
+TO GETENVIRONMENTVARIABLETEST
+   SIMPLEREPORTTEST [GETENVIRONMENTVARIABLE "systemdrive ] "C:
+   FAILIFNOTTRUE    [WORD? GETENVIRONMENTVARIABLE "PATH] ; %PATH% should exist
+   SIMPLEREPORTTEST [GETENVIRONMENTVARIABLE "unknownvariable] []
+END
+
+TO GETMODULEFILENAMETEST
+   ; Get the path to fmslogo.exe.
+   ; We don't know what it is, but it should contain "fmslogo".
+   FAILIFNOTTRUE [ SUBSTRINGP "fmslogo GETMODULEFILENAME 0 ]
+
+   ; Get the handle of an unknown HMODULE.
+   SIMPLEREPORTTEST [GETMODULEFILENAME 999999999] []
+END
+
+
+TO GETTEMPPATHTEST
+   ; We don't know what it is, but it should be a word.
+   FAILIFNOTTRUE [ WORD? GETTEMPPATH ]
+END
+
+TO WORKINGDIRECTORYTEST
+   LOCALMAKE "originalWorkingDirectory GETWORKINGDIRECTORY
+
+   ; Change to a directory that should exist.
+   TRACEINSTRUCTION [ SETWORKINGDIRECTORY "c:\\windows ]
+
+   ; Get it.
+   SIMPLEREPORTTEST [GETWORKINGDIRECTORY] "c:\\windows
+
+   ; Change to a directory that doesn't exist.
+   ; This should should throw an error.
+   (RUNEXPECTERRORTEST
+       [SETWORKINGDIRECTORY "c:\\does-not-exist\\very-unlikely]
+       21 ; user error
+       "|\|Could not change to c:\\\\does-not-exist\\\\very-unlikely.\||)
+
+   ; Confirm that the working directory didn't change.
+   SIMPLEREPORTTEST [GETWORKINGDIRECTORY] "c:\\windows
+
+   ; Restore the original working directory.
+   SETWORKINGDIRECTORY :originalWorkingDirectory
+
+   ; Confirm that it's the same as before.
+   SIMPLEREPORTTEST [GETWORKINGDIRECTORY] :originalWorkingDirectory
+
+END
+
+TO SETCLIPBOARDDATATEST
+   ; Copy some text to a buffer that can be written to the clipboard
+   LOCAL [originalText hMem textFromClipboard CF_UNICODETEXT]
+   MAKE "originalText "|This is my text|
+   MAKE "hMem GLOBALALLOC :originalText SUM 2 PRODUCT 2 COUNT :originalText
+
+   ; Paste some text to the clipboard as Unicode text.
+   MAKE "CF_UNICODETEXT 13
+   SETCLIPBOARDDATA :CF_UNICODETEXT :hMem
+
+   GLOBALFREE :hMem
+
+   ; Read it back using FMSLogo
+   OPENREAD "clipboard
+   SETREAD  "clipboard
+   MAKE "textFromClipboard READWORD
+   SETREAD  []
+   CLOSE    "clipboard
+
+   ; Confirm that we read the text that we wrote to the clipboard.
+   SIMPLEREPORTTEST [:textFromClipboard] :originalText
+
+   ; Test when hMem = NULL
+   (RUNEXPECTERRORTEST
+       [SETCLIPBOARDDATA :CF_UNICODETEXT 0]
+       21 ; user error
+       "|Delayed Rendering is not supported by FMSLogo|)
+
+   ; Test when the buffer is not a HANDLE.
+   (RUNEXPECTERRORTEST
+       [SETCLIPBOARDDATA :CF_UNICODETEXT "hello]
+       21 ; user error
+       "|SetClipboardData failed|)
+
+END
+
+TO GLOBALALLOCTEST
+   ; GLOBALALLOC is tested for its real use by SETCLIPBOARDDATATEST.
+   ; This function only tests the error condition.
+
+   (RUNEXPECTERRORTEST
+       [GLOBALALLOC "buffer 4294967295] ; request more than available to user-mode
+       21 ; user error
+       "|GlobalAlloc returned NULL|)
+END
+
+TO GLOBALFREETEST
+   ; GLOBALFREE is tested for its real use by SETCLIPBOARDDATATEST.
+   ; This function only tests the error condition.
+   TRACEINSTRUCTION [GLOBALFREE 0]
+END
+
+
+TO DLLCALLSAMPLESTEST
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   GETENVIRONMENTVARIABLETEST
+   GETMODULEFILENAMETEST
+   GETTEMPPATHTEST
+   WORKINGDIRECTORYTEST
+   SETCLIPBOARDDATATEST
+   GLOBALALLOCTEST
+   GLOBALFREETEST
+END

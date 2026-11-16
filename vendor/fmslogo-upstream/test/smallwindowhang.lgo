@@ -1,0 +1,37 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO TESTSMALLWINDOWHANG
+   ; This function undocks the commander, resizes the screen 
+   ; window so that it is very small, then redocks the commander.
+   ; This is a regression test for Bug #276, which caused an
+   ; infinite regress in this condition.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; undock the commander
+   TEXTSCREEN
+
+   ; Load the Windows User API client DLL
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+      ; Get Handle to Main Window
+      LOCALMAKE "hwnd UIAUTOMATION.FINDWINDOW "FMSLogo 0
+
+      ; Shrink the Main Window
+      IGNORE UIAUTOMATION.MOVEWINDOW :hwnd 0 0 0 0 "true
+
+      ; redock the commander.  This is where FMSLogo used to hang.
+      SPLITSCREEN
+
+      ; Resize Main Window
+      IGNORE UIAUTOMATION.MOVEWINDOW :hwnd 0 0 400 400 "true
+   ]
+
+   IGNORE FAILIFERROR "MESSAGEBOXTEST.SMOKETEST
+
+   ; cleanup
+   UIAUTOMATION.UNINITIALIZE
+
+   REPORTTESTPASSED [Resizing FMSLogo to be very small didn't cause an infinite loop.]
+END

@@ -1,0 +1,172 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO MESSAGEBOXTEST.SMOKETEST
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+
+     LOCALMAKE "title [MESSAGEBOX Test]
+
+     ; press OK
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Ok
+     TRACEINSTRUCTION (list "MESSAGEBOX :title [Press "OK" ] )
+
+     ; press Cancel
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW :title "Cancel
+     RUNSTOPPINGTEST  (list "MESSAGEBOX :title [Press "Cancel"] )
+   ]
+
+   IGNORE FAILIFERROR "MESSAGEBOXTEST.SMOKETEST
+
+   UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO MESSAGEBOXTEST.POSITION.GETWINDOWRECT :title :varname
+   ; Sets the rectangle of a dialog box to a variable named :varname
+   ; This is of the form [left top right bottom], or [] on error.
+
+   LOCAL "hwnd
+   MAKE "hwnd UIAUTOMATION.FINDWINDOW :title "#32770
+   IF EQUALP :hwnd 0 [
+      REPORTTESTFAILED (WORD "|Unable to locate | :title "| window.|)
+      STOP
+   ]
+
+   MAKE :varname UIAUTOMATION.GETWINDOWRECT :hwnd
+END
+
+TO MESSAGEBOXTEST.POSITION.GETWINDOWRECTANDPRESSBUTTON :title :varname :button
+   ; Two procedures in one, to remove a delay in the UIAUTOMATION queue.
+   MESSAGEBOXTEST.POSITION.GETWINDOWRECT :title :varname
+   UIAUTOMATION.SENDBUTTONPUSHTOWINDOW :title :button
+END
+
+TO MESSAGEBOXTEST.POSITION.RUNPOSITIONTEST :parentHwnd :parentWindowName
+   ; Opens and closes a message box.
+   ; Also confirms that it was within the bounds of the parent window.
+   LOCAL [dialogTitle dialogPosition parentWindowPosition]
+
+   ; Get the position of the parent window.
+   MAKE "parentWindowPosition UIAUTOMATION.GETWINDOWRECT :parentHwnd
+
+   MAKE "dialogTitle "MESSAGEBOXTEST.POSITION
+
+   ; Set up an asynchronous call to determine the location of the MESSAGEBOX
+   ; and close it.
+   UIAUTOMATION.POSTEVENT (LIST
+      "MESSAGEBOXTEST.POSITION.GETWINDOWRECTANDPRESSBUTTON
+      (LIST :dialogTitle "dialogPosition "Ok))
+
+   ; Open the message box.
+   TRACEINSTRUCTION (LIST "MESSAGEBOX QUOTED :dialogTitle [Press "OK" if test gets stuck])
+
+   ; Confirm that the dialog box can fit within the bounds of the parent window.
+   IF (LESS? DIFFERENCE ITEM 3 :parentWindowPosition ITEM 1 :parentWindowPosition 
+             DIFFERENCE ITEM 3 :dialogPosition       ITEM 1 :dialogPosition) [
+      REPORTTESTBUG (WORD
+          "|MESSAGEBOX is wider than | :parentWindowName "|.  |
+          "|Resize the parent so that MESSAGEBOX can fit entirely within its bounds.|)
+   ]
+   IF (LESS? DIFFERENCE ITEM 4 :parentWindowPosition ITEM 2 :parentWindowPosition 
+             DIFFERENCE ITEM 4 :dialogPosition       ITEM 2 :dialogPosition) [
+      REPORTTESTBUG (WORD
+          "|MESSAGEBOX is taller than | :parentWindowName "|.  |
+          "|Resize the parent so that MESSAGEBOX can fit entirely within its bounds.|)
+   ]
+
+   ; Confirm that the dialog box was positioned somewhere in the middle of the parent window.
+   IF LESS? ITEM 1 :dialogPosition        ITEM 1 :parentWindowPosition [
+      REPORTTESTFAILED (WORD "|MESSAGEBOX appeared to the left of the | :parentWindowName "| window.|)
+   ]
+   IF LESS? ITEM 2 :dialogPosition        ITEM 2 :parentWindowPosition [
+      REPORTTESTFAILED (WORD "|MESSAGEBOX appeared above the | :parentWindowName "| window.|)
+   ]
+   IF LESS? ITEM 3 :parentWindowPosition  ITEM 3 :dialogPosition [
+      REPORTTESTFAILED (WORD "|MESSAGEBOX appeared to the right of the | :parentWindowName "| window.|)
+   ]
+   IF LESS? ITEM 4 :parentWindowPosition  ITEM 4 :dialogPosition [
+      REPORTTESTFAILED (WORD "|MESSAGEBOX appeared below the | :parentWindowName "| window.|)
+   ]
+END
+
+TO MESSAGEBOXTEST.POSITION
+   ; Tests that the message box is positioned in a sensible location
+   ; in various different scenarios.
+   ; This is really a test for GetParentWindowForDialog().
+   ; This is a regression test for Bug #550.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   LOCAL [screenHwnd commanderHwnd]
+
+   ; Where does the messagebox appear when the commander is docked.
+   SPLITSCREEN
+
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+      ; Find the main window.
+      MAKE "screenHwnd UIAUTOMATION.FINDWINDOW "FMSLogo 0
+      IF EQUALP :screenHwnd 0 [
+         REPORTTESTFAILED (WORD "|Unable to locate FMSLogo window.|)
+      ]
+
+      ; Set the size/location of the main window to known values.
+      IGNORE UIAUTOMATION.MOVEWINDOW :screenHwnd 100 100 400 300 "true
+
+      ; Test that a MESSAGEBOX appears within bounds of the screen window.
+      MESSAGEBOXTEST.POSITION.RUNPOSITIONTEST :screenHwnd "screen
+
+      ; Undock the commander
+      TRACEINSTRUCTION [ TEXTSCREEN ]
+
+      ; Find the commander dialog.
+      MAKE "commanderHwnd UIAUTOMATION.FINDWINDOW.COMMANDER
+      IF EQUALP :commanderHwnd 0 [
+         REPORTTESTFAILED (WORD "|Unable to locate the commander window.|)
+      ]
+
+      ; Set the size/location of the commander window to known values.
+      IGNORE UIAUTOMATION.MOVEWINDOW :commanderHwnd 400 400 400 300 "true
+
+      ; Test that a MESSAGEBOX appears within bounds of the commander window.
+      MESSAGEBOXTEST.POSITION.RUNPOSITIONTEST :commanderHwnd "commander
+
+      ; Minimize the commander
+      TRACEINSTRUCTION [ MINIMIZE "Commander ]
+
+      ; Test that a MESSAGEBOX now appears within bounds of the screen window.
+      MESSAGEBOXTEST.POSITION.RUNPOSITIONTEST :screenHwnd "screen
+
+      ; Restore, then hide the commander.
+      TRACEINSTRUCTION [ RESTORE "Commander     ]
+      TRACEINSTRUCTION [ WINDOWSET "Commander 0 ]
+
+      ; Test that a MESSAGEBOX still appears within bounds of the screen window.
+      MESSAGEBOXTEST.POSITION.RUNPOSITIONTEST :screenHwnd "screen
+
+
+      ; Restore a normal size for the application
+      SPLITSCREEN
+      IGNORE UIAUTOMATION.MOVEWINDOW :screenHwnd 0 0 800 600 "true
+   ]
+
+   IGNORE FAILIFERROR "MESSAGEBOXTEST.POSITION
+
+   UIAUTOMATION.UNINITIALIZE
+END
+
+TO MESSAGEBOXTEST.BADINPUT
+   RUNNOTENOUGHINPUTSTEST [ (MESSAGEBOX [Title]) ]
+   RUNTOOMANYINPUTSTEST   [ (MESSAGEBOX [Title] [Message] "toomany) ]
+END
+
+TO MESSAGEBOXTEST
+  MESSAGEBOXTEST.SMOKETEST
+  MESSAGEBOXTEST.POSITION
+  MESSAGEBOXTEST.BADINPUT
+END

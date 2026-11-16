@@ -1,0 +1,72 @@
+LOAD "testlib.lgo
+
+TO TRANSFERTEST.SMOKETEST
+
+   ; reverse input list
+   SIMPLEREPORTTEST [ TRANSFER [] [FPUT ?IN ?OUT] [A B C] ] [C B A]
+
+   ; transfer voweles
+   SIMPLEREPORTTEST [
+      TRANSFER [] [IFELSE MEMBER? ?IN "AEIOU [LPUT ?IN ?OUT] [?OUT]] [A B C D E]
+   ] [A E]
+
+   ; transfer voweles (in a word)
+   ; This is not really supported, as ?OUT is intially the empty list.
+   SIMPLEREPORTTEST [
+      TRANSFER
+         []
+         [IFELSE MEMBER? ?IN "AEIOU [IFELSE EMPTY? ?OUT [?IN] [WORD ?OUT ?IN]] [?OUT]]
+         "ABCDE
+   ] "AE
+
+   ; non-empty end condition (using ?OUT)
+   SIMPLEREPORTTEST [
+      TRANSFER [EQUAL? 3 COUNT ?OUT] [LPUT ?IN ?OUT] [1 2 3 4 5]
+   ] [1 2 3]
+
+   ; non-empty end condition (using ?IN)
+   SIMPLEREPORTTEST [
+      TRANSFER [EQUAL? 5 ?IN] [LPUT ?IN ?OUT] [1 2 3 4 5]
+   ] [1 2 3 4]
+
+   ; non-empty end condition (always quit)
+   SIMPLEREPORTTEST [ TRANSFER [ LOCALETRUE ] [LPUT ?IN ?OUT] [1 2 3 4 5] ] []
+
+   ; Example from the manual
+   SIMPLEREPORTTEST [
+       TRANSFER
+         []
+         [IFELSE MEMBERP ?IN ?OUT [?OUT] [LPUT ?IN ?OUT]]
+         [A B C B D E F B C G]
+   ] [A B C D E F G]
+
+   ; transfer nothing
+   SIMPLEREPORTTEST [ TRANSFER [] [THROW "ERROR] [] ] []
+
+END
+
+TO TRANSFERTEST.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [( TRANSFER [] [LPUT ?IN ?OUT] )]
+   RUNTOOMANYINPUTSTEST   [( TRANSFER [] [LPUT ?IN ?OUT] [a] "extra )]
+
+   ; bad endtest input
+   RUNDOESNTLIKEINPUTTEST [TRANSFER {1}    [LPUT ?IN ?OUT]  [1] ]
+   RUNIDONTKNOWHOWTOTEST  [TRANSFER "BAD   [LPUT ?IN ?OUT]  [1] ]
+   RUNDOESNTLIKEINPUTTEST [TRANSFER ["BAD] [LPUT ?IN ?OUT]  [1] ] ; must be predicate
+   RUNDIDNTOUTPUTTEST     [TRANSFER [OUTPUT "FALSE] [FPUT ?IN ?OUT] [A B C] ]
+
+   ; bad template input
+   RUNAPPLYDOESNTLIKETEST              [TRANSFER []  {LPUT ?IN ?OUT}  [1] ]
+   RUNNONRECOVERABLEIDONTKNOWHOWTOTEST [TRANSFER []  "|LPUT ?IN ?OUT| [1] ]
+   RUNDIDNTOUTPUTTEST                  [TRANSFER [] [OUTPUT FPUT ?IN ?OUT] [A B C] ]
+
+   ; bad inbasket input
+   RUNDOESNTLIKEINPUTTEST [TRANSFER [] [LPUT ?IN ?OUT]  {1} ]
+
+END
+
+TO TRANSFERTEST
+   TRANSFERTEST.SMOKETEST
+   TRANSFERTEST.BADINPUT
+END

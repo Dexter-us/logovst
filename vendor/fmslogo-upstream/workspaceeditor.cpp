@@ -1,0 +1,1025 @@
+#include "pch.h"
+#ifndef USE_PRECOMPILED_HEADER
+    #include <wx/crt.h>
+    #include <wx/menu.h>
+    #include <wx/fontdlg.h>
+    #include <wx/msgdlg.h>
+    #include <wx/sizer.h>
+    #include <wx/file.h>
+
+    #include "workspaceeditor.h"
+    #include "logocodectrl.h"
+    #include "internationalizedstrings.h"
+    #include "guiutils.h"
+    #include "fontutils.h"
+    #include "fmslogo.h"
+    #include "mainframe.h"
+    #include "logoeventqueue.h"
+    #include "utils.h"
+    #include "dlgwind.h"      // for edit_editexit
+    #include "logocore.h"     // for ARRAYSIZE
+    #include "wrksp.h"        // for bExpert
+    #include "screenwindow.h" // for TraceOutput
+    #include "eval.h"         // for process_special_conditions
+    #include "startup.h"      // for TempPathName
+    #include "commander.h"    // for putcombobox
+    #include "graphwin.h"     // for do_help
+    #include "helputils.h"    // for ContextHelp
+#endif
+
+enum
+{
+    ID_FILESAVEANDEXIT = wxID_HIGHEST,
+    ID_FILESAVETOWORKSPACE,
+    ID_SEARCHFINDNEXT,
+    ID_EDITSETFONT,
+    ID_TESTRUNSELECTION,
+    ID_HELP,
+    ID_HELPEDIT,
+
+    ID_LOGOCODECONTROL,
+
+    ID_FINDMATCHINGPAREN,
+    ID_SELECTMATCHINGPAREN,
+    ID_AUTOCOMPLETE,
+
+    ID_NEXT_WINDOW,
+};
+
+BEGIN_EVENT_TABLE(CWorkspaceEditor, wxFrame)
+
+    EVT_MENU(wxID_EXIT,              CWorkspaceEditor::OnExit)
+    EVT_MENU(ID_FILESAVEANDEXIT,     CWorkspaceEditor::OnSaveAndExit)
+    EVT_MENU(ID_FILESAVETOWORKSPACE, CWorkspaceEditor::OnSaveToWorkspace)
+    EVT_MENU(wxID_PRINT,             CWorkspaceEditor::OnPrint)
+
+    EVT_MENU(wxID_UNDO,              CWorkspaceEditor::OnUndo)
+    EVT_UPDATE_UI(wxID_UNDO,         CWorkspaceEditor::OnUpdateUndo)
+    EVT_MENU(wxID_REDO,              CWorkspaceEditor::OnRedo)
+    EVT_UPDATE_UI(wxID_REDO,         CWorkspaceEditor::OnUpdateRedo)
+    EVT_MENU(wxID_CUT,               CWorkspaceEditor::OnCut)
+    EVT_UPDATE_UI(wxID_CUT,          CWorkspaceEditor::OnUpdateCut)
+    EVT_MENU(wxID_COPY,              CWorkspaceEditor::OnCopy)
+    EVT_UPDATE_UI(wxID_COPY,         CWorkspaceEditor::OnUpdateCopy)
+    EVT_MENU(wxID_PASTE,             CWorkspaceEditor::OnPaste)
+    EVT_UPDATE_UI(wxID_PASTE,        CWorkspaceEditor::OnUpdatePaste)
+    EVT_MENU(wxID_DELETE,            CWorkspaceEditor::OnDelete)
+    EVT_UPDATE_UI(wxID_DELETE,       CWorkspaceEditor::OnUpdateDelete)
+    EVT_MENU(wxID_CLEAR,             CWorkspaceEditor::OnClear)
+    EVT_UPDATE_UI(wxID_CLEAR,        CWorkspaceEditor::OnUpdateClear)
+    EVT_MENU(wxID_SELECTALL,         CWorkspaceEditor::OnSelectAll)
+    EVT_UPDATE_UI(wxID_SELECTALL,    CWorkspaceEditor::OnUpdateSelectAll)
+
+    EVT_MENU(wxID_FIND,              CWorkspaceEditor::OnFind)
+    EVT_UPDATE_UI(wxID_FIND,         CWorkspaceEditor::OnUpdateFind)
+    EVT_MENU(wxID_REPLACE,           CWorkspaceEditor::OnReplace)
+    EVT_UPDATE_UI(wxID_REPLACE,      CWorkspaceEditor::OnUpdateReplace)
+    EVT_MENU(ID_SEARCHFINDNEXT,      CWorkspaceEditor::OnFindNext)
+    EVT_UPDATE_UI(ID_SEARCHFINDNEXT, CWorkspaceEditor::OnUpdateFindNext)
+
+    EVT_MENU(ID_EDITSETFONT,         CWorkspaceEditor::OnSetFont)
+
+    EVT_MENU(ID_TESTRUNSELECTION,      CWorkspaceEditor::OnRunSelection)
+    EVT_UPDATE_UI(ID_TESTRUNSELECTION, CWorkspaceEditor::OnUpdateRunSelection)
+
+    EVT_MENU(ID_HELP,                CWorkspaceEditor::OnHelp)
+    EVT_MENU(ID_HELPEDIT,            CWorkspaceEditor::OnHelpEditor)
+    EVT_MENU(wxID_HELP_INDEX,        CWorkspaceEditor::OnHelpTopicSearch)
+
+    EVT_MENU(ID_FINDMATCHINGPAREN,   CWorkspaceEditor::OnFindMatchingParen)
+    EVT_MENU(ID_SELECTMATCHINGPAREN, CWorkspaceEditor::OnSelectMatchingParen)
+    EVT_MENU(ID_AUTOCOMPLETE,        CWorkspaceEditor::OnAutoComplete)
+    EVT_CLOSE(CWorkspaceEditor::OnClose)
+
+    EVT_FIND(wxID_ANY,             CWorkspaceEditor::OnFindDialog)
+    EVT_FIND_NEXT(wxID_ANY,        CWorkspaceEditor::OnFindDialog)
+    EVT_FIND_REPLACE(wxID_ANY,     CWorkspaceEditor::OnFindDialogReplace)
+    EVT_FIND_REPLACE_ALL(wxID_ANY, CWorkspaceEditor::OnFindDialogReplaceAll)
+    EVT_FIND_CLOSE(wxID_ANY,       CWorkspaceEditor::OnFindDialogClose)
+
+    EVT_MENU(ID_NEXT_WINDOW, CWorkspaceEditor::OnNavigateNextWindow)
+END_EVENT_TABLE()
+
+
+// The workspace frame's constructor
+CWorkspaceEditor::CWorkspaceEditor(
+    wxWindow       * Parent,
+    const wxString & Title,
+    const wxPoint  & Position,
+    const wxSize   & Size,
+    const wxString & FileName,
+    NODE           * EditArguments,   // consumes a reference
+    bool             CheckForErrors,
+    bool             OpenToError
+    )
+    : wxFrame(
+        Parent,
+        wxID_ANY,
+        Title,
+        Position,
+        Size,
+        wxDEFAULT_FRAME_STYLE | wxFRAME_NO_TASKBAR),
+    m_LogoCodeControl(NULL),
+    m_FindReplaceDialog(NULL),
+    m_FileName(FileName),
+    m_EditArguments(EditArguments),
+    m_CheckForErrors(CheckForErrors),
+    m_ErrorDetected(false)
+{
+    SetFmsLogoIcon(*this);
+
+    m_LogoCodeControl = new CLogoCodeCtrl(this, ID_LOGOCODECONTROL);
+
+    // Make sure that the Logo code edit control expands
+    // to fill all available space
+    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(m_LogoCodeControl, 1, wxEXPAND);
+    SetSizer(sizer);
+
+    //
+    // Construct the main menu
+    //
+    static const MENUITEM defaultFileMenuItems[] = {
+        {g_LOCALIZED_EDITOR_FILE_SAVEANDEXIT,     ID_FILESAVEANDEXIT},
+        {g_LOCALIZED_EDITOR_FILE_PRINT,           wxID_PRINT},
+        {0},
+        {g_LOCALIZED_EDITOR_FILE_EXIT,            wxID_EXIT},
+    };
+
+    static const MENUITEM expertFileMenuItems[] = {
+        {g_LOCALIZED_EDITOR_FILE_SAVEANDEXIT,     ID_FILESAVEANDEXIT},
+        {g_LOCALIZED_EDITOR_FILE_SAVETOWORKSPACE, ID_FILESAVETOWORKSPACE},
+        {g_LOCALIZED_EDITOR_FILE_PRINT,           wxID_PRINT},
+        {0},
+        {g_LOCALIZED_EDITOR_FILE_EXIT,            wxID_EXIT},
+    };
+
+    static const MENUITEM editMenuItems[] = {
+        {g_LOCALIZED_EDITOR_EDIT_UNDO,      wxID_UNDO},
+        {g_LOCALIZED_EDITOR_EDIT_REDO,      wxID_REDO},
+        {0},
+        {g_LOCALIZED_EDITOR_EDIT_CUT,       wxID_CUT},
+        {g_LOCALIZED_EDITOR_EDIT_COPY,      wxID_COPY},
+        {g_LOCALIZED_EDITOR_EDIT_PASTE,     wxID_PASTE},
+        {g_LOCALIZED_EDITOR_EDIT_DELETE,    wxID_DELETE},
+        {0},
+        {g_LOCALIZED_EDITOR_EDIT_CLEARALL,  wxID_CLEAR},
+        {g_LOCALIZED_EDITOR_EDIT_SELECTALL, wxID_SELECTALL},
+    };
+
+    static const MENUITEM searchMenuItems[] = {
+        {g_LOCALIZED_EDITOR_SEARCH_FIND,    wxID_FIND},
+        {g_LOCALIZED_EDITOR_SEARCH_REPLACE, wxID_REPLACE},
+        {g_LOCALIZED_EDITOR_SEARCH_NEXT,    ID_SEARCHFINDNEXT},
+    };
+
+    static const MENUITEM setMenuItems[] = {
+        {g_LOCALIZED_EDITOR_SET_FONT,       ID_EDITSETFONT},
+    };
+
+    static const MENUITEM testMenuItems[] = {
+        {g_LOCALIZED_EDITOR_TEST_RUN_SELECTION, ID_TESTRUNSELECTION},
+    };
+
+    static const MENUITEM helpMenuItems[] = {
+        {g_LOCALIZED_EDITOR_HELP_INDEX,       ID_HELP},
+        {g_LOCALIZED_EDITOR_HELP_EDITOR,      ID_HELPEDIT},
+        {g_LOCALIZED_EDITOR_HELP_TOPICSEARCH, wxID_HELP_INDEX},
+    };
+
+    wxMenuBar * mainMenu = new wxMenuBar;
+
+    if (bExpert)
+    {
+        AppendChildMenu(
+            mainMenu,
+            g_LOCALIZED_EDITOR_FILE,
+            expertFileMenuItems,
+            ARRAYSIZE(expertFileMenuItems));
+    }
+    else
+    {
+        AppendChildMenu(
+            mainMenu,
+            g_LOCALIZED_EDITOR_FILE,
+            defaultFileMenuItems,
+            ARRAYSIZE(defaultFileMenuItems));
+    }
+    AppendChildMenu(mainMenu, g_LOCALIZED_EDITOR_EDIT,   editMenuItems,   ARRAYSIZE(editMenuItems));
+    AppendChildMenu(mainMenu, g_LOCALIZED_EDITOR_SEARCH, searchMenuItems, ARRAYSIZE(searchMenuItems));
+    AppendChildMenu(mainMenu, g_LOCALIZED_EDITOR_SET,    setMenuItems,    ARRAYSIZE(setMenuItems));
+    AppendChildMenu(mainMenu, g_LOCALIZED_EDITOR_TEST,   testMenuItems,   ARRAYSIZE(testMenuItems));
+    AppendChildMenu(mainMenu, g_LOCALIZED_EDITOR_HELP,   helpMenuItems,   ARRAYSIZE(helpMenuItems));
+
+
+    SetMenuBar(mainMenu);
+
+    // set the font
+    wxFont font;
+    font.SetFamily(wxFONTFAMILY_TELETYPE);
+    GetConfigurationFont(L"EditFont", font);
+    m_LogoCodeControl->SetFont(font);
+
+    // Configure the keyboard shortcuts
+    static const ACCELERATORITEM keyboardShortcuts[] = {
+        // Ctrl+] moves to matching paren
+        {wxACCEL_CTRL,                 ']',          ID_FINDMATCHINGPAREN},
+
+        // Ctrl+Shift+] selects to matching paren
+        {wxACCEL_CTRL | wxACCEL_SHIFT, ']',          ID_SELECTMATCHINGPAREN},
+
+        // Ctrl+Tab navigates to the next window.
+        {wxACCEL_CTRL,                 WXK_TAB,      ID_NEXT_WINDOW},
+
+        // Ctrl+Enter starts auto-complete
+        {wxACCEL_CTRL,                 WXK_SPACE,    ID_AUTOCOMPLETE},
+    };
+    SetAccelerators(this, keyboardShortcuts, ARRAYSIZE(keyboardShortcuts));
+
+
+    SetFileName(FileName);
+    if (!FileName.IsEmpty())
+    {
+        if (!Read())
+        {
+            // We couldn't read the file into the editor,
+            // so unset the filename.
+            SetFileName(wxEmptyString);
+        }
+    }
+
+    // make sure that the editor is visible
+    Iconize(false);
+    Show();
+    Raise();
+
+    if (OpenToError)
+    {
+        m_LogoCodeControl->ReopenAfterError();
+    }
+}
+
+#ifndef WX_PURE
+bool CWorkspaceEditor::TranslateKeyboardShortcut(WXMSG * Message)
+{
+    return MSWDoTranslateMessage(this, Message);
+}
+#endif
+
+void CWorkspaceEditor::OnSetFont(wxCommandEvent& WXUNUSED(Event))
+{
+    wxFont font;
+
+    font.SetFamily(wxFONTFAMILY_TELETYPE);
+    GetConfigurationFont(L"EditFont", font);
+
+    wxFontDialog fontChooser(this);
+    fontChooser.GetFontData().SetInitialFont(font);
+
+    // Disable color selection, since we colorize based on syntax.
+    fontChooser.GetFontData().EnableEffects(false);
+
+    int rval = fontChooser.ShowModal();
+    if (rval == wxID_OK)
+    {
+        // the user selected a new font
+        font = fontChooser.GetFontData().GetChosenFont();
+
+        // use this font in the Rich Edit
+        m_LogoCodeControl->SetFont(font);
+
+        // Set this as the new default font
+        SetConfigurationFont(L"EditFont", font);
+    }
+}
+
+// Evaluates the contents of the editor as Logo code and sets the
+// ErrorDetected flag if something went wrong.
+bool CWorkspaceEditor::EndEdit()
+{
+    bool realsave = endedit();
+
+    // check for errors
+    m_ErrorDetected = process_special_conditions();
+
+    return realsave;
+}
+
+//
+// Saves the contents of the editor to the file currently being edited.
+//
+// returns true if the file was saved or if the contents were already saved.
+//
+bool CWorkspaceEditor::Save()
+{
+    if (!m_LogoCodeControl->IsDirty())
+    {
+        // The editor's contents are already in sync with
+        // the workspace, so nothing needs to be done.
+        return true;
+    }
+
+    // Save the contents.
+    return Write();
+}
+
+// A helper routine for selecting a file to read from or write to.
+const wxString
+CWorkspaceEditor::SelectFile(
+    const wxString & GivenFileName
+    ) const
+{
+    if (!GivenFileName.IsEmpty())
+    {
+        // We were given a file name, so use it.
+        return GivenFileName;
+    }
+
+    // The caller didn't supply a file name, so use the
+    // file name that was supplied in the constructor.
+    return m_FileName;
+}
+
+//
+// sets the file name of the window and updates the caption
+//
+void CWorkspaceEditor::SetFileName(const wxString & NewFileName)
+{
+    m_FileName = NewFileName;
+
+    const wxString newTitle = m_FileName.IsEmpty() ?
+        wxString::Format(L"(%ls)", g_LOCALIZED_UNTITLED) :
+        m_FileName;
+
+    const wxString & currentTitle = GetName();
+    if (currentTitle.IsEmpty())
+    {
+        // The editor has no caption
+        SetName(newTitle);
+    }
+    else
+    {
+        SetName(currentTitle + L" - " + newTitle);
+    }
+}
+
+
+//
+// Read the contents of a previously-specified file into the editor
+//
+bool CWorkspaceEditor::Read(const wxString & FileName)
+{
+    const wxString & fileName = SelectFile(FileName);
+    if (fileName.IsEmpty())
+    {
+        // No file name was given.
+        return false;
+    }
+
+    m_LogoCodeControl->ClearAll();
+    m_LogoCodeControl->EmptyUndoBuffer();
+    m_LogoCodeControl->SetSavePoint();
+    m_LogoCodeControl->Cancel();
+    m_LogoCodeControl->SetUndoCollection(0);
+
+    bool success = false;
+    wxFile file(fileName, wxFile::read);
+    if (file.IsOpened())
+    {
+        // Read the file into a single buffer.
+        // This will use the appropriate character coding depending
+        // on the BOM at the beginning of the file.
+        wxString fileContents;
+        if (file.ReadAll(&fileContents))
+        {
+            m_LogoCodeControl->AddText(fileContents);
+            success = true;
+        }
+    }
+
+    m_LogoCodeControl->SetUndoCollection(true);
+    m_LogoCodeControl->SetFocus();
+    m_LogoCodeControl->EmptyUndoBuffer();
+    m_LogoCodeControl->SetSavePoint();
+    m_LogoCodeControl->GotoPos(0);
+
+    if (!success)
+    {
+        // Something went wrong when trying to open the file.
+        // Report the error to the user.
+        const wxString & errorMessage = wxString::Format(
+            g_LOCALIZED_ERROR_CANTREADFILE,
+            fileName);
+
+        wxMessageBox(
+            errorMessage,
+            g_LOCALIZED_GENERAL_PRODUCTNAME,
+            wxICON_EXCLAMATION | wxOK);
+    }
+
+    return success;
+}
+
+//
+// Writes the contents of the editor to a previously-specified file.
+//
+bool
+CWorkspaceEditor::Write(
+    const wxString & FileName
+    )
+{
+    const wxString & fileName = SelectFile(FileName);
+    if (fileName.IsEmpty())
+    {
+        // No file name was given.
+        return false;
+    }
+
+    wxFile file(fileName, wxFile::write);
+    if (!file.IsOpened())
+    {
+        // Something went wrong when trying to open the file.
+        // Report the error to the user.
+        const wxString & errorMessage = wxString::Format(
+            g_LOCALIZED_ERROR_CANTWRITEFILE,
+            fileName);
+
+        wxMessageBox(
+            errorMessage,
+            g_LOCALIZED_GENERAL_PRODUCTNAME,
+            wxICON_EXCLAMATION | wxOK);
+
+        return false;
+    }
+
+    bool success = true;
+
+    // If the text contains a non-ASCII character, then write out a
+    // BOM in UTF-8 so that we can later determine the correct encoding.
+    // Do not write a BOM for pure ASCII files so that the program will be
+    // readable by FMSLogo 7.7.0 and below and other Logo implementations
+    // which try to execute the BOM as a procedure.
+    if (!m_LogoCodeControl->IsTextPureAscii())
+    {
+        if (!file.Write(UTF8_BOM, sizeof(UTF8_BOM))) {
+            success = false;
+        }
+    }
+
+    const size_t WRITE_BLOCK_SIZE = 1024;
+    int lengthDoc = m_LogoCodeControl->GetTextLength();
+    for (int i = 0;
+         i < lengthDoc;
+         i += WRITE_BLOCK_SIZE)
+    {
+        size_t grabSize = lengthDoc - i;
+        if (WRITE_BLOCK_SIZE < grabSize)
+        {
+            grabSize = WRITE_BLOCK_SIZE;
+        }
+
+        // Get this block from the editor
+        wxString textBlock(m_LogoCodeControl->GetTextRange(i, i + grabSize));
+
+#ifdef WX_PURE
+        // HACK: this is only needed on GNU/Linux
+        // BUG: This doesn't work if the CRLF spans a block boundary.
+        textBlock.Replace(L"\r\n", L"\n");
+#endif
+
+        // Write the block to the file as UTF-8.
+        if (!file.Write(textBlock, wxConvUTF8))
+        {
+            // Not all of the data was written.
+            success = false;
+            break;
+        }
+    }
+
+    if (success)
+    {
+        m_LogoCodeControl->SetSavePoint();
+    }
+
+    return success;
+}
+
+bool CWorkspaceEditor::CanClose()
+{
+    bool canClose;
+
+    if (m_LogoCodeControl->IsDirty())
+    {
+        // if changed better ask user
+        int result = wxMessageBox(
+            g_LOCALIZED_SAVECHANGEDCONTENTSTOWORKSPACE,
+            g_LOCALIZED_CONTENTSCHANGED,
+            wxYES_NO | wxCANCEL | wxICON_QUESTION);
+        switch (result)
+        {
+        case wxYES:
+            // The user wants to save then exit.
+            canClose = Save();
+            break;
+
+        case wxCANCEL:
+            // The user wants doesn't want to close.
+            canClose = false;
+            break;
+
+        default:
+            // The user wants to close without saving.
+            canClose = true;
+        }
+    }
+    else
+    {
+        // There's nothing to save, so it's safe to close.
+        canClose = true;
+    }
+
+    return canClose;
+}
+
+// menu command handlers
+void CWorkspaceEditor::OnExit(wxCommandEvent& WXUNUSED(Event))
+{
+    // Close the window, but give the user the
+    // opportunity to save all unsaved changes.
+    Close(false);
+}
+
+void CWorkspaceEditor::OnSaveAndExit(wxCommandEvent& Event)
+{
+    Save();
+    OnExit(Event);
+}
+
+void CWorkspaceEditor::OnSaveToWorkspace(wxCommandEvent& Event)
+{
+    Save();
+
+    if (m_EditArguments != NIL)
+    {
+        EndEdit();
+
+        wxRemove(TempPathName);
+
+        if (m_ErrorDetected)
+        {
+            // Notify the user that:
+            // 1) The changes in the editor failed to load
+            // 2) The cursor is positioned just after the last
+            //    successful definition
+            ::wxMessageBox(
+                g_LOCALIZED_CURSORISATLASTGOODDEFINITION,
+                g_LOCALIZED_EDITFAILEDTOLOAD,
+                wxOK | wxICON_ERROR,
+                CFmsLogo::GetMainFrame()->GetCommander());
+
+            // Reopen the editor to the location of the error.
+            m_LogoCodeControl->ReopenAfterError();
+        }
+    }
+}
+
+// Prints the contents of the editor
+void CWorkspaceEditor::OnPrint(wxCommandEvent& WXUNUSED(Event))
+{
+    m_LogoCodeControl->Print();
+}
+
+void CWorkspaceEditor::OnUndo(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnUndo(Event);
+}
+
+void CWorkspaceEditor::OnUpdateUndo(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanUndo());
+}
+
+void CWorkspaceEditor::OnRedo(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnRedo(Event);
+}
+
+void CWorkspaceEditor::OnUpdateRedo(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanRedo());
+}
+
+void CWorkspaceEditor::OnCut(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnCut(Event);
+}
+
+void CWorkspaceEditor::OnUpdateCut(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanCut());
+}
+
+void CWorkspaceEditor::OnCopy(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnCopy(Event);
+}
+
+void CWorkspaceEditor::OnUpdateCopy(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanCopy());
+}
+
+void CWorkspaceEditor::OnPaste(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnPaste(Event);
+}
+
+void CWorkspaceEditor::OnUpdatePaste(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanPaste());
+}
+
+void CWorkspaceEditor::OnDelete(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnDelete(Event);
+}
+
+void CWorkspaceEditor::OnUpdateDelete(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanDelete());
+}
+
+void CWorkspaceEditor::OnClear(wxCommandEvent& WXUNUSED(Event))
+{
+    // Delete everything in the editor
+    m_LogoCodeControl->SelectAll();
+    m_LogoCodeControl->Clear();
+}
+
+void CWorkspaceEditor::OnUpdateClear(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanSelectAll());
+}
+
+void CWorkspaceEditor::OnSelectAll(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnSelectAll(Event);
+}
+
+void CWorkspaceEditor::OnUpdateSelectAll(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->CanSelectAll());
+}
+
+void CWorkspaceEditor::OnFind(wxCommandEvent& WXUNUSED(Event))
+{
+    // Create and show the search dialog box.
+    // Note that this routine should not be callable if the search
+    // dialog box is already created.
+    if (m_FindReplaceDialog == NULL)
+    {
+        m_FindReplaceData.SetFlags(wxFR_DOWN); // default to searching down
+        m_FindReplaceDialog = new wxFindReplaceDialog(
+            this,
+            &m_FindReplaceData,
+            g_LOCALIZED_EDITOR_TITLE_FIND);
+
+        m_FindReplaceDialog->Show();
+    }
+}
+
+void CWorkspaceEditor::OnUpdateFind(wxUpdateUIEvent& Event)
+{
+    // Once the dialog box is showing, disable selecting it.
+    Event.Enable(m_FindReplaceDialog == NULL);
+}
+
+void CWorkspaceEditor::OnReplace(wxCommandEvent& WXUNUSED(Event))
+{
+    // Create and show the search dialog box.
+    // Note that this routine should not be callable if the search
+    // dialog box is already created.
+    if (m_FindReplaceDialog == NULL)
+    {
+        m_FindReplaceData.SetFlags(wxFR_DOWN); // default to searching down
+        m_FindReplaceDialog = new wxFindReplaceDialog(
+            this,
+            &m_FindReplaceData,
+            g_LOCALIZED_EDITOR_TITLE_REPLACE,
+            wxFR_REPLACEDIALOG);
+
+        m_FindReplaceDialog->Show();
+    }
+}
+
+void CWorkspaceEditor::OnUpdateReplace(wxUpdateUIEvent& Event)
+{
+    // Once the dialog box is showing, disable selecting it.
+    Event.Enable(m_FindReplaceDialog == NULL);
+}
+
+void CWorkspaceEditor::OnFindNext(wxCommandEvent& WXUNUSED(Event))
+{
+    m_LogoCodeControl->Find(
+        m_FindReplaceDialog,
+        static_cast<wxFindReplaceFlags>(m_FindReplaceData.GetFlags()),
+        m_FindReplaceData.GetFindString());
+}
+
+void CWorkspaceEditor::OnUpdateFindNext(wxUpdateUIEvent& Event)
+{
+    // Enable the option if we have a string to look for.
+    Event.Enable(!m_FindReplaceData.GetFindString().IsEmpty());
+}
+
+void CWorkspaceEditor::OnFindDialog(wxFindDialogEvent & WXUNUSED(Event))
+{
+    m_LogoCodeControl->Find(
+        m_FindReplaceDialog,
+        static_cast<wxFindReplaceFlags>(m_FindReplaceData.GetFlags()),
+        m_FindReplaceData.GetFindString());
+}
+
+void CWorkspaceEditor::OnFindDialogReplace(wxFindDialogEvent& WXUNUSED(Event))
+{
+    m_LogoCodeControl->ReplaceText(
+        m_FindReplaceDialog,
+        static_cast<wxFindReplaceFlags>(m_FindReplaceData.GetFlags()),
+        m_FindReplaceData.GetFindString(),
+        m_FindReplaceData.GetReplaceString());
+}
+
+void CWorkspaceEditor::OnFindDialogReplaceAll(wxFindDialogEvent& WXUNUSED(Event))
+{
+    m_LogoCodeControl->ReplaceAll(
+        static_cast<wxFindReplaceFlags>(m_FindReplaceData.GetFlags()),
+        m_FindReplaceData.GetFindString(),
+        m_FindReplaceData.GetReplaceString());
+}
+
+void CWorkspaceEditor::OnFindDialogClose(wxFindDialogEvent& WXUNUSED(Event))
+{
+    m_FindReplaceDialog->Destroy();
+    m_FindReplaceDialog = NULL;
+}
+
+void CWorkspaceEditor::OnFindMatchingParen(wxCommandEvent& WXUNUSED(Event))
+{
+    m_LogoCodeControl->FindMatchingParen();
+}
+
+void CWorkspaceEditor::OnSelectMatchingParen(wxCommandEvent& WXUNUSED(Event))
+{
+    m_LogoCodeControl->SelectMatchingParen();
+}
+
+void CWorkspaceEditor::OnAutoComplete(wxCommandEvent& WXUNUSED(Event))
+{
+    m_LogoCodeControl->AutoComplete();
+}
+
+void CWorkspaceEditor::OnRunSelection(wxCommandEvent& WXUNUSED(Event))
+{
+    wxString selectedText = m_LogoCodeControl->GetSelectedText();
+
+    // This function uses direct string manipulation because it was copied
+    // from MSWLogo.  It could be rewritten to use wxString functions.
+    size_t theTextSize = selectedText.Len() + 1;
+    wchar_t * theText = new wchar_t[theTextSize];
+    memcpy(theText, selectedText.wc_str(), theTextSize * sizeof(*theText));
+
+    wchar_t * ptr = theText;
+
+    // strip comments
+    bool more = true;
+    while (more)
+    {
+        wchar_t * ptr2 = wcschr(ptr, ';');
+
+        if (ptr2 != NULL)
+        {
+            // overwrite the comment character with a space
+            *ptr2 = ' ';
+
+            // put whitespace over everything until the end-of-string
+            // the end-of-line, or a comment continuer
+            while (*ptr2 != '\0' &&
+                   *ptr2 != '\n' &&
+                   *ptr2 != '\r' &&
+                   *ptr2 != '~')
+            {
+                *ptr2++ = ' ';
+            }
+        }
+        else
+        {
+            more = false;
+        }
+    }
+
+    // paste continuation
+    more = true;
+    while (more)
+    {
+        wchar_t * ptr2 = wcschr(ptr, '~');
+        if (ptr2 != NULL)
+        {
+            // We found a line continuation character.
+            // Effect the continuation by overwriting the continuation character
+            // with a space, as well as the following newline.
+            *ptr2 = ' ';
+            wchar_t * ptr3 = wcschr(ptr2, '\n');
+            if (ptr3 != NULL)
+            {
+                *ptr3 = ' ';       // \n
+                *(ptr3 - 1) = ' '; // \r
+            }
+        }
+        else
+        {
+            more = false;
+        }
+    }
+
+    // for each real line left execute it
+    more = true;
+    while (more)
+    {
+        // NUL-terminate the string at the newline.
+        wchar_t * ptr2 = wcschr(ptr, '\n');
+        if (ptr2 != NULL)
+        {
+            *ptr2 = '\0';       // \n
+            *(ptr2 - 1) = '\0'; // \r
+        }
+
+        // Execute the line
+        putcombobox(ptr, MESSAGETYPE_Normal);
+        do_execution(ptr);
+
+        if (ptr2 != NULL)
+        {
+            ptr = ptr2 + 1; // Advance past the now-NULed newline
+        }
+        else
+        {
+            more = false;
+        }
+    }
+
+    delete [] theText;
+}
+
+void CWorkspaceEditor::OnUpdateRunSelection(wxUpdateUIEvent& Event)
+{
+    Event.Enable(m_LogoCodeControl->IsTextSelected());
+}
+
+void CWorkspaceEditor::OnHelp(wxCommandEvent& WXUNUSED(Event))
+{
+    do_help(NULL);
+}
+
+void CWorkspaceEditor::OnHelpEditor(wxCommandEvent& WXUNUSED(Event))
+{
+    do_help(L"Editor");
+}
+
+void CWorkspaceEditor::OnHelpTopicSearch(wxCommandEvent& Event)
+{
+    m_LogoCodeControl->OnHelpTopicSearch(Event);
+}
+
+
+void CWorkspaceEditor::OnClose(wxCloseEvent& Event)
+{
+    if (Event.CanVeto() && !CanClose())
+    {
+        // The user doesn't want to close.
+        return;
+    }
+
+    // Remove this window from the set of windows that the main window
+    // is tracking.
+    CFmsLogo::GetMainFrame()->CloseWorkspaceEditor(this);
+
+    // Because wxWidgets won't destroy the window until the applicaton is idle,
+    // it will still be visible to the tests.  This causes some tests to fail.
+    // To work around ths problem, we change the window's title in a way that
+    // the tests can see, but the users cannot.
+    SetTitle(GetTitle() + L" ");
+
+    if (m_EditArguments != NIL || m_CheckForErrors)
+    {
+        CCommander * commander = CFmsLogo::GetMainFrame()->GetCommander();
+
+        // Attempt to load the contents of the editor into the workspace,
+        // just to see if there are any errors.
+        bool realsave = EndEdit();
+        if (m_ErrorDetected)
+        {
+            // Notify the user that:
+            // 1) The changes in the editor failed to load
+            // 2) The cursor is positioned just after the last
+            //    successful definition
+            //
+            // Ask if they want to reedit.
+            if (::wxMessageBox(
+                    wxString(g_LOCALIZED_CURSORISATLASTGOODDEFINITION) + L"\n"
+                        L"\n" +
+                        g_LOCALIZED_RETURNTOEDIT,
+                    g_LOCALIZED_EDITFAILEDTOLOAD,
+                    wxYES_NO | wxICON_ERROR,
+                    commander) == wxYES)
+            {
+                // Open up another editor.
+
+                // Give the new editor our reference on m_EditArguments
+                CFmsLogo::GetMainFrame()->PopupEditor(
+                    TempPathName,
+                    m_EditArguments,
+                    m_CheckForErrors,
+                    true); // open the editor to the error
+                wxRemove(TempPathName);
+            }
+            else
+            {
+                // The user doesn't care about the error.
+
+                // Release our reference on m_EditArguments
+                assign(m_EditArguments, NIL);
+
+                // Clear the error flag, since it was handled by the user.
+                m_ErrorDetected = false;
+
+                // Give keyboard focus to the commander so that
+                // the user can start typing commands after the
+                // editor closes.
+                commander->GiveControlToInputBox();
+            }
+        }
+        else
+        {
+            // no errors happened
+            if (m_EditArguments != NIL)
+            {
+                // Now that we know we can load the contents without error,
+                // we can erase the parts of the workspace that were removed
+                // from the editor (for example, if the editor was opened
+                // with the definition of "TO SQUARE" and this definition
+                // was removed before the editor was saved, then SQUARE should
+                // be erased from the workspace.)
+                if (realsave)
+                {
+                    lerase(m_EditArguments);
+
+                    // Since we erased part of the workspace, we must load
+                    // again, but we don't need to do any error checking,
+                    // since we know the file loads without error.
+                    endedit();
+                }
+
+                // free up m_EditArguments
+                assign(m_EditArguments, NIL);
+            }
+
+            // Delete the temporary file which held the workspace
+            // while we were re-reading it.
+            wxRemove(TempPathName);
+
+            // Give focus back to the commander so that the user
+            // can give Logo more commands.
+            commander->GiveControlToInputBox();
+        }
+    }
+    else
+    {
+        // else execute callback for WINDOWFILEEDIT
+        callthing *callevent = callthing::CreateFunctionEvent(edit_editexit);
+        calllists.insert(callevent);
+    }
+
+    // Save the location and size of our window so we can
+    // come back up in the same spot next time we are invoked.
+    if (!IsIconized())
+    {
+        const wxRect windowRectangle = GetRect();
+
+        SetConfigurationQuadruple(
+            L"Editor",
+            windowRectangle.GetLeft(),
+            windowRectangle.GetTop(),
+            windowRectangle.GetWidth(),
+            windowRectangle.GetHeight());
+    }
+
+    // Perform the default processing, which will destroy the window.
+    Event.Skip();
+}
+
+void CWorkspaceEditor::OnNavigateNextWindow(wxCommandEvent& Event)
+{
+    CFmsLogo::GetMainFrame()->KeyboardNavigateTopLevelWindow(
+        this,
+        wxNavigationKeyEvent::IsForward);
+}

@@ -1,0 +1,19 @@
+; Calls the win32 function GetModuleFileNameW.
+; Outputs the full path of the module name on success.
+; Outputs [] on error.
+TO GETMODULEFILENAME :module
+    LOCAL [rval]
+
+    DllLoad "kernel32.dll
+
+    ; Call it with a buffer size of MAX_PATH + 1 (adding 1 for the NUL terminator)
+    MAKE "rval (DLLCALL (LIST "L "GetModuleFileNameW "L 261 "B 522 "L :module) "kernel32.dll)
+
+    (DLLFREE "kernel32.dll)
+
+    ; check for errors
+    IF EQUAL? 0 ITEM 1 :rval [ OUTPUT [] ]
+
+    ; Remove the NUL characters from the buffer
+    OUTPUT FILTER [NOTEQUAL? CHAR 0 ? ] ITEM 2 :rval
+END

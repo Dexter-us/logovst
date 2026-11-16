@@ -1,0 +1,823 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This file contains some regression tests for the evaluator (eval.cpp).
+; It also contains regression tests for the treeification process (paren.cpp).
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+LOAD "testlib.lgo
+
+TO EVALTEST.NONTAILRECURSIVECOUNT :depth
+
+   LOCAL [count something.to.break.tail.recursion]
+
+   ; base-case
+   if :depth = 0  [ output 0 ]
+
+   ; call this recursively
+   MAKE "count 1 + EVALTEST.NONTAILRECURSIVECOUNT :depth - 1 
+
+   ; put some code after the recursive call
+   MAKE "something.to.break.tail.recursion "true
+
+   OUTPUT :count
+
+END
+
+TO EVALTEST.NONTAILRECURSIVE
+
+   SIMPLEREPORTTEST [ EVALTEST.NONTAILRECURSIVECOUNT 120   ] 120
+   SIMPLEREPORTTEST [ EVALTEST.NONTAILRECURSIVECOUNT 60000 ] 60000
+
+END
+
+
+TO EVALTEST.TAILRECURSIVECOUNT :depth
+
+   ; base-case
+   if :depth = 0  [ output 0 ]
+
+   ; call this recursively
+   OUTPUT 1 + EVALTEST.TAILRECURSIVECOUNT :depth - 1 
+
+END
+
+
+TO EVALTEST.NONTAILRECURSIVE
+   SIMPLEREPORTTEST [ EVALTEST.NONTAILRECURSIVECOUNT 120    ] 120
+   SIMPLEREPORTTEST [ EVALTEST.NONTAILRECURSIVECOUNT 100000 ] 100000
+END
+
+TO EVALTEST.TAILRECURSIVE
+   SIMPLEREPORTTEST [ EVALTEST.TAILRECURSIVECOUNT 120   ]  120
+   SIMPLEREPORTTEST [ EVALTEST.TAILRECURSIVECOUNT 100000 ] 100000
+END
+
+TO EVALTEST.CATCHTOOMANYINPUTSERROR
+  CATCH "ERROR [ (FD 1 "toomany) ]
+END
+
+TO EVALTEST.CATCHERRORMANYTIMES
+  ; This crashed once and no other test case caught the same problem.
+  ; I have no idea why this crashed, but it must be taking an unconventional
+  ; code path in the evaluator.
+
+  EVALTEST.CATCHTOOMANYINPUTSERROR
+  EVALTEST.CATCHTOOMANYINPUTSERROR
+  EVALTEST.CATCHTOOMANYINPUTSERROR
+  EVALTEST.CATCHTOOMANYINPUTSERROR
+  REPORTTESTPASSED [|The "catch 'too many inputs' error many times" test did not crash.|]
+END
+
+TO EVALTEST.TOWHILERUNNING
+
+    ; Define a procedure that loads a file which redefines the procedure
+    ; as its running.  This tests that the procedure can be retreeified
+    ; while it's being run.
+    DEFINE "EVALTEST.TOWHILERUNNING.PROC [ []
+        ; Load a file
+        [ LOAD "EVALTEST.TOWHILERUNNING.lgo ]
+
+        ; Output something predictable.
+        [ OUTPUT EVALTEST.TOWHILERUNNING.UNKNOWN 1 ]
+    ]
+
+   ; Create a Logo program that re-defines the procedure with TO.
+   ; The new version doesn't take arguments and outputs something else.
+   WRITEBINARYDATA "EVALTEST.TOWHILERUNNING.lgo (WORD
+      ; Redefine the procedure that's running.
+      "|TO EVALTEST.TOWHILERUNNING.PROC :variable\n|
+      "|  OUTPUT :variable\n|
+      "|END\n|
+      "|\n|
+
+      ; Define the unknown procedure which is called by the previous
+      ; definition of EVALTEST.TOWHILERUNNING.PROC.
+      "|TO EVALTEST.TOWHILERUNNING.UNKNOWN :input\n|
+      "|  OUTPUT SUM 100 :input\n|
+      "|END\n|
+      "|\n|
+    )
+
+    ; Running should use the original definition.
+    SIMPLEREPORTTEST [ EVALTEST.TOWHILERUNNING.PROC ] 101
+
+    ; Confirm that the procedure was redefined.
+    SIMPLEREPORTTEST [ EVALTEST.TOWHILERUNNING.PROC 321 ] 321
+
+    ; Clean up
+    ERASE "EVALTEST.TOWHILERUNNING.PROC
+    ERASE "EVALTEST.TOWHILERUNNING.UNKNOWN
+    ERASEFILE "EVALTEST.TOWHILERUNNING.lgo
+END
+
+TO EVALTEST.REDEFINEWHILERUNNING
+    ; This is a regression test for Bug #609.
+
+    ; Define a procedure that redefines itself, calls the
+    ; new definition, and outputs 1.
+    DEFINE "REDEFINEWHILERUNNING [ []
+        ; Redefine the procedure to output what its given.
+        [ DEFINE "REDEFINEWHILERUNNING [ [arg] [OUTPUT :arg] ] ]
+
+        ; Run the new definition.
+        ; The next line should be re-treeified.
+        [ OUTPUT REDEFINEWHILERUNNING 1 ]
+    ]
+
+    SIMPLEREPORTTEST [ REDEFINEWHILERUNNING   ] 1
+    SIMPLEREPORTTEST [ REDEFINEWHILERUNNING 2 ] 2
+
+    ; Cleanup
+    ERASE "REDEFINEWHILERUNNING
+END
+
+TO EVALTEST.ERASEWHILERUNNING
+    ; Erases a procedure while its running.
+    DEFINE "ERASEWHILERUNNING [ [variable]
+        [ ERASE "ERASEWHILERUNNING ]
+        [ ] ; sometimes NIL causes problems
+        [ OUTPUT :variable ]
+    ]
+
+    ; Running should use the original definition.
+    SIMPLEREPORTTEST [ ERASEWHILERUNNING 4 ] 4
+
+    ; Confirm that the procedure was erased.
+    FAILIFNOTFALSE [ PROCEDURE? "ERASEWHILERUNNING ]
+END
+
+TO EVALTEST.ERASEWHILERUNNING.NEEDRETREEIFY
+    ; Allow the redefinition of FORWARD.
+    LOCAL "redefp
+    MAKE  "redefp "true
+
+    ; Define a procedure that takes no arguments.
+    DEFINE "ZEROARGS [ [] ]
+
+    ; Define a procedure that erases itself and which changes
+    ; the treeification needs of the procedure.
+    DEFINE "ERASEWHILERUNNING [ []
+        ; Erase the procedure.
+        [ ERASE "ERASEWHILERUNNING ]
+
+        ; Make ZEROARGS crash if it doesn't get an argument.
+        [ COPYDEF "ZEROARGS "FORWARD ]
+
+        ; Now, calling ZEROARGS without any arguments will fail.
+        [ ZEROARGS ]
+    ]
+
+    ; Running should use the original definition, which doesn't
+    ; give ZEROARGS any arguments.
+    RUNNOTENOUGHINPUTSTEST [ ERASEWHILERUNNING ]
+
+    ; Confirm that the procedure was erased.
+    FAILIFNOTFALSE [ PROCEDURE? "ERASEWHILERUNNING ]
+
+    ; Clean up
+    ERASE "ZEROARGS
+END
+
+TO EVALTEST.COPYDEFWHILERUNNING
+
+    ; Define a procedure that redefines itself (and a new procedure) using COPYDEF.
+    DEFINE "EVALTEST.COPYDEFWHILERUNNING.PROC [ []
+        ; Copy the definition of the current procedure to a new one.
+        [ COPYDEF "EVALTEST.COPYDEFWHILERUNNING.COPY "EVALTEST.COPYDEFWHILERUNNING.PROC ]
+
+        ; Copy another procedure to overwrite this procedure.
+        [ COPYDEF "EVALTEST.COPYDEFWHILERUNNING.PROC "EVALTEST.COPYDEFWHILERUNNING.HELPER2 ]
+
+        ; Copy another procedure to a procedure which is called next.
+        [ COPYDEF "EVALTEST.COPYDEFWHILERUNNING.HELPER "EVALTEST.COPYDEFWHILERUNNING.HELPER1 ]
+
+        ; Run a procedure that didn't exist until the previous instruction was run.
+        [ OUTPUT EVALTEST.COPYDEFWHILERUNNING.HELPER ]
+    ]
+
+    ; Define some helper procedures referenced above.
+    DEFINE "EVALTEST.COPYDEFWHILERUNNING.HELPER  [ [variable] [] ] ; change the number of inputs
+    DEFINE "EVALTEST.COPYDEFWHILERUNNING.HELPER1 [ [] [OUTPUT [original output]] ]
+    DEFINE "EVALTEST.COPYDEFWHILERUNNING.HELPER2 [ [] [OUTPUT [new output     ]] ]
+
+    ; The first definition should be used for the duration of the first execution.
+    ; It shouldn't change mid-execution.
+    SIMPLEREPORTTEST [ EVALTEST.COPYDEFWHILERUNNING.PROC ] [original output]
+
+    ; Confirm that the COPYDEFs completed successfully.
+    SIMPLEREPORTTEST [ EVALTEST.COPYDEFWHILERUNNING.PROC ] [new output]
+    SIMPLEREPORTTEST [ EVALTEST.COPYDEFWHILERUNNING.COPY ] [original output]
+
+    ; Clean up.
+    ERASE "EVALTEST.COPYDEFWHILERUNNING.COPY
+    ERASE "EVALTEST.COPYDEFWHILERUNNING.PROC
+    ERASE "EVALTEST.COPYDEFWHILERUNNING.HELPER
+    ERASE "EVALTEST.COPYDEFWHILERUNNING.HELPER1
+    ERASE "EVALTEST.COPYDEFWHILERUNNING.HELPER2
+END
+
+TO EVALTEST.DEFINEAFTERRUN
+    ; Define a procedure that runs an undefined procedure.
+    DEFINE "DEFINEAFTERRUN [ []
+        [ LOCAL [variable] ]
+        [ MAKE "variable MISSINGPROCEDURE 1 2 ]
+        [ OUTPUT :variable ]
+    ]
+
+    ; Running the procedure should throw an error.
+    (RUNIDONTKNOWHOWTOTEST
+        [ DEFINEAFTERRUN ]
+        "|I don't know how to MISSINGPROCEDURE|)
+
+    ; Define the missing procedure.
+    DEFINE "MISSINGPROCEDURE [ [a b] [OUTPUT SUM :a :b] ]
+
+    ; Running the procedure should retreeify it.
+    SIMPLEREPORTTEST [ DEFINEAFTERRUN ] 3
+
+    ; Cleanup
+    ERASE [DEFINEAFTERRUN MISSINGPROCEDURE]
+END
+
+TO EVALTEST.UNEXPECTEDCLOSEPAREN.BADPROC
+   ; For bug #563, the repro needs two lines before the bad line.
+   MAKE "variable1 "value1
+   MAKE "variable2 "value2
+   MAKE "variable3 "value3    ) ; unexpected close paren
+   MAKE "variable4 "value4
+END
+
+TO EVALTEST.UNEXPECTEDCLOSEPAREN
+   ; Bug #563 is that a proceedure with an unbalanced close paren
+   ; would cause FMSLogo to go into an infinite loop if it was
+   ; run twice.  In addition to the infinite loop, there the
+   ; instructions prior to the syntax error were not run.
+   LOCAL [variable1 variable2 variable3 variable4]
+   RUNUNEXPECTEDCLOSEPARENTEST [ EVALTEST.UNEXPECTEDCLOSEPAREN.BADPROC ]
+   SIMPLEREPORTTEST  [ :variable1 ] "value1
+   SIMPLEREPORTTEST  [ :variable2 ] "value2
+   SIMPLEREPORTTEST  [ :variable3 ] "value3
+   RUNHASNOVALUETEST [ :variable4 ]
+
+   ; Running it a second time caused an infinite loop.
+   TRACEINSTRUCTION  [ MAKE "variable1 "unset ]
+   TRACEINSTRUCTION  [ MAKE "variable2 "unset ]
+   TRACEINSTRUCTION  [ MAKE "variable3 "unset ]
+   RUNUNEXPECTEDCLOSEPARENTEST [ EVALTEST.UNEXPECTEDCLOSEPAREN.BADPROC ]
+   SIMPLEREPORTTEST  [ :variable1 ] "value1
+   SIMPLEREPORTTEST  [ :variable2 ] "value2
+   SIMPLEREPORTTEST  [ :variable3 ] "value3
+   RUNHASNOVALUETEST [ :variable4 ]
+END
+
+TO EVALTEST.BUG137.OUTPUT1234
+   OUTPUT 1234
+END
+
+TO EVALTEST.BUG137.PARAMETERWITHDEFAULTVALUE [:param EVALTEST.BUG137.OUTPUT1234]
+END
+
+TO EVALTEST.BUG137
+    ; Bug 137 is a leak when calling a procedure with
+    ; a default value whose evaluation requires calling
+    ; a non-primitive.
+    EVALTEST.BUG137.PARAMETERWITHDEFAULTVALUE
+END
+
+; A macro that outputs whever its given as input.
+.MACRO EVALTEST.BUG599.MACRO :variable
+    OUTPUT [:variable]
+END
+
+TO EVALTEST.BUG599
+    ; Bug #599 is a bug where running a macro as an input
+    ; to another procedure ends up evaluating the macro's
+    ; output list in the context of the macro, not the
+    ; context of the caller.
+    LOCAL "variable
+    MAKE "variable "outer_scope
+
+    ; EVALTEST.BUG599.MACRO has a parameter that shadows
+   ; "variable".  The output list from EVALTEST.BUG599.MACRO
+    ; is [:variable], which, when evaluated in the context of
+    ; the caller, has the value "outer_scope".  The bug
+    ; was that it would be evaluted as "innner_scope".
+    SIMPLEREPORTTEST [EVALTEST.BUG599.MACRO "inner_scope] "outer_scope
+END
+
+TO EVALTEST.BUG600.INNER :variable
+   OUTPUT APPLY [[x] "output] [ignored]
+END
+
+TO EVALTEST.BUG600
+    ; Bug #600 is a bug where the local variables of a tail-called
+    ; procedure leak into the calling procedure's scope when the
+    ; tail-called procedure invokes APPLY with certain arguments.
+    LOCAL "variable
+
+    MAKE "variable "outside
+    SIMPLEREPORTTEST [LIST EVALTEST.BUG600.INNER "input :variable] [output outside]
+END
+
+TO EVALTEST.BUG606.PROCEDURE
+   IGNORE [The instructions before the TO used to be leaked]
+   IGNORE [This was a problem in cleaning up a partially tree-ified procedure]
+   TO BADPROCEDURE
+END
+
+TO EVALTEST.BUG606
+   ; Bug #606 is a memory leak when the definition of a procedure
+   ; has "TO" in it (or any syntax error).
+   RUNEXPECTERRORTEST [ EVALTEST.BUG606.PROCEDURE ] 23
+END
+
+TO EVALTEST.UNKNOWNAFTERSTOP.PROC
+  MAKE "beforestop "true
+  STOP
+  MAKE "afterstop "true
+
+  ; Different paths in the parser for an unknown procedure.
+  UNKNOWN1 1
+  (UNKNOWN2)
+  (UNKNOWN3 1)
+END
+
+TO EVALTEST.UNKNOWNAFTERSTOP.SINGLELINE
+  ; This is simmilar to EVALTEST.UNKNOWNAFTERSTOP.PROC except
+  ; All of the code is on a single line.  This should not
+  ; affect the behvavior.
+  MAKE "beforestop "true STOP MAKE "afterstop "true UNKNOWN1 1 (UNKNOWN2)  (UNKNOWN3 1)
+END
+
+TO EVALTEST.UNKNOWNAFTERSTOP
+   ; Bug #603 is that having unknown procedures after a STOP
+   ; can cause a parse error that prevents instructions before
+   ; the stop from being run.
+   LOCAL [beforestop afterstop]
+   TRACEINSTRUCTION [ MAKE "beforestop "false ]
+   TRACEINSTRUCTION [ MAKE "afterstop  "false ]
+
+   ; The procedure should run up to the STOP.
+   TRACEINSTRUCTION [ EVALTEST.UNKNOWNAFTERSTOP.PROC ]
+   FAILIFNOTTRUE  [:beforestop]
+   FAILIFNOTFALSE [:afterstop]
+
+   ; Run the same test, except with all instructions on the same line.
+   ; The behavior should be the same as above.
+   TRACEINSTRUCTION [ MAKE "beforestop "false ]
+   TRACEINSTRUCTION [ MAKE "afterstop  "false ]
+   TRACEINSTRUCTION [ EVALTEST.UNKNOWNAFTERSTOP.SINGLELINE ]
+   FAILIFNOTTRUE  [:beforestop]
+   FAILIFNOTFALSE [:afterstop]
+
+END
+
+
+TO EVALTEST.PARSEERRORAFTEROUTPUT.PROC :parameter
+   ; Since "OUTPUT 5" is before any parse errors, it should run no parse
+   ; error should be reported.  This should happen, even if the treeification
+   ; errors are same line as OUTPUT.
+   OUTPUT 5 ~
+     (EVALTEST.PARSEERRORAFTEROUTPUT.PROC) ~
+     (EVALTEST.PARSEERRORAFTEROUTPUT.PROC 1 2) ~
+     (*5) ~
+     (5*) ~
+     (*) ~
+     (5**6) ~
+     )
+
+   ; Repeat all of the errors on a different line
+   EVALTEST.PARSEERRORAFTEROUTPUT.PROC
+   (EVALTEST.PARSEERRORAFTEROUTPUT.PROC)
+   (EVALTEST.PARSEERRORAFTEROUTPUT.PROC 1 2)
+   *5
+   5*
+   5**6
+   )
+END
+
+
+TO EVALTEST.PARSEERRORAFTEROUTPUT
+  ; Bug #250 is that instructions on a line don't get run.
+  ; This is similar to Bug #603, which is tested by EVALTEST.UNKNOWNAFTERSTOP.
+  SIMPLEREPORTTEST [ EVALTEST.PARSEERRORAFTEROUTPUT.PROC ] 5
+
+  ; Some parse errors can't be reproduced with TO because its parser checks for
+  ; unbalanced parentheses.  We can use DEFINE to test all parse errors in isolation.
+  ; To get a real open paren, we must runparse it.
+  LOCAL "open_paren
+  MAKE "open_paren ITEM 1 RUNPARSE "\(
+  TRACEINSTRUCTION [ DEFINE "BUGPROC (LIST [] [OUTPUT 1] (LIST :open_paren ) ) ]
+  SIMPLEREPORTTEST [ BUGPROC ] 1
+
+  ; Make sure that the parse errors are still errors if executed.
+  LOCAL "counter
+  TRACEINSTRUCTION [ MAKE "counter 0 ]
+  TRACEINSTRUCTION [ DEFINE "BUGPROC (LIST [] [MAKE "counter 1] (LIST :open_paren) ) ]
+  RUNTOOMANYOPENPARENSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 1
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 2] [EVALTEST.PARSEERRORAFTEROUTPUT.PROC] ] ]
+  RUNNOTENOUGHINPUTSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 2
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 3] [(EVALTEST.PARSEERRORAFTEROUTPUT.PROC)] ] ]
+  RUNNOTENOUGHINPUTSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 3
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 4] [(EVALTEST.PARSEERRORAFTEROUTPUT.PROC 1 2)] ] ]
+  RUNTOOMANYINPUTSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 4
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 5] [*5] ] ]
+  RUNNOTENOUGHINPUTSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 5
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 6] [5*] ] ]
+  RUNNOTENOUGHINPUTSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 6
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 7] [*] ] ]
+  RUNNOTENOUGHINPUTSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 7
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 8] [5**6] ] ]
+  RUNNOTENOUGHINPUTSTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 8
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 9] [)] ] ]
+  RUNUNEXPECTEDCLOSEPARENTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 9
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 10] [()] ] ]
+  RUNUNEXPECTEDCLOSEPARENTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 10
+
+  TRACEINSTRUCTION [ DEFINE "BUGPROC [ [] [MAKE "counter 11] [EVALTEST.PARSEERRORAFTEROUTPUT.PROC ()] ] ]
+  RUNUNEXPECTEDCLOSEPARENTEST [ BUGPROC ]
+  SIMPLEREPORTTEST [:counter] 11
+
+  ; Clean up
+  ERASE "BUGPROC
+END
+
+TO EVALTEST.PARAMSDONTPOLLUTEVARIABLES.PARAM1 [:Param1Param 123]
+
+   LOCALMAKE "Param1LocalVariable 123
+   OUTPUT 1234
+END
+
+TO EVALTEST.PARAMSDONTPOLLUTEVARIABLES.PARAM2
+
+   ; Param1 should be defined when evaluating Param2
+   SIMPLEREPORTTEST [NAMEP "Param1] LOCALETRUE
+
+   ; The parameters to the procedure which defined
+   ; Param1 should not be defined.
+   SIMPLEREPORTTEST [NAMEP "Param1Param] LOCALEFALSE
+
+   ; Local variables defined in the procedure which defined
+   ; Param1 should not be defined.
+   SIMPLEREPORTTEST [NAMEP "Param1LocalVariable] LOCALEFALSE
+
+   OUTPUT 1234
+END
+
+TO EVALTEST.PARAMSDONTPOLLUTEVARIABLES.INNER [:Param1 EVALTEST.PARAMSDONTPOLLUTEVARIABLES.PARAM1] [:Param2 EVALTEST.PARAMSDONTPOLLUTEVARIABLES.PARAM2]
+
+   ; The parameters to the procedure which defined
+   ; Param1 should not be defined.
+   SIMPLEREPORTTEST [NAMEP "Param1Param] LOCALEFALSE
+
+   ; Local variables defined in the procedure which defined
+   ; Param1 should not be defined.
+   SIMPLEREPORTTEST [NAMEP "Param1LocalVariable] LOCALEFALSE
+END
+
+TO EVALTEST.PARAMSDONTPOLLUTEVARIABLES
+   LOCAL [Param1 Param1Variable Param1Param Param2]
+   EVALTEST.PARAMSDONTPOLLUTEVARIABLES.INNER
+END
+
+TO EVALTEST.CANNOTTREEIFYDEFAULTVALUE.WORKER [:a ()]
+  ; Tests when treeifying the expression for a default value
+  ; encounters an error.  During some refactoring, this caused
+  ; an access violation, so it's a good regression test to keep.
+END
+
+TO EVALTEST.CANNOTTREEIFYDEFAULTVALUE
+   ; The procedure shouldn't run if the expression for the default
+   ; value cannot be treeified.
+   RUNUNEXPECTEDCLOSEPARENTEST [ EVALTEST.CANNOTTREEIFYDEFAULTVALUE.WORKER ]
+
+   ; The procedure should run if an argument is explicitly supplied,
+   ; so that the expression for the default value does not need to be run.
+   (EVALTEST.CANNOTTREEIFYDEFAULTVALUE.WORKER 1)
+END
+
+TO EVALTEST.NOINPUTSTOOUTPUT.HELPER
+   IF LOCALETRUE [ 
+     MAKE "instructionlistran 1 ; This should be run
+     (OutPut)                   ; error: not enough inputs given
+     MAKE "instructionlistran 2 ; This should not be run
+   ]
+END
+
+TO EVALTEST.NOINPUTSTOOUTPUT
+   LOCALMAKE "instructionlistran 0
+
+   ; This is a regression test for bug #356, which is when OUTPUT
+   ; is not given enough inputs within an instruction list.
+   ; This used to crash.
+   RUNNOTENOUGHINPUTSTEST [ EVALTEST.NOINPUTSTOOUTPUT.HELPER ]
+   SIMPLEREPORTTEST [:instructionlistran] 1
+END
+
+TO EVALTEST.OUTPUTNOTHING
+END
+
+TO EVALTEST.DIDNTOUTPUTTOOUTPUT
+   OUTPUT EVALTEST.OUTPUTNOTHING
+END
+
+TO EVALTEST.NOOUTPUTTOOUTPUTTHROWSERROR
+   ; Evaluate an expression in the context of an argument to OUTPUT
+   ; such that the expression doesn't output a value.
+   ; This should throw an error. (See bug #418)
+   RUNDIDNTOUTPUTTEST [EVALTEST.DIDNTOUTPUTTOOUTPUT]
+END
+
+
+TO EVALTEST.UNKNOWNPROCINMACROLIST.HELPER
+   ; RUN is a macroized primative, so the instruction list is treeified
+   ; as part of the "macro_return" label.  This tests when the treeification
+   ; fails because the procedure is unknown.
+
+   ; This particular repro is a regression test for a crash.
+   ; The parameter to UNKNOWNPROC must be a list and there must
+   ; be a procedure call after it.
+   RUN [(UNKNOWNPROC [1 2 3])]
+   HOME
+END
+
+TO EVALTEST.UNKNOWNPROCINMACROLIST
+
+  (RUNIDONTKNOWHOWTOTEST
+      [ EVALTEST.UNKNOWNPROCINMACROLIST.HELPER ]
+      "|I don't know how to UNKNOWNPROC|
+      "EVALTEST.UNKNOWNPROCINMACROLIST.HELPER
+      [RUN [(UNKNOWNPROC [1 2 3])] ]
+  )
+
+END
+
+
+TO EVALTEST.TOOMANYINPUTSINMACROLIST
+  RUNTOOMANYINPUTSTEST [RUN [(FD 10 "toomany)] ]
+END
+
+TO EVALTEST.SILENTLOADFROMTREEIFY
+
+   ; Erase the library procedure PI, if it exists.
+   ; This forces it to be reloaded when PI is next run.
+   ERASE "pi
+
+   ; Define a simple procedure that calls PI
+   DEFINE "EVALTEST.SILENTLOADFROMTREEIFY.PROC [ []
+      ; Run a procedure that is defined in pi.lgo.
+      [ OUTPUT EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC 1 ]
+
+      ; Run PI, which force the loading of pi.lgo and logolib/pi,
+      ; even though the line is never executed.
+      ; pi.lgo defines EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC.
+      ; logolib/pi defines PI.
+      ; For some reason, loading both files causes different behavior
+      ; than just loading one of them.
+      [ PI ]
+   ]
+
+   ; Create a Logo program that defines the procedure and the
+   ; unknown procedure using the name of the unknown procedure.
+   ; Also important, it's named pi.lgo but does not define PI.
+   ; When the first procedure is treeified, FMSLogo will try to
+   ; load the definition of the PI procedure from this procedure.
+   WRITEBINARYDATA "pi.lgo (WORD
+      ; Redefine the procedure
+      "|TO EVALTEST.SILENTLOADFROMTREEIFY.PROC\n|
+      "|END\n|
+      "|\n|
+
+      ; Also define the unknown procedure
+      "|TO EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC :x\n|
+      "|  OUTPUT SUM 1 :x\n|
+      "|END\n|
+   )
+
+   ; Run the procedure.
+   SIMPLEREPORTTEST [ EVALTEST.SILENTLOADFROMTREEIFY.PROC ] 2
+
+   ; Clean up.
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.PROC
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC
+   ERASEFILE "pi.lgo
+END
+
+TO EVALTEST.SILENTLOADFROMTREEIFY.THROWSERROR
+
+   ; Define a simple procedure that calls an unknown procedure.
+   DEFINE "EVALTEST.SILENTLOADFROMTREEIFY.PROC [ []
+      ; Call an unknown procedure.
+      [ EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC 1 ]
+
+      ; Add an instruction afterward to prove that the error
+      ; thrown when loading UNKNOWNPROC didn't stop execution.
+      [ OUTPUT 123 ]
+   ]
+
+   ; Create a Logo program that throws an error.
+   ; This is loaded when the procedure defined above is treeified.
+   ; Note that the filename must be lowercase, even though the procedure
+   ; is defined in uppercase.
+   WRITEBINARYDATA "evaltest.silentloadfromtreeify.unknownproc.lgo (WORD
+
+      ; Define the missing procedure, otherwise we'll get a
+      ; "I don't know how to" error and we won't know if that
+      ; masked the error thrown below.
+      "|TO EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC :x\n|
+      "|END\n|
+ 
+      ; Add some proof that the file was loaded.
+      "|MAKE "fileloaded "TRUE\n|
+
+      ; Throw an error
+      "|THROW "ERROR [Intentional Error]\n|
+
+      ; This shouldn't be called because the error should halt loading.
+      "|MAKE "aftererror "TRUE\n|
+   )
+
+   ; Run the main procedure.
+   ; When this is treeified, it loads the file above, which throws an error.
+   LOCAL [fileloaded aftererror]
+   TRACEINSTRUCTION [ MAKE "fileloaded "FALSE ]
+   TRACEINSTRUCTION [ MAKE "aftererror "FALSE ]
+   SIMPLEREPORTTEST [ EVALTEST.SILENTLOADFROMTREEIFY.PROC ] 123
+
+   ; Confirm that the file was loaded.
+   SIMPLEREPORTTEST [:fileloaded] "TRUE
+
+   ; Confirm that the error was thrown.
+   SIMPLEREPORTTEST [:aftererror] "FALSE
+
+   ; Confirm that the error was ignored.
+   SIMPLEREPORTTEST [ ERROR ] []
+
+   ; Even though the error isn't thrown, FMSLogo still informs the user
+   ; of the problem and offers to open the editor to the file.
+   ; Even if the user declines, the workspace is marked dirty, which
+   ; ends up prompting us if we try to exit.  We clear this error
+   ; by saving the workspace.  We can save it anywhere, but since
+   ; we're going to delete the file created above anyway, we might as
+   ; well save it there.
+   TRACEINSTRUCTION [ SAVE "evaltest.silentloadfromtreeify.unknownproc.lgo ]
+
+   ; Clean up.
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.PROC
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC
+   ERASEFILE "evaltest.silentloadfromtreeify.unknownproc.lgo
+END
+
+
+TO EVALTEST.SILENTLOADFROMTREEIFY.SYNTAXERROR
+   ; This is similar to EVALTEST.SILENTLOADFROMTREEIFY.THROWSERROR
+   ; except that instead of discovering an error at runtime, it's
+   ; discovered when parsing the silently loaded file.
+   ; This exercises a different code path.
+
+   ; Define a simple procedure that calls an unknown procedure.
+   DEFINE "EVALTEST.SILENTLOADFROMTREEIFY.PROC [ []
+
+      ; Call an unknown procedure.
+      ; This forces a silent load during treeification.
+      [ EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC ]
+
+      ; Add an instruction afterward to prove that the error
+      ; thrown when loading UNKNOWNPROC didn't stop execution.
+      [ OUTPUT 100 ]
+   ]
+
+   ; Create a Logo program that that defines the missing procedure.
+   WRITEBINARYDATA "evaltest.silentloadfromtreeify.unknownproc.lgo (WORD
+      ; Define the procedure
+      "|TO EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC\n|
+      "|END\n|
+
+      ; Syntax error (open vbar with no close bar)
+      "|TO OTHER\n|
+      "|  IGNORE "\|\n| ; open vbar
+      "|END\n|          ; DEEPEND error
+      "|\|\n|           ; close the vbar
+   )
+
+   ; Run the main procedure.
+   ; When this is treeified, it loads the file above, which has a syntax error.
+   SIMPLEREPORTTEST [ EVALTEST.SILENTLOADFROMTREEIFY.PROC ] 100
+
+   ; Clean up.
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.PROC
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.UNKNOWNPROC
+   ERASEFILE "evaltest.silentloadfromtreeify.unknownproc.lgo
+
+END
+
+
+TO EVALTEST.RETREEIFYFROMRETREEIFY
+   ; This is a carefully-constructed test case to make it so that
+   ; a procedure is retreeified during the silent load while retreeifing
+   ; that same procedure.  This is an interesting execution path.
+
+   ; Define a simple procedure that calls the "other" procedure.
+   DEFINE "EVALTEST.RETREEIFYFROMRETREEIFY.PROC [ []
+
+      ; A procedure only runs after it has been treeified.
+      ; Now, erase the "other" procedure to force silent loading during
+      ; re-treeifcation.
+      [ ERASE "EVALTEST.RETREEIFYFROMRETREEIFY.OTHER ]
+
+      ; Define and redefine a procedure to force re-treeification as this
+      ; procedure is run.
+      [ DEFINE "EVALTEST.TEMP_PROC [ [x] ] ]
+      [ DEFINE "EVALTEST.TEMP_PROC [ []  ] ]
+
+      ; Call the other prcoedure, which is now undefined.
+      [ EVALTEST.RETREEIFYFROMRETREEIFY.OTHER ]
+
+      ; Execute something to prove that the silent load during retreeification
+      ; was successful and execution continued.
+      [ OUTPUT 123 ]
+   ]
+
+   ; Create a Logo program that calls the main procedure, which is contructed
+   ; to always need to be retreeified.
+   WRITEBINARYDATA "evaltest.retreeifyfromretreeify.other.lgo (WORD
+      ; Run the procedure that silently loaded this file.
+      ; We only do this once to prevent an infinite load loop.
+      "|MAKE "fileloaded SUM 1 :fileloaded\n|
+      "|IFELSE :fileloaded < 2 [\n|
+      "|    IGNORE EVALTEST.RETREEIFYFROMRETREEIFY.PROC\n|
+      "|][\n|
+      "|    DEFINE "EVALTEST.RETREEIFYFROMRETREEIFY.OTHER [ [] ]\n|
+      "|]\n|
+   )
+
+   ; Define the "Other" procedure so that, when the main procedure is run
+   ; it can be initially treeified without any silent loading.  We're saving
+   ; the silent loading for when it's retreefied as it runs.
+   DEFINE "EVALTEST.RETREEIFYFROMRETREEIFY.OTHER [[] ]
+
+   ; Run the main procedure.
+   ; When this is run, it changes the generation to force re-treeification and
+   ; it also deletes a procedure that it calls, to force silent loading.
+   LOCAL "fileloaded
+   TRACEINSTRUCTION [ MAKE "fileloaded 0 ]
+   SIMPLEREPORTTEST [ EVALTEST.RETREEIFYFROMRETREEIFY.PROC ] 123
+
+   ; Confirm that the file was silently loaded twice.
+   SIMPLEREPORTTEST [:fileloaded] 2
+
+   ; Clean up.
+   ERASE "EVALTEST.TEMP_PROC
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.PROC
+   ERASE "EVALTEST.SILENTLOADFROMTREEIFY.OTHER
+   ERASEFILE "evaltest.retreeifyfromretreeify.other.lgo
+
+END
+
+
+TO EVALTEST
+   EVALTEST.CATCHERRORMANYTIMES
+   EVALTEST.TAILRECURSIVE
+   EVALTEST.NONTAILRECURSIVE
+   EVALTEST.TOWHILERUNNING
+   EVALTEST.REDEFINEWHILERUNNING
+   EVALTEST.ERASEWHILERUNNING
+   EVALTEST.ERASEWHILERUNNING.NEEDRETREEIFY
+   EVALTEST.COPYDEFWHILERUNNING
+   EVALTEST.DEFINEAFTERRUN
+   EVALTEST.UNEXPECTEDCLOSEPAREN
+   EVALTEST.BUG137
+   EVALTEST.BUG599
+   EVALTEST.BUG600
+   EVALTEST.BUG606
+   EVALTEST.UNKNOWNAFTERSTOP
+   EVALTEST.PARSEERRORAFTEROUTPUT
+   EVALTEST.PARAMSDONTPOLLUTEVARIABLES
+   EVALTEST.CANNOTTREEIFYDEFAULTVALUE
+   EVALTEST.NOINPUTSTOOUTPUT
+   EVALTEST.NOOUTPUTTOOUTPUTTHROWSERROR
+   EVALTEST.UNKNOWNPROCINMACROLIST
+   EVALTEST.TOOMANYINPUTSINMACROLIST
+   EVALTEST.SILENTLOADFROMTREEIFY
+   EVALTEST.SILENTLOADFROMTREEIFY.THROWSERROR
+   EVALTEST.SILENTLOADFROMTREEIFY.SYNTAXERROR
+   EVALTEST.RETREEIFYFROMRETREEIFY
+END

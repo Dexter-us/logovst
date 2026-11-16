@@ -1,0 +1,49 @@
+LOAD "testlib.lgo
+
+TO LASTTEST.SMOKETEST
+   SIMPLEREPORTTEST [LAST [1 2 3] ] 3
+   SIMPLEREPORTTEST [LAST [1 2]   ] 2
+   SIMPLEREPORTTEST [LAST [1]     ] 1
+   SIMPLEREPORTTEST [LAST "hello  ] "o
+   SIMPLEREPORTTEST [LAST "h      ] "h
+   SIMPLEREPORTTEST [LAST 123     ] 3
+   SIMPLEREPORTTEST [LAST 1.234   ] 4
+   SIMPLEREPORTTEST [LAST 0       ] 0
+   SIMPLEREPORTTEST [LAST -1      ] 1
+END
+
+TO LASTTEST.BADINPUT
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(LAST)]
+   RUNTOOMANYINPUTSTEST   [(LAST "word "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [LAST []  ]
+   RUNDOESNTLIKEINPUTTEST [LAST "|| ]
+   RUNDOESNTLIKEINPUTTEST [LAST {1} ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement.
+   RUNRECOVERABLEERRORTEST [
+      LAST []   ; can't be the empty list
+   ](LIST
+      "||        ; can't be empty word
+      {1}        ; can't be an array
+      []         ; can't be an empty list (again)
+      "||        ; can't be empty word (again)
+      {1 2 3}    ; can't be an array (again)
+      123        ; legal, but must be converted to a string
+   ) ~
+   [3] ; last digit of 123
+
+   ; Test that LAST accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST "allocated "in "LASTTEST.BADINPUT) ] ]
+   SIMPLEREPORTTESTNOCATCH [ LAST [] ] "LASTTEST.BADINPUT
+
+END
+
+TO LASTTEST
+   LASTTEST.SMOKETEST
+   LASTTEST.BADINPUT
+END

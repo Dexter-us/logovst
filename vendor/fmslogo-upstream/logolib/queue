@@ -1,0 +1,14 @@
+.macro queue :the.queue.name :the.item.value
+  ; If :the.queue.name is "the.queue.name, then we can't access
+  ; the caller's queue because the parameter shadows it.
+  ; This is why queue is a macro, to be able to access it in the callers context.
+  if member? :the.queue.name [the.queue.name the.item.value] [
+    output (list "make quoted :the.queue.name "lput quoted :the.item.value "thing quoted :the.queue.name)
+  ]
+
+  ; common case: use a faster way
+  make :the.queue.name lput :the.item.value thing :the.queue.name
+  output []
+end
+
+bury "queue

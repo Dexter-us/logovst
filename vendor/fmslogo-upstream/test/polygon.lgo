@@ -1,0 +1,376 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Tests for POLYSTART, POLYEND, POLYVIEW, LIGHT, and SETLIGHT
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+LOAD "testlib.lgo
+
+TO POLYGONTEST.RUNALREADYSTARTEDTEST :instructions
+  (RUNEXPECTERRORTEST
+      :instructions
+      1500
+      "|Invalid state for instruction: you already have a polygon started|)
+END
+
+TO POLYGONTEST.RUNNOTSTARTEDTEST :instructions
+  (RUNEXPECTERRORTEST
+      :instructions
+      1500
+      "|Invalid state for instruction: you have not started a polygon|)
+END
+
+TO POLYGONTEST.RUNTOOFEWVECTORSTEST :instructions
+  (RUNEXPECTERRORTEST
+      :instructions
+      1500
+      "|Invalid state for instruction: you must have at least 3 vectors to define a polygon|)
+END
+
+TO NEAREST.DECIMAL.PLACES :n :num
+  ; rounds :num to the nearest :n decimal places
+  OUTPUT (ROUND :num*POWER 10 :n) * POWER 10 -1*:n
+END
+
+TO ROUND.VECTOR :n :vector
+  ; rounds every value in :vector to the nearest :n decimal places
+  OUTPUT MAP [NEAREST.DECIMAL.PLACES :n ?] :vector
+END
+
+TO POLYGONTEST.DRAWFACE :k :n 
+  ; k either +1 or -1.  Determines direction.
+  ; n recursion level
+
+  IF :n=0 [STOP]
+
+  LOCALMAKE "roll.pitch ROUND.VECTOR 4 (LIST ROLL PITCH)
+
+  ; stop if we wrapped around the polyhedron
+  IF MEMBERP :roll.pitch :vec.list [STOP]
+
+  PUSH "vec.list :roll.pitch
+
+  ; pick a new color for this face of the polyhedron
+  SETPENCOLOR 1+REMAINDER PENCOLOR 5
+
+  ; draw face for rendering
+  POLYSTART
+  PENDOWN
+  REPEAT :face.edges [
+     FORWARD :edge.length 
+     LEFT    :k*:ang.p
+  ]
+  PENUP
+  POLYEND
+
+  LOCAL [saved.position saved.orientation]
+
+  ; After drawing this face, we draw recursively 
+  ; draw the adjacent faces.  Many of these will
+  ; overlap each other.
+
+  REPEAT :face.edges [
+    FORWARD :edge.length
+
+    MAKE "saved.position    POSXYZ
+    MAKE "saved.orientation ORIENTATION
+
+    ; roll to adjacent face
+    LEFTROLL -:k*:ang.f
+    LEFT     -:k*:ang.p
+
+    POLYGONTEST.DRAWFACE -:k :n-1
+
+    ; restore turtle to original position
+    SETPOSXYZ      :saved.position
+    SETORIENTATION :saved.orientation
+
+    if NOT ORIENTATION = :saved.orientation [
+       ; this is too noisy right now (bug #95)
+       ; REPORTTESTFAILED (LIST "SETORIENTATION :saved.orientation "set "ORIENTATION "to ORIENTATION)
+    ]
+
+    LEFT :k*:ang.p
+  ]
+END
+
+
+TO POLYGONTEST.DEFINEPOLYGON :face.edges :polygons.around :edge.length
+
+   ; :face.edges      = total number of edges in each polygon
+   ; :polygons.around = total number of polygons around half of the polyhedron
+   ; :edge.length     = the number of turtle steps on each edge.
+
+   LOCALMAKE "vec.list [] ; for storing roll.pitch pairs
+
+   LOCALMAKE "ang.f 180-2*ARCSIN ((COS 180/:polygons.around)/(SIN 180/:face.edges))
+   LOCALMAKE "ang.p 360/:face.edges
+
+   BACK :edge.length
+   UPPITCH ARCSIN (1/((TAN (180/:polygons.around)) * TAN (180/:face.edges)))
+   RIGHT 90-(180/:face.edges)
+   POLYGONTEST.DRAWFACE 1 8
+   POLYVIEW
+
+END
+
+TO POLYGONTEST.ROTATEPERSPECTIVE
+  LOCALMAKE "y 200
+  LOCALMAKE "r 800  ; distance of viewpoint from y axis
+  SETTURTLE -1
+  REPEAT 18 [
+     LOCALMAKE "r1 (:r * :r) - (:y * :y)
+     IFELSE :r1>0 [MAKE "r1 SQRT :r1] [MAKE "r1 1]
+     SETXYZ (:r1 * SIN REPCOUNT * 10) :y (:r1 * COS REPCOUNT * 10)
+     POLYVIEW
+  ]
+END
+
+
+TO POLYGONTEST.SMOKETEST
+
+  PERSPECTIVE
+ 
+  SETTURTLE -3 SETPOSXYZ [1000 0 2000]
+  SETLIGHT [.2 .7]
+  SETTURTLE 0
+  CLEARSCREEN
+  PENUP
+  HIDETURTLE
+  SETPENCOLOR 1
+
+  ; We draw a tetrahedron as a regression test for bug #269
+  POLYGONTEST.DEFINEPOLYGON 3 3 250
+
+  ; rotate the perspective a bit
+  POLYGONTEST.ROTATEPERSPECTIVE
+
+  CHECKSCREEN "tetrahedron-in-perspective
+ 
+  ; restore to default state
+  CLEARSCREEN
+  SHOWTURTLE
+  PENDOWN
+  SETPENCOLOR 0
+  WRAP
+END
+
+TO POLYGONTEST.PENUP
+  ; Tests that movements when the pen is up are not
+  ; treated as polygon vertices.  We do this by confirming
+  ; that we get an error because the vertices are ignored.
+  PERSPECTIVE
+  CLEARSCREEN
+
+  POLYSTART
+  PENDOWN
+  REPEAT 1 [ FORWARD 100 RIGHT 90 ] ; counted
+  PENUP
+  REPEAT 2 [ FORWARD 100 RIGHT 90 ] ; not counted
+  PENDOWN
+  REPEAT 1 [ FORWARD 100 RIGHT 90 ] ; counted
+
+  ; We have added four vertices to the polygon, but two
+  ; of them were added while the pen was up.  These should
+  ; be ignored, so in effect we only added two vertices.
+  ; This should result in an error, because a polygon must
+  ; have at least three vertices.
+  POLYGONTEST.RUNTOOFEWVECTORSTEST [ POLYEND ]
+
+  WRAP
+END
+
+TO POLYGONTEST.TRIANGLE
+  ; tests that there are no error when defining a polygon with three vertices
+  PERSPECTIVE
+
+  TRACEINSTRUCTION [ POLYSTART ]
+  TRACEINSTRUCTION [ FORWARD 100 ]           ; vertex #1
+  TRACEINSTRUCTION [ RIGHT 40 FORWARD 100  ] ; vertex #2
+  TRACEINSTRUCTION [ RIGHT 40 FORWARD 100  ] ; vertex #3
+  TRACEINSTRUCTION [ POLYEND ]
+  POLYVIEW
+
+  WRAP
+END
+
+
+TO POLYGONTEST.COMPLEX.RECTPOINT :ang
+  ; BAND X,Z AFTER Z ROTN
+  LOCALMAKE "tx :bradius*(COS :ang)*COS :phi
+  LOCALMAKE "tz :bradius*(SIN :ang)
+
+  OUTPUT (LIST
+    :tx*(COS :theta)-(:tz*SIN :theta)
+    :tx*(SIN :theta)+(:tz*COS :theta)
+    -:bradius*(COS :ang)*SIN :phi
+  )
+END
+
+TO POLYGONTEST.COMPLEX
+  ; Draws a complex 3D shape with hidden surfaces and shared verticies.
+  ; This is a regression test for a Bug #592 and the code for it is
+  ; adapted from the the bug report.
+  PERSPECTIVE
+
+  PENUP
+  SETLIGHT [.3 .5]
+  CLEARSCREEN
+  HIDETURTLE
+
+  ; :rs and :rl should be small, relatively prime integers. DO NOT PUT RS = RL
+  ; :fh (0 - 1) size of h relative to rs
+  ; :size controls size of plot
+  ; :fbr (0 - 1) radius of band relative to m
+  ; :n no. of segments /cycle for whole curve
+  ; :lor (values 0 or 1) determines whether knot is left or right handed
+
+  LOCALMAKE "dr 3
+  LOCALMAKE "fr 2.5
+  LOCALMAKE "h 0.3
+  LOCALMAKE "lor 0
+  LOCALMAKE "n 130
+  LOCALMAKE "rl 5
+  LOCALMAKE "rs 2
+  LOCALMAKE "size 120
+  LOCALMAKE "size1 40
+
+  ; 5-KNOT
+
+  LOCALMAKE "eyepos [0 0 1000]
+  LOCALMAKE "offset [0 100 0]
+  LOCALMAKE "b.incr 20                         ;ASSIGNS BAND INCREMENT in degress
+  LOCALMAKE "bradius .1*:size
+  LOCALMAKE "position.list [(MAP "SUM :offset (LIST
+     :size1*(:dr*(COS :u)+:h*COS (:dr/:rs*:u)) ; X
+     :size1*(:dr*(SIN :u)-:h*SIN (:dr/:rs*:u)) ; Y
+     :size1*(sin (:fr*:u+180*:lor))            ; Z
+  ))]
+
+  SETTURTLE -1 SETPOSXYZ :eyepos 
+  SETTURTLE 0
+  LOCALMAKE "u.start 0
+  LOCALMAKE "u :u.start                               ;SET :U TO START
+  LOCALMAKE "u.incr 360/:n                            ;SET UP U INCREMENT
+  LOCALMAKE "u.end  360*:rs                           ;SET UP U.END
+  LOCALMAKE "iposn  RUN :position.list                ;STORES FIRST CURVE POINT 
+  REPEAT (ROUND (:u.end-:u.start)/:u.incr)+1 [
+    MAKE "u :u+:u.incr
+    LOCALMAKE "tcoord RUN :position.list              ;FIND NEXT CURVE POINT
+    LOCAL [p0 p1 p2 p3]
+    LOCALMAKE "norm (MAP "DIFFERENCE :iposn :tcoord)
+
+    ;SET UP SPHERICAL COORD OF NORMAL TO BAND
+    LOCALMAKE "s SQRT APPLY "SUM MAP [?1 * ?1] :norm  ; s = size of normal
+    LOCALMAKE "theta (ARCTAN FIRST :norm FIRST BUTFIRST :norm)
+    LOCALMAKE "phi ARCCOS (LAST :norm)/:s
+    MAKE "norm MAP [2 * ?] :norm                      ;CHANGE THE OVERLAP BETWEEN BANDS HERE
+    MAKE "p1 (MAP "SUM (POLYGONTEST.COMPLEX.RECTPOINT :b.incr) :iposn)    ;1ST PT OF RECTANGLE AND BAND
+    MAKE "p3 (MAP "SUM :p1 :norm)                                         ;NEXT EDGE OF BAND
+    PENUP
+    FOR [ang1 0 360 :b.incr] [
+        MAKE "p0 (MAP "SUM (POLYGONTEST.COMPLEX.RECTPOINT :ang1) :iposn)
+        MAKE "p2 (MAP "SUM :p0 :norm)
+
+        ; Draw the rectangle
+        POLYSTART
+        SETPOSXYZ :p0
+        PENDOWN
+        SETPOSXYZ :p2
+        SETPOSXYZ :p3
+        SETPOSXYZ :p1
+        SETPOSXYZ :p0
+        PENUP
+        POLYEND
+
+        ; The next rectangle shares two points
+        ; with the current rectangle.
+        MAKE "p1 :p0
+        MAKE "p3 :p2
+    ] ;BAND OF RECT
+    MAKE "iposn :tcoord
+  ]
+
+  POLYVIEW
+
+  CHECKSCREEN "polygon-5-knot
+  SHOWTURTLE
+  PENDOWN
+END
+
+
+TO POLYGONTEST.CLEARSCREEN
+  ; tests that the polygons are cleared with clearscreen.
+  PERSPECTIVE
+
+  TRACEINSTRUCTION [ POLYSTART REPEAT 4 [ FORWARD 100 RIGHT 90 ] POLYEND ] ; complete polygon
+  TRACEINSTRUCTION [ POLYSTART REPEAT 4 [ FORWARD 100 LEFT  90 ] ]         ; open polygon
+  TRACEINSTRUCTION [ CLEARSCREEN ] ; clears completed and open polygon
+  TRACEINSTRUCTION [ FORWARD 100 ] ; draws something on the screen
+  TRACEINSTRUCTION [ POLYVIEW ] ; should do nothing because there are no polygons
+
+  CHECKSCREEN "polyview-after-clearscreen
+
+  WRAP
+END
+
+TO POLYGONTEST.BADINPUT
+  PERSPECTIVE
+
+  RUNTOOMANYINPUTSTEST   [ (POLYSTART "toomany) ]
+  RUNTOOMANYINPUTSTEST   [ (POLYEND   "toomany) ]
+  RUNTOOMANYINPUTSTEST   [ (POLYVIEW  "toomany) ]
+  RUNTOOMANYINPUTSTEST   [ (LIGHT     "toomany) ]
+  RUNNOTENOUGHINPUTSTEST [ (SETLIGHT)           ]
+  RUNTOOMANYINPUTSTEST   [ (SETLIGHT  [0.3 0.3] "toomany) ]
+
+  ; POLYSTART while in POLYSTART (no vertices)
+  TRACEINSTRUCTION                  [ POLYSTART ]
+  POLYGONTEST.RUNALREADYSTARTEDTEST [ POLYSTART ]
+
+  ; POLYSTART while in POLYSTART (create some vertices)
+  TRACEINSTRUCTION                  [ POLYSTART REPEAT 3 [ BACK 10 LEFT 40 ] ]
+  POLYGONTEST.RUNALREADYSTARTEDTEST [ POLYSTART ]
+
+  ; POLYEND without POLYSTART
+  ; Also tests that the POLYSTART errors above reset polygon state.
+  POLYGONTEST.RUNNOTSTARTEDTEST [ POLYEND ]
+
+  ; POLYEND with one vertex
+  TRACEINSTRUCTION                 [ POLYSTART FORWARD 10 ]
+  POLYGONTEST.RUNTOOFEWVECTORSTEST [ POLYEND ]
+
+  ; POLYEND with two vertices
+  TRACEINSTRUCTION                 [ POLYSTART FORWARD 10 RIGHT 40 FORWARD 10 ]
+  POLYGONTEST.RUNTOOFEWVECTORSTEST [ POLYEND ]
+
+  ; SETLIGHT
+  TRACEINSTRUCTION [ SETLIGHT [0.1 0.2] ] ; seed with a known value
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT "word           ]
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT 100             ]
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT []              ] ; NIL (always a good test)
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT { 0.4 0.4 }     ] ; not a list
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ 0.4 ]         ] ; list too small
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ 0.4 0.4 0.4 ] ] ; list too large
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ abc 0.4 ]     ] ; bad ambient
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ []  0.4 ]     ] ; bad ambient
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ {}  0.4 ]     ] ; bad ambient
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ 0.4 abc ]     ] ; bad diffuse
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ 0.4 []  ]     ] ; bad diffuse
+  RUNDOESNTLIKEINPUTTEST [ SETLIGHT [ 0.4 {}  ]     ] ; bad diffuse
+  SIMPLEREPORTTEST [ LIGHT ] [0.1 0.2] ; the value of LIGHT should not have changed
+
+  WRAP
+
+  ; POLYGON is not supported outside of PERSPECTIVE mode.
+  ; The error is reported in POLYGON, see Bug #492.
+  TRACEINSTRUCTION                 [ POLYSTART REPEAT 3 [ FORWARD 10 RIGHT 120 ] ]
+  POLYGONTEST.RUNTOOFEWVECTORSTEST [ POLYEND ]
+
+END
+
+TO POLYGONTEST
+  POLYGONTEST.SMOKETEST
+  POLYGONTEST.COMPLEX
+  POLYGONTEST.TRIANGLE
+  POLYGONTEST.PENUP
+  POLYGONTEST.CLEARSCREEN
+  POLYGONTEST.BADINPUT
+END

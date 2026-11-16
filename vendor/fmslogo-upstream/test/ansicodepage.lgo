@@ -1,0 +1,54 @@
+; This file contains simple, interactive tests to confirm that
+; non-ASCII characters can be read according to the system's code
+; page and rendered correctly on different versions of FMSLogo.
+;
+; Note that all languages are given in the same file.  That's
+; also part of the test.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+LOAD "testlib.lgo
+
+TO ANSICODEPAGETEST
+
+  IF EQUALP 2052 ITEM 4 LOGOVERSION [ ; Tranditional Chinese
+
+     ; This is the translation for simplified chinese
+     SIMPLEREPORTTEST [COUNT "єєЧЦ ] 2
+
+     ; This is the translation for traditional chinese
+     SIMPLEREPORTTEST [COUNT "ќhЧЦ ] 2
+
+     ; Drawing text to the screen should work
+     CLEARSCREEN
+     RIGHT 90
+     LABEL "|єєЧЦ and ќhЧЦ work!|
+     CHECKSCREEN "ansi-chinese
+  ]
+  IF EQUALP 1049 ITEM 4 LOGOVERSION [ ; Russian
+
+     ; This is the translation for the Russia Federation
+     SIMPLEREPORTTEST [COUNT "|Российская Федерация| ] 20
+
+     ; This is the translation for Moscow
+     SIMPLEREPORTTEST [COUNT "Москва ] 6
+
+     ; The code point should be shown correctly.
+     SIMPLEREPORTTEST [ASCII "я ] 255
+
+     ; Drawing text to the screen should work
+     CLEARSCREEN
+     RIGHT 90
+     LABEL "|Российская Федерация and Москва work!|
+     CHECKSCREEN "ansi-russian
+  ]
+  IF EQUALP 1032 ITEM 4 LOGOVERSION [ ; Greek
+
+     ; This is the translation for "Greek Language"
+     SIMPLEREPORTTEST [COUNT "|еллзнйкЮ глюууб| ] 15
+
+     ; Drawing text to the screen should work
+     CLEARSCREEN
+     RIGHT 90
+     LABEL "|еллзнйкЮ глюууб works!|
+     CHECKSCREEN "ansi-greek
+  ]
+END

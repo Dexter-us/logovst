@@ -1,0 +1,245 @@
+LOAD "testlib.lgo
+
+TO READCHARSTEST.READBINARYDATA :filename :data
+
+   LOCALMAKE "previousreader READER
+
+   (OPENREAD :filename LOCALETRUE)
+   SETREAD   :filename
+
+   WHILE [ NOT EMPTY? :data ] [
+      LOCALMAKE "datum POP "data
+      SIMPLEREPORTTEST [READCHARS 1] :datum
+   ]
+   SIMPLEREPORTTEST [READCHAR] []
+
+   CLOSE :filename
+
+END
+
+TO READCHARSTEST.COMMANDER
+   LOCALMAKE "oldreader READER
+
+   ; set the read stream to the commander
+   TRACEINSTRUCTION [ SETREAD []  ]
+
+   ; reading from the commander always outputs the empty list
+   SIMPLEREPORTTEST [ READCHARS 0   ] []
+   SIMPLEREPORTTEST [ READCHARS 100 ] []
+
+   SETREAD :oldreader
+END
+
+TO READCHARSTEST.EOFTEST
+
+   LOCALMAKE "data MAP "CHAR ISEQ 0 255
+   LOCALMAKE "filename "readchars-test.txt
+
+   WRITEBINARYDATA :filename APPLY "WORD :data
+
+   (OPENREAD :filename LOCALETRUE)
+   SETREAD   :filename
+
+   ; read exactly the size of the file
+   TRACEINSTRUCTION [READCHARS 256]
+
+   ; reading zero characters should output []
+   SIMPLEREPORTTEST [READCHARS 0] []
+
+   CLOSE     :filename
+   ERASEFILE :filename
+END
+
+TO READCHARSTEST.SMOKETEST
+   LOCALMAKE "data MAP "CHAR ISEQ 0 255
+   LOCALMAKE "filename "readchars-test.txt
+
+   WRITEBINARYDATA :filename APPLY "WORD :data
+
+   (OPENREAD :filename LOCALETRUE)
+   SETREAD   :filename
+
+   ; reading zero characters should output the empty word
+   SIMPLEREPORTTEST [READCHARS 0] "||
+
+   ; reading one character should output that character
+   SIMPLEREPORTTEST [READCHARS 1] CHAR 0
+
+   ; reading one character should output that character
+   SIMPLEREPORTTEST [READCHARS 2] WORD CHAR 1 CHAR 2
+
+   ; Read more bytes than remain in the file. 
+   ; This should output however much data is left.
+   SIMPLEREPORTTEST [READCHARS 1000] APPLY "WORD MAP "CHAR ISEQ 3 255
+
+   ; Read beyond the end of the file.  This outputs [].
+   SIMPLEREPORTTEST [READCHARS 1] []
+
+   ; there is no more data, so READCHARS should always output the empty list
+   SIMPLEREPORTTEST [READCHARS 0] []
+
+   CLOSE     :filename
+   ERASEFILE :filename
+END
+
+TO READCHARSTEST.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [(READCHARS)]
+   RUNTOOMANYINPUTSTEST   [(READCHARS 100 "toomany)]
+
+   RUNDOESNTLIKEINPUTTEST [READCHARS 12.5 ]
+   RUNDOESNTLIKEINPUTTEST [READCHARS []   ]
+   RUNDOESNTLIKEINPUTTEST [READCHARS [1]  ]
+   RUNDOESNTLIKEINPUTTEST [READCHARS -1   ]
+   RUNDOESNTLIKEINPUTTEST [READCHARS {1}  ]
+   RUNDOESNTLIKEINPUTTEST [READCHARS "ten ]
+
+   ; Open a file so that READCHARS won't simply return []
+   LOCALMAKE "filename "readchars-badinput.txt
+   WRITEBINARYDATA :filename "|This is a test file for READCHARS|
+
+   (OPENREAD :filename LOCALETRUE)
+   SETREAD   :filename
+
+   ; The size of the data structures is different on Windows and GNU/Linux.
+   IF NOT EQUALP 1 ITEM 1 MACHINE [
+      ; IsWindows = 0 (assume GNU/Linux where sizeof(wchar_t) == 4)
+      ; For the tests below, on Windows, malloc() would be called, which
+      ; could return a buffer, if there was >512MiB available.
+      RUNOUTOFMEMORYTEST [READCHARS 536870911] ; malloc() fails (4 byte wchar_t)
+      RUNOUTOFMEMORYTEST [READCHARS 536870912] ; overflow (4 byte wchar_t)
+   ]
+
+   RUNOUTOFMEMORYTEST     [READCHARS 1000000000] ; malloc() fails
+   RUNOUTOFMEMORYTEST     [READCHARS 1073741822] ; malloc() fails (limit, 2 byte wchar_t)
+   RUNOUTOFMEMORYTEST     [READCHARS 1073741823] ; overflow (limit 2 byte wchar_t)
+   RUNOUTOFMEMORYTEST     [READCHARS 2147483647] ; overflow
+   RUNDOESNTLIKEINPUTTEST [READCHARS 2147483648] ; must be a signed int
+
+   CLOSE     :filename
+   ERASEFILE :filename
+
+END
+
+TO READCHARSTEST.UTF8
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   LOCALMAKE "filename "readchars-test-utf8.txt
+
+   LOCALMAKE "utf8Bom      (WORD CHAR 239 CHAR 187 CHAR 191)
+   LOCALMAKE "utf8Char1Min (WORD CHAR 0)
+   LOCALMAKE "utf8Char1Max (WORD CHAR 127)
+
+   LOCALMAKE "utf8Char2Nul (WORD CHAR 192 CHAR 128)
+   LOCALMAKE "utf8Char2Min (WORD CHAR 194 CHAR 128)
+   LOCALMAKE "utf8Char2Max (WORD CHAR 223 CHAR 191)
+
+   LOCALMAKE "utf8Char3Nul (WORD CHAR 224 CHAR 128 CHAR 128)
+   LOCALMAKE "utf8Char3Min (WORD CHAR 224 CHAR 160 CHAR 128)
+   LOCALMAKE "utf8Char3Max (WORD CHAR 239 CHAR 191 CHAR 191)
+
+   LOCALMAKE "utf8Char4Nul (WORD CHAR 240 CHAR 128 CHAR 128 CHAR 128)
+   LOCALMAKE "utf8Char4Min (WORD CHAR 247 CHAR 144 CHAR 128 CHAR 128)
+   LOCALMAKE "utf8Char4Max (WORD CHAR 247 CHAR 191 CHAR 191 CHAR 191)
+
+   ; UTF-8 only specifies up to 4-byte codings, but you can follow the
+   ; pattern to create illegal 5- and 6- byte codings.
+   LOCALMAKE "utf8Char5Max (WORD CHAR 251 CHAR 191 CHAR 191 CHAR 191 CHAR 191)
+   LOCALMAKE "utf8Char6Max (WORD CHAR 253 CHAR 191 CHAR 191 CHAR 191 CHAR 191 CHAR 191)
+
+   LOCALMAKE "utf8NonStartByte CHAR 187
+
+   WRITEBINARYDATA :filename (WORD
+     :utf8Bom
+     :utf8Char1Min ; min char in 1-char coding
+     :utf8Char1Max ; max char in 1-char coding
+     :utf8Char2Min ; min char in 2-char coding
+     :utf8Char2Max ; max char in 2-char coding
+     :utf8Char3Min ; min char in 3-char coding
+     :utf8Char3Max ; max char in 3-char coding
+     :utf8Char4Min ; min char in 4-char coding
+     :utf8Char4Max ; max char in 4-char coding
+
+     :utf8NonStartByte :utf8NonStartByte ; illegal sequence
+
+     :utf8Char2Min ; legal again
+
+     :utf8Char2Nul ; overlong NUL (2-bytes)
+     :utf8Char3Nul ; overlong NUL (3-bytes)
+     :utf8Char4Nul ; overlong NUL (4-bytes)
+
+     :utf8Char5Max ; illegal 5-byte sequence
+     :utf8Char6Max ; illegal 6-byte sequence
+     CHAR 254      ; 0xFE is also illegal
+     CHAR 255      ; 0xFF is also illegal
+     :utf8Char1Min ; legal 1-byte sequence
+
+     CHAR 224 ; end the file on the start of a three-byte sequence
+   )
+
+   ; Now, read the file
+   LOCALMAKE "char1Min CHAR 0
+   LOCALMAKE "char1Max CHAR 127
+   LOCALMAKE "char2Min CHAR 128
+   LOCALMAKE "char2Max CHAR 2047
+   LOCALMAKE "char3Min CHAR 2048
+   LOCALMAKE "char3Max CHAR 65535
+   LOCALMAKE "char4Min CHAR 65536
+   LOCALMAKE "char4Max CHAR 1114111 ; silent bug, this wraps at 0x10000.
+
+   OPENREAD :filename
+   SETREAD  :filename
+
+   ; Reading five characters (different than five bytes)
+   SIMPLEREPORTTEST [READCHARS 5] (WORD
+      :char1Min
+      :char1Max
+      :char2Min
+      :char2Max
+      :char3Min
+   )
+
+   ; Read 10 more characters.
+   SIMPLEREPORTTEST [READCHARS 10] (WORD 
+      :char3Max
+      :char4Min
+      :char4Max
+      :char2Min ; illegal sequences are skipped
+      :char1Min ; overlong UTF-8 is accepted
+      :char1Min ; overlong UTF-8 is accepted
+      :char1Min ; overlong UTF-8 is accepted
+      :char1Min ; illegal sequences are skipped
+   )
+   SETREAD []
+   CLOSE   :filename
+
+   ;
+   ; Re-read the same file, this time opened in binary mode.
+   ;
+   (OPENREAD :filename LOCALETRUE)
+   SETREAD   :filename
+
+   ; Now, reading five characters reads bytes.
+   SIMPLEREPORTTEST [READCHARS 5] (WORD
+      CHAR 239 ; UTF-8 BOM byte 1
+      CHAR 187 ; UTF-8 BOM byte 2
+      CHAR 191 ; UTF-8 BOM byte 3
+      CHAR   0 ; :char1Min
+      CHAR 127 ; :char1Max
+   )
+   SETREAD []
+   CLOSE   :filename
+
+
+   ERASEFILE :filename
+END
+
+TO READCHARSTEST
+
+   READCHARSTEST.SMOKETEST
+   READCHARSTEST.UTF8
+   READCHARSTEST.EOFTEST
+   READCHARSTEST.COMMANDER
+   READCHARSTEST.BADINPUT
+
+END

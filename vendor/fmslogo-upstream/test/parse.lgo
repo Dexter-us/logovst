@@ -1,0 +1,650 @@
+﻿LOAD "testlib.lgo
+
+TO A.COLORIZATION.TEST :darkblue [:alsodarkblue 123] ; comment
+  THIS.SHOULD.BE.NORMAL ; this should be green, but the tilde should be black->~
+  THIS.SHOULD.BE.NORMAL ; ~ all of ~ this should be ~ green
+
+  NORMAL :darkblue "darkred
+  NORMAL "|dark red dark red|
+  NORMAL "|dark red~dark red
+dark red \~dark red
+dark red ; dark red \; dark red
+dark red | NORMAL
+
+  ; A ';' doesn't need a space before it
+  "red;green
+  :darkblue;green
+  black;green
+  black 100;green
+
+  ; vbars hold their syntactic value
+  |
+  "still black
+  ;still black
+  |
+
+  "|
+  red
+  "still red
+  |
+
+  ; The '~' character continues the line.
+  ; It should be red, to indicate it continues a word literal.
+  "darkred;green~
+still-dark-red;green\~green~
+still| dark red ; dark red |;green~
+still-dark-red||;green~
+still-dark-red
+
+  ; A ';' ends a word literal if the line is not continued by a '~'
+  "darkred;
+black
+
+  ; line continuation doesn't break a variable
+  :dark.blue;green~
+still.dark.blue~
+still| dark blue ; dark blue|blue;green~
+still.dark.blue||;green~
+still.dark.blue
+
+  ; backslash'd space
+  "dark\ red
+
+  ; vbar in bar
+  "dark| red |still| red |red
+
+  ; backslashed vbar in vbar
+  "|dark red \| dark read \| dark red|
+
+  ; backslash'd tilde is part of a word
+  "darkred\~
+black
+
+  ; A vbar'd backslack doesn't stop vbar from ending
+  "|\\| black ; green
+
+  ; backslash'd tilde is part of a variable
+  :darkblue\~
+black
+
+  NORMAL:NORMAL ; colons inside a word do not indicate a variable
+
+END
+
+TO ~IGNOREME
+   MAKE "~IGNOREMEWASCALLED 1
+END
+
+
+TO ~CALLME
+   MAKE "~CALLMEWASCALLED 1
+END
+
+
+;
+; The next function contains some comments that
+; have given the tokenizer some difficulty.
+;
+; comments in the main scope should be ignored
+;
+TO DIFFICULTCOMMENTS1 ; comments here should be legal
+
+  ; a single vertical bar in a comment |
+
+  ; other special characters ?][!+}{"<>-
+
+  ; The Great Logo Atlas conformance test:\
+  comments can be continued to the next line when\
+  they end in a backslash.
+
+  ; a comment with nothing after it
+  ;
+
+  ; regression test: tildes should be ignored ~ignoreme
+
+  OUTPUT ; a comment that continues~
+  1; comment here is okay (no whitespace between 1 and ;)
+END ; comments here should be legal
+
+TO DIFFICULTCOMMENTS2
+  ; try a comment immediately followed by a tilde
+  OUTPUT ;~
+  2
+END
+
+TO DIFFICULTCOMMENTS.A
+  ; try a comment that breaks a word
+  OUTPUT "A; this is a comment
+B; B should not be run
+C; C should not be run
+END
+
+TO LINECONTINUATION32
+
+  ; a multi-line continuation
+  OUTPUT ; comment ~
+  ;this is ignored ~
+  ;~
+  ~
+~
+  3~
+2 ; almost done~
+~
+
+END
+
+TO LINECONTINUATIONCONCAT
+  ; Confirm that words are not broken by continuation character
+  OUTPUT "A~
+B~
+C
+END
+
+TO LINECONTINUATIONLIST1
+  ; Confirm that "[" after a line continuation is a word boundary
+  OUTPUT [ A~
+[ ~
+B~
+C~
+]
+]
+END
+
+TO LINECONTINUATIONLIST2
+  ; Confirm that "]" after a line continuation is a word boundary
+  OUTPUT [ A~
+]
+END
+
+TO TILDAINLINE
+  ~CALLME ; yes, this is a function
+  OUTPUT 4
+END
+
+TO VBARINANDOUT
+   OUTPUT "A||B| |C|
+ D|E| F|
+END
+
+TO SHEBANG
+  #! function bodies with shebang lines are ignored
+and then anything that comes after.
+And the #! doesn't even have to be at the start of the line.
+This is a bug, but it might have too much backward-compatility risk to fix.
+
+  (THROW "ERROR "everything)
+  OUTPUT 100
+END
+
+TO PARSETEST.FUNC
+
+   LOCALMAKE "~IGNOREMEWASCALLED 0
+   LOCALMAKE "~CALLMEWASCALLED   0
+
+   SIMPLEREPORTTEST [DIFFICULTCOMMENTS1]     1
+   SIMPLEREPORTTEST [DIFFICULTCOMMENTS2]     2
+   SIMPLEREPORTTEST [DIFFICULTCOMMENTS.A]    "A
+   SIMPLEREPORTTEST [LINECONTINUATION32]     32
+   SIMPLEREPORTTEST [LINECONTINUATIONCONCAT] "ABC
+   SIMPLEREPORTTEST [LINECONTINUATIONLIST1]  [A [BC] ]
+   SIMPLEREPORTTEST [LINECONTINUATIONLIST2]  [A]
+   SIMPLEREPORTTEST [TILDAINLINE]            4
+   SIMPLEREPORTTEST [VBARINANDOUT]           "|AB C\n DE F|
+   TRACEINSTRUCTION [SHEBANG]
+
+   SIMPLEREPORTTEST [:~IGNOREMEWASCALLED] 0
+   SIMPLEREPORTTEST [:~CALLMEWASCALLED]   1
+
+END
+
+TO PARSETEST.NUMBER
+
+   SIMPLEREPORTTEST [-0]     0
+   SIMPLEREPORTTEST [-0.0]   0
+   SIMPLEREPORTTEST [.00]    0
+   SIMPLEREPORTTEST [0e10]   0
+   SIMPLEREPORTTEST [0e+10]  0
+   SIMPLEREPORTTEST [0e-10]  0
+
+   SIMPLEREPORTTEST [00012]  12
+
+   SIMPLEREPORTTEST [1e3]        1000
+   SIMPLEREPORTTEST [1E3]        1000
+   SIMPLEREPORTTEST [1.234e3]    1234
+   SIMPLEREPORTTEST [1.234e+3]   1234
+   SIMPLEREPORTTEST [1.234e+03]  1234
+   SIMPLEREPORTTEST [1.234e+003] 1234
+   SIMPLEREPORTTEST [1.23e-1]    0.123
+   SIMPLEREPORTTEST [1.23e]      1.23
+
+   ; nothing needs to follow a decimal place
+   SIMPLEREPORTTEST [ 5. ]        5
+   SIMPLEREPORTTEST [-5. ]       -5
+   SIMPLEREPORTTEST [-5.E1 ]     -50
+
+   SIMPLEREPORTTEST [.5]        0.5
+   SIMPLEREPORTTEST [-.5]      -0.5
+   SIMPLEREPORTTEST [0.50000]   0.5
+
+   ; A number can be up to 49 digits long
+   ;                 0000000001111111111122222222233333333334444444444
+   ;                 1234567890123456789012345678901234567890123456789
+   SIMPLEREPORTTEST [5000000000000000000000000000000000000000000000000] 5e48
+
+   ; these can't be numbers -- they have too many e's
+   RUNIDONTKNOWHOWTOTEST [1e1e]
+   RUNIDONTKNOWHOWTOTEST [1e1.5]
+
+   ; the exponent must have a base
+   RUNIDONTKNOWHOWTOTEST [e1]
+   RUNIDONTKNOWHOWTOTEST [e-1]
+   RUNIDONTKNOWHOWTOTEST [.e1]
+
+   ; these can't be numbers -- they have too many dots
+   RUNIDONTKNOWHOWTOTEST [1.1.]
+   RUNIDONTKNOWHOWTOTEST [1..]
+   RUNIDONTKNOWHOWTOTEST [.1.]
+
+   ; this can't be a number -- it has 50 digits in it (arbitrary cutoff)
+   RUNIDONTKNOWHOWTOTEST [50000000000000000000000000000000000000000000000000]
+
+END
+
+
+TO PARSETEST.WORD
+   SIMPLEREPORTTEST ["WORD]   "WORD
+   SIMPLEREPORTTEST ["|A B|]  "A\ B
+
+   ; Test non-vbarred special characters in a word.
+   ; Only the characters which require a backslash have one.
+   LOCAL [specialCharacters vbarredSpecialCharacters backslashedNormalCharacters]
+   MAKE "specialCharacters "\ \n\(\)\[\]\\\;\|\{\}?+~-*/=<>":
+   SIMPLEREPORTTEST [ ITEM  1 :specialCharacters ] CHAR 32  ; space
+   SIMPLEREPORTTEST [ ITEM  2 :specialCharacters ] CHAR 10  ; newline
+   SIMPLEREPORTTEST [ ITEM  3 :specialCharacters ] CHAR 40  ; open paren
+   SIMPLEREPORTTEST [ ITEM  4 :specialCharacters ] CHAR 41  ; close paren
+   SIMPLEREPORTTEST [ ITEM  5 :specialCharacters ] CHAR 91  ; open bracket
+   SIMPLEREPORTTEST [ ITEM  6 :specialCharacters ] CHAR 93  ; close bracket
+   SIMPLEREPORTTEST [ ITEM  7 :specialCharacters ] CHAR 92  ; backslash
+   SIMPLEREPORTTEST [ ITEM  8 :specialCharacters ] CHAR 59  ; semicolon
+   SIMPLEREPORTTEST [ ITEM  9 :specialCharacters ] CHAR 124 ; vertical bar
+   SIMPLEREPORTTEST [ ITEM 10 :specialCharacters ] CHAR 123 ; open brace
+   SIMPLEREPORTTEST [ ITEM 11 :specialCharacters ] CHAR 125 ; close brace
+   SIMPLEREPORTTEST [ ITEM 12 :specialCharacters ] CHAR  63 ; question mark
+   SIMPLEREPORTTEST [ ITEM 13 :specialCharacters ] CHAR  43 ; plus
+   SIMPLEREPORTTEST [ ITEM 14 :specialCharacters ] CHAR 126 ; tilde
+   SIMPLEREPORTTEST [ ITEM 15 :specialCharacters ] CHAR  45 ; minus
+   SIMPLEREPORTTEST [ ITEM 16 :specialCharacters ] CHAR  42 ; asterisk
+   SIMPLEREPORTTEST [ ITEM 17 :specialCharacters ] CHAR  47 ; slash
+   SIMPLEREPORTTEST [ ITEM 18 :specialCharacters ] CHAR  61 ; equals
+   SIMPLEREPORTTEST [ ITEM 19 :specialCharacters ] CHAR  60 ; less than
+   SIMPLEREPORTTEST [ ITEM 20 :specialCharacters ] CHAR  62 ; greater than
+   SIMPLEREPORTTEST [ ITEM 21 :specialCharacters ] CHAR  34 ; double quote
+   SIMPLEREPORTTEST [ ITEM 22 :specialCharacters ] CHAR  58 ; colon
+   SIMPLEREPORTTEST [ COUNT   :specialCharacters ] 22
+
+   ; Only backslash the special characters which require it.
+   MAKE "vbarredSpecialCharacters "| \n()[]\\;\|{}?+~-*/=<>":|
+   SIMPLEREPORTTEST [ ITEM  1 :vbarredSpecialCharacters ] CHAR 32  ; space
+   SIMPLEREPORTTEST [ ITEM  2 :vbarredSpecialCharacters ] CHAR 10  ; newline
+   SIMPLEREPORTTEST [ ITEM  3 :vbarredSpecialCharacters ] CHAR 40  ; open paren
+   SIMPLEREPORTTEST [ ITEM  4 :vbarredSpecialCharacters ] CHAR 41  ; close paren
+   SIMPLEREPORTTEST [ ITEM  5 :vbarredSpecialCharacters ] CHAR 91  ; open bracket
+   SIMPLEREPORTTEST [ ITEM  6 :vbarredSpecialCharacters ] CHAR 93  ; close bracket
+   SIMPLEREPORTTEST [ ITEM  7 :vbarredSpecialCharacters ] CHAR 92  ; backslash
+   SIMPLEREPORTTEST [ ITEM  8 :vbarredSpecialCharacters ] CHAR 59  ; semicolon
+   SIMPLEREPORTTEST [ ITEM  9 :vbarredSpecialCharacters ] CHAR 124 ; vertical bar
+   SIMPLEREPORTTEST [ ITEM 10 :vbarredSpecialCharacters ] CHAR 123 ; open brace
+   SIMPLEREPORTTEST [ ITEM 11 :vbarredSpecialCharacters ] CHAR 125 ; close brace
+   SIMPLEREPORTTEST [ ITEM 12 :vbarredSpecialCharacters ] CHAR  63 ; question mark
+   SIMPLEREPORTTEST [ ITEM 13 :vbarredSpecialCharacters ] CHAR  43 ; plus
+   SIMPLEREPORTTEST [ ITEM 14 :vbarredSpecialCharacters ] CHAR 126 ; tilde
+   SIMPLEREPORTTEST [ ITEM 15 :vbarredSpecialCharacters ] CHAR  45 ; minus
+   SIMPLEREPORTTEST [ ITEM 16 :vbarredSpecialCharacters ] CHAR  42 ; asterisk
+   SIMPLEREPORTTEST [ ITEM 17 :vbarredSpecialCharacters ] CHAR  47 ; slash
+   SIMPLEREPORTTEST [ ITEM 18 :vbarredSpecialCharacters ] CHAR  61 ; equals
+   SIMPLEREPORTTEST [ ITEM 19 :vbarredSpecialCharacters ] CHAR  60 ; less than
+   SIMPLEREPORTTEST [ ITEM 20 :vbarredSpecialCharacters ] CHAR  62 ; greater than
+   SIMPLEREPORTTEST [ ITEM 21 :vbarredSpecialCharacters ] CHAR  34 ; double quote
+   SIMPLEREPORTTEST [ ITEM 22 :vbarredSpecialCharacters ] CHAR  58 ; colon
+   SIMPLEREPORTTEST [ COUNT   :vbarredSpecialCharacters ] 22
+
+   MAKE "backslashedNormalCharacters "\A\B\C\d\e\f
+   SIMPLEREPORTTEST [ ITEM  1 :backslashedNormalCharacters ] CHAR  65 ; A
+   SIMPLEREPORTTEST [ ITEM  2 :backslashedNormalCharacters ] CHAR  66 ; B
+   SIMPLEREPORTTEST [ ITEM  3 :backslashedNormalCharacters ] CHAR  67 ; C
+   SIMPLEREPORTTEST [ ITEM  4 :backslashedNormalCharacters ] CHAR 100 ; d
+   SIMPLEREPORTTEST [ ITEM  5 :backslashedNormalCharacters ] CHAR 101 ; e
+   SIMPLEREPORTTEST [ ITEM  6 :backslashedNormalCharacters ] CHAR 102 ; f
+   SIMPLEREPORTTEST [ COUNT   :backslashedNormalCharacters ] 6
+END
+
+TO PARSETEST.SYMBOLSOFINCLUSION
+
+   ; bug #225
+   SIMPLEREPORTTEST [ ITEM 1 [ \{ ] ]  "\{
+   SIMPLEREPORTTEST [ ITEM 1 [ \} ] ]  "\}
+   SIMPLEREPORTTEST [ ITEM 1 [ \] ] ]  "\]
+   SIMPLEREPORTTEST [ ITEM 1 [ \[ ] ]  "\[
+   SIMPLEREPORTTEST [ ITEM 1 [ \| ] ]  "\|
+
+   SIMPLEREPORTTEST [    [||]     ]  []
+
+   ; bug #225
+   SIMPLEREPORTTEST [ITEM 1 { \[ }]  "\[
+   SIMPLEREPORTTEST [ITEM 1 { \] }]  "\]
+   SIMPLEREPORTTEST [ITEM 1 { \{ }]  "\{
+   SIMPLEREPORTTEST [ITEM 1 { \} }]  "\}
+   SIMPLEREPORTTEST [ITEM 1 { \| }]  "\|
+
+   SIMPLEREPORTTEST [ITEM 1 ["]]  ""
+   SIMPLEREPORTTEST [ITEM 1 {"}]  ""
+
+END
+
+TO PARSETEST.EXPRESSION
+
+   RUNNOTENOUGHINPUTSTEST [ 5**5 ] ; bug #72
+   RUNNOTENOUGHINPUTSTEST [ *5   ]
+   RUNNOTENOUGHINPUTSTEST [ 5*   ] ; bug #173
+
+   RUNNOTENOUGHINPUTSTEST [ -    ] ; bug #109
+
+   RUNNOTENOUGHINPUTSTEST [ MODULO 100 * 100 ] ; argument gathering halts at an infix operation
+END
+
+TO PARSETEST.INFIXEXPRESSION.PRIORITY
+   ; tests the priority (precedence) of infix operators
+
+   ; multiplication/division have higher precence than addition/subtraction
+   SIMPLEREPORTTEST [ 1+2*2 ] 5
+   SIMPLEREPORTTEST [ 2*2+1 ] 5
+   SIMPLEREPORTTEST [ 1-2/2 ] 0
+   SIMPLEREPORTTEST [ 2/2+1 ] 2
+
+   ; infix operators have higher precedence than non-infix operators
+   SIMPLEREPORTTEST [ PRODUCT 2 2 + 1 ] 6 ; PRODUCT 2 (2+1)
+   SIMPLEREPORTTEST [ PRODUCT 2 2 - 1 ] 2 ; PRODUCT 2 (2-1)
+
+   ; spaces can affect parsing of -
+   SIMPLEREPORTTEST [ PRODUCT   1 -2        ]  -2  ; PRODUCT (1)      (-2)
+   SIMPLEREPORTTEST [ PRODUCT   1 -2 - 3    ]  -5  ; PRODUCT (1)      (-2 - 3)
+   SIMPLEREPORTTEST [ PRODUCT   1 - 2 -3    ]   3  ; PRODUCT (1 - 2)  (-3)
+   SIMPLEREPORTTEST [ PRODUCT  -1 -2 - - 3  ]  -1  ; PRODUCT (-1)     (-2 - -3)
+   SIMPLEREPORTTEST [ PRODUCT   1 (- 2 - 3) ]  -5  ; PRODUCT (1)      (-2 - 3)
+   SIMPLEREPORTTEST [ PRODUCT - 1 -2 - 3    ]   5  ; PRODUCT -1       (-2 -3)
+   SIMPLEREPORTTEST [ PRODUCT - 1 -(2 - 3)  ]  -1  ; PRODUCT (-1)     (-(2 - 3))
+   SIMPLEREPORTTEST [ PRODUCT --1 --2 - --3 ]  -1  ; PRODUCT (1)      (2 - 3)
+   RUNIDONTKNOWHOWTOTEST         [ PRODUCT - 1 -(2 -3) ] ; tries to execute 2
+   RUNNOTENOUGHINPUTSTEST        [ PRODUCT 1 - 2 - 3   ] ; 1 - 2 - 3 is a single expression
+   RUNYOUDONTSAYWHATTODOWITHTEST [ PRODUCT 1 -2 -3     ] ; the -3 is a separate argument
+
+   ; same tests as above, but with variables in case -1 is parsed into a negative number
+   LOCAL [one two three]
+   MAKE "one   1
+   MAKE "two   2
+   MAKE "three 3
+   SIMPLEREPORTTEST [ PRODUCT  :one -:two              ]  -2 ; PRODUCT (1)      (-2)
+   SIMPLEREPORTTEST [ PRODUCT  :one -:two - :three     ]  -5 ; PRODUCT (1)      (-2 - 3)
+   SIMPLEREPORTTEST [ PRODUCT  :one - :two -:three     ]   3 ; PRODUCT (1 - 2)  (-3)
+   SIMPLEREPORTTEST [ PRODUCT  -:one -:two - - :three  ]  -1 ; PRODUCT (-1)     (-2 - -3)
+   SIMPLEREPORTTEST [ PRODUCT  :one (- :two - :three)  ]  -5 ; PRODUCT (1)      (-2 - 3)
+   SIMPLEREPORTTEST [ PRODUCT - :one -:two - :three    ]   5 ; PRODUCT (-1 - 2) (-3)
+   SIMPLEREPORTTEST [ PRODUCT - :one -(:two - :three)  ]  -1 ; PRODUCT (-1)     (-(2 - 3))
+   SIMPLEREPORTTEST [ PRODUCT --:one --:two - --:three ]  -1 ; PRODUCT (1)      (2 - 3)
+   RUNIDONTKNOWHOWTOTEST         [ PRODUCT - :one -(:two -:three) ] ; tries to execute 2
+   RUNNOTENOUGHINPUTSTEST        [ PRODUCT :one - :two - :three   ] ; 1 - 2 - 3 is a single expression
+   RUNYOUDONTSAYWHATTODOWITHTEST [ PRODUCT :one -:two -:three     ] ; the -3 is a separate argument
+
+   ; negation has the highest precedence
+   SIMPLEREPORTTEST [ 2 - - 1 ] 3  ; 2 - (-1)
+   SIMPLEREPORTTEST [ 2 - -1  ] 3  ; 2 - (-1)
+   SIMPLEREPORTTEST [ 2 * - 1 ] -2 ; 2 * (-1)
+   SIMPLEREPORTTEST [ - 2 + 3 ] 1  ; (-2) + 3
+   RUNYOUDONTSAYWHATTODOWITHTEST [ 2 --1 ] ; 2 (-(-1))
+
+   ; Bug #589 (precedence of negation appears to spread right)
+   SIMPLEREPORTTEST [2 * -1  + 100] 98
+   SIMPLEREPORTTEST [2 * - 1 + 100] 98
+   SIMPLEREPORTTEST [2*-1+100]      98
+
+   ; arithmetic operators have higher precedence than logical operators
+   SIMPLEREPORTTEST [ 1 + 2 <  3 * 4 ] LOCALETRUE
+   SIMPLEREPORTTEST [ 1 + 2 <= 3 * 4 ] LOCALETRUE
+   SIMPLEREPORTTEST [ 1 + 2 <> 3 * 4 ] LOCALETRUE
+   SIMPLEREPORTTEST [ 1 + 2 >  3 * 4 ] LOCALEFALSE
+   SIMPLEREPORTTEST [ 1 + 2 >= 3 * 4 ] LOCALEFALSE
+   SIMPLEREPORTTEST [ 1 + 2 =  3 * 4 ] LOCALEFALSE
+
+   ; all operator precedence classes
+   SIMPLEREPORTTEST [  -2 < 2 * -3 + 4  ] LOCALEFALSE
+   SIMPLEREPORTTEST [  -3 < 2 * -3 + 4  ] LOCALETRUE
+   SIMPLEREPORTTEST [  2 * -3 + 4 >= -1 ] LOCALEFALSE
+   SIMPLEREPORTTEST [  2 * -3 + 4 >= -2 ] LOCALETRUE
+
+   ; same tests without spaces
+   SIMPLEREPORTTEST [-2<2*-3+4]  LOCALEFALSE
+   SIMPLEREPORTTEST [-3<2*-3+4]  LOCALETRUE
+   SIMPLEREPORTTEST [2*-3+4>=-1] LOCALEFALSE
+   SIMPLEREPORTTEST [2*-3+4>=-2] LOCALETRUE
+
+   ; logical operators have higher precedence than procedures
+   SIMPLEREPORTTEST [ FIRST 1 =  2 ] FIRST LOCALEFALSE
+   SIMPLEREPORTTEST [ FIRST 1 <  2 ] FIRST LOCALETRUE
+   SIMPLEREPORTTEST [ FIRST 1 <= 2 ] FIRST LOCALETRUE
+   SIMPLEREPORTTEST [ FIRST 1 <> 2 ] FIRST LOCALETRUE
+   SIMPLEREPORTTEST [ FIRST 1 >  2 ] FIRST LOCALEFALSE
+   SIMPLEREPORTTEST [ FIRST 1 >= 2 ] FIRST LOCALEFALSE
+
+   ; arithemetic operators have higher precedence than procedures
+   SIMPLEREPORTTEST [ SUM 1 + 2 * 3 4 + 5 ] 16 ; (SUM (1+(2*3)) (4*5))
+   SIMPLEREPORTTEST [ 1 + PRODUCT 1 + 1 2 ]  5 ; 1 + (PRODUCT (1+1) 2)
+   SIMPLEREPORTTEST [ 1 + - PRODUCT 2 3   ] -5 ; 1 + (- (PRODUCT 2 3))
+END
+
+TO PARSETEST.INFIXEXPRESSION
+   SIMPLEREPORTTEST [ (1 +  2) * 3 ] 9
+   SIMPLEREPORTTEST [  1 + (2 * 3) ] 7
+   SIMPLEREPORTTEST [  1 +  2 * 3  ] 7
+
+   SIMPLEREPORTTEST [ (2 *  3) + 4 ] 10
+   SIMPLEREPORTTEST [  2 * (3 + 4) ] 14
+   SIMPLEREPORTTEST [  2 *  3 + 4  ] 10
+
+   ; Bug #566 (paren shouldn't influence nested infix expressions)
+   ; "POWER 1 + BITOR 1 2 4" -> "(1 + (0x01 | 0x02)) ** 4"
+   SIMPLEREPORTTEST [ POWER 1 + BITOR 1 2 4 ] 256
+   SIMPLEREPORTTEST [(POWER 1 + BITOR 1 2 4)] 256
+
+   ; not enough inputs to negation operator
+   RUNNOTENOUGHINPUTSTEST  [ 1 +]
+   RUNNOTENOUGHINPUTSTEST  [ 1 + -]
+   RUNNOTENOUGHINPUTSTEST  [ 1-]
+   RUNNOTENOUGHINPUTSTEST  [ - ]
+
+   ; chained negations
+   SIMPLEREPORTTEST [    -1 ] -1
+   SIMPLEREPORTTEST [   --1 ]  1
+   SIMPLEREPORTTEST [  ---1 ] -1
+   SIMPLEREPORTTEST [ ----1 ]  1
+
+   FAILIFNOTTRUE  [  1 + 1  = 2 ]
+   FAILIFNOTTRUE  [ (1 + 1) = 2 ]
+   FAILIFNOTTRUE  [ 2 = 1 + 1 ]
+   FAILIFNOTFALSE [ 2 = 1 = 1 ]
+
+   ; test parsing of <, >, <>, >=, <=, =
+   FAILIFNOTTRUE  [ 1 <  2 ]
+   FAILIFNOTTRUE  [ 1 <= 2 ]
+   FAILIFNOTFALSE [ 1 >  2 ]
+   FAILIFNOTFALSE [ 1 >= 2 ]
+   FAILIFNOTFALSE [ 1 =  2 ]
+   FAILIFNOTTRUE  [ 1 <  2 ]
+   FAILIFNOTTRUE  [ 1 <> 2 ]
+
+   ; same tests without any spaces to help tokenization
+   FAILIFNOTTRUE  [1<2]
+   FAILIFNOTTRUE  [1<=2]
+   FAILIFNOTFALSE [1>2]
+   FAILIFNOTFALSE [1>=2]
+   FAILIFNOTFALSE [1=2]
+   FAILIFNOTTRUE  [1<2]
+   FAILIFNOTTRUE  [1<>2]
+
+   ; put spaces between what could have been a 
+   ; two-character infix operator
+   RUNNOTENOUGHINPUTSTEST  [ 1 < > 2 ]
+   RUNNOTENOUGHINPUTSTEST  [ 1 < = 2 ]
+   RUNNOTENOUGHINPUTSTEST  [ 1 > = 2 ]
+
+   ; test when the string ends in the middle of a two-character
+   ; infix operator
+   RUNNOTENOUGHINPUTSTEST  [1>]
+   RUNNOTENOUGHINPUTSTEST  [1<]
+
+   ; Missing close paren (have to wrap close paren in a list)
+   RUNTOOMANYOPENPARENSTEST [ ( 1 + [)] ]
+
+   ; Unexpected close paren
+   RUNUNEXPECTEDCLOSEPARENTEST [ ( 1 + ) ]
+   RUNUNEXPECTEDCLOSEPARENTEST [   1 + ) ]
+END
+
+TO PARSETEST.MANYINPUTS
+
+   ; bug #194 (this used to crash)
+   LOCALMAKE "longsequence (SENTENCE "\( "SUM ISEQ 1 100000 "\))
+   LOCALMAKE "sum RUN :longsequence 
+
+   SIMPLEREPORTTEST [ :sum ] 5000050000
+   REPORTTESTPASSED [|Bug #194 is fixed; running an expression with a long list of inputs didn't crash.|]
+END
+
+TO PARSETEST.MANYNESTEDCALLS
+
+   ; Bug #202 (this crashes)
+   LOCALMAKE "longsequence [0]
+   REPEAT 100000 [ MAKE "longsequence FPUT "SUM FPUT 1 :longsequence ]
+   LOCALMAKE "sum RUN :longsequence
+
+   SIMPLEREPORTTEST :sum 100000
+   REPORTTESTPASSED [|Bug #202 is fixed; running a long list of deeply nested expressions didn't crash.|]
+END
+
+TO PARSETEST.LONGINSTRUCTIONLINEWITHCATCH
+
+   ; Create an instruction list line that's a repeated application of 
+   ;   MAKE "value :value + 1
+   ;
+   LOCALMAKE "instructions []
+   REPEAT 100000 [ MAKE "instructions FPUT "MAKE FPUT ""value FPUT ":value FPUT "+ FPUT 1 :instructions ]
+
+   ; Run the long instruction list inside a catch block
+   LOCALMAKE "value 0
+   CATCH "ERROR [ RUN :instructions ]
+
+   ; test that the the instructions actually ran
+   SIMPLEREPORTTEST :value 100000
+   REPORTTESTPASSED [|Bug #205 is fixed; running a long list of expressions didn't crash.|]
+END
+
+TO PARSETEST.LONGINSTRUCTIONLINE
+
+   ; Create an instruction list line that's a repeated application of 
+   ;   MAKE "value :value + 1
+   ;
+   LOCALMAKE "instructions []
+   REPEAT 100000 [ MAKE "instructions FPUT "MAKE FPUT ""value FPUT ":value FPUT "+ FPUT 1 :instructions ]
+
+   ; Run the long instruction list with no catch block
+   LOCALMAKE "value 0
+   RUN :instructions
+
+   ; test that the the instructions actually ran
+   SIMPLEREPORTTEST :value 100000
+   REPORTTESTPASSED [|Bug #205 is fixed; running a long list of expressions didn't crash.|]
+END
+
+TO PARSETEST.DEEPLYNESTEDINFIXEXPRESSION
+
+   ; Bug #206 (this crashes)
+
+   ; Create and RUN an instruction list of the form
+   ;   1 + 1 + 1 ... + 1 + 0
+   ;
+   LOCALMAKE "instructions [0]
+   REPEAT 100000 [ MAKE "instructions FPUT 1 FPUT "+ :instructions ]
+   LOCALMAKE "sum RUN :instructions
+
+   SIMPLEREPORTTEST :sum 100000
+   REPORTTESTPASSED [|Bug #206 is fixed; running a long list of infix expressions didn't crash.|]
+END
+
+
+TO PARSETEST.DEEPLYPARENTHESIZEDEXPRESSION
+
+   ; Bug #209 (this crashes)
+
+   ; Create and RUN an instruction list of the form
+   ;   ((( ... 0 ... )))
+   ;
+   LOCALMAKE "instructions []
+   REPEAT 100000 [ MAKE "instructions FPUT "\) :instructions ]
+   MAKE "instructions FPUT 123 :instructions 
+   REPEAT 100000 [ MAKE "instructions FPUT "\( :instructions ]
+   LOCALMAKE "sum RUN :instructions
+
+   SIMPLEREPORTTEST :sum 123
+   REPORTTESTPASSED [|Bug #209 is fixed; running a deeply parenthesized expression didn't crash.|]
+END
+
+TO PARSETEST.LOTSOFNEGATIONOPERATORS
+
+   ; Bug #201 (this crashes)
+
+   ; Create and RUN an instruction list of the form
+   ;   ------ ... -1
+   ;
+   LOCALMAKE "instructions [1]
+   REPEAT 100000 [ MAKE "instructions FPUT "- :instructions ]
+   LOCALMAKE "value RUN :instructions
+
+   SIMPLEREPORTTEST :value 1
+   REPORTTESTPASSED [|Bug #201 is fixed; running a long chain of minus expressions didn't crash.|]
+END
+
+TO PARSETEST.PARSECHAR255
+   ; This is a regression test for bug #302.
+   localmake "myvalue "ÿ
+   SIMPLEREPORTTEST [:myvalue] CHAR 255
+END
+
+
+TO PARSETEST.NUMBERWHEREPROCISEXPECTED
+   ; This is a regression test for bug #497.
+   ; When tree-ifying an expression like (1 2), it
+   ; expected 1 to be a tree because it was first.
+   ; This crashed because 1 has no "car".
+   RUNIDONTKNOWHOWTOTEST [ (1 2)   ] ; minimal repro
+   RUNIDONTKNOWHOWTOTEST [ (5 ^ 3) ] ; ^ is not an infix operator
+
+END
+
+TO PARSETEST
+   PARSETEST.NUMBER
+   PARSETEST.WORD
+   PARSETEST.FUNC
+   PARSETEST.SYMBOLSOFINCLUSION
+   PARSETEST.EXPRESSION
+   PARSETEST.INFIXEXPRESSION
+   PARSETEST.INFIXEXPRESSION.PRIORITY
+   PARSETEST.MANYINPUTS
+   PARSETEST.DEEPLYNESTEDINFIXEXPRESSION
+   PARSETEST.LONGINSTRUCTIONLINEWITHCATCH
+   PARSETEST.LONGINSTRUCTIONLINE
+   PARSETEST.PARSECHAR255
+   PARSETEST.NUMBERWHEREPROCISEXPECTED
+   ;PARSETEST.DEEPLYPARENTHESIZEDEXPRESSION
+   ;PARSETEST.MANYNESTEDCALLS
+   ;PARSETEST.LOTSOFNEGATIONOPERATORS
+END

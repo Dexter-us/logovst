@@ -1,0 +1,67 @@
+LOAD "testlib.lgo
+
+TO BUTFIRSTTEST.SMOKETEST
+   SIMPLEREPORTTEST [BF       [1 2 3] ] [2 3]
+   SIMPLEREPORTTEST [BUTFIRST [1 2 3] ] [2 3]
+   SIMPLEREPORTTEST [BUTFIRST     [1] ] []
+
+   SIMPLEREPORTTEST [BUTFIRST "hello  ] "ello
+   SIMPLEREPORTTEST [BUTFIRST "h      ] "||
+   SIMPLEREPORTTEST [BUTFIRST 1       ] "||
+   SIMPLEREPORTTEST [BUTFIRST 123     ] 23
+   SIMPLEREPORTTEST [BUTFIRST -1      ] 1
+   SIMPLEREPORTTEST [BUTFIRST .12     ] .12 ; .12 becomes 0.12
+END
+
+TO BUTFIRSTTEST.NULCHAR
+   ; This is a regression test for Bug #506.
+   SIMPLEREPORTTEST [ BUTFIRST (WORD CHAR 0 "x)                 ] "x
+   SIMPLEREPORTTEST [ BUTFIRST (WORD CHAR 0 CHAR 0 "x)          ] WORD CHAR 0 "x
+   SIMPLEREPORTTEST [ BUTFIRST BUTFIRST (WORD CHAR 0 CHAR 0 "x) ] "x
+END
+
+TO BUTFIRSTTEST.BADINPUT
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(BUTFIRST)]
+   RUNTOOMANYINPUTSTEST   [(BUTFIRST "word "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [BUTFIRST []  ]
+   RUNDOESNTLIKEINPUTTEST [BUTFIRST "|| ]
+   RUNDOESNTLIKEINPUTTEST [BUTFIRST {1} ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement.
+   RUNRECOVERABLEERRORTEST [
+      BUTFIRST []   ; can't be the empty list
+   ](LIST
+      "||        ; can't be empty word
+      {1}        ; can't be an array
+      []         ; can't be an empty list (again)
+      "||        ; can't be empty word (again)
+      {1 2 3}    ; can't be an array (again)
+      123        ; legal, but must be converted to a string
+   ) ~
+   [23] ; everything except the first digit of 123
+
+   ; Test that BUTFIRST accepts ownership of any node :erract provides.
+   ; This erract provides a bad intput followed by a good input, both
+   ; of which are newly allocated.
+   LOCAL [ erract erractCounter ]
+   TRACEINSTRUCTION [ MAKE "erractCounter 0 ]
+   TRACEINSTRUCTION [ MAKE "erract [
+      MAKE "erractCounter :erractCounter + 1
+      RUN ITEM :erractCounter [
+        [ (ARRAY 10) ]
+        [ (LIST "allocated "in "BUTFIRSTTEST.BADINPUT) ]
+      ]
+   ] ]
+   SIMPLEREPORTTESTNOCATCH [ BUTFIRST [] ] [in BUTFIRSTTEST.BADINPUT]
+
+END
+
+TO BUTFIRSTTEST
+   BUTFIRSTTEST.SMOKETEST
+   BUTFIRSTTEST.NULCHAR
+   BUTFIRSTTEST.BADINPUT
+END

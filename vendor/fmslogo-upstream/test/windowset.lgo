@@ -1,0 +1,244 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO WINDOWSETTEST.WINDOWPREDICATE :win32function :hwnd
+  ; Only works on windows within the current process.
+  IFELSE EQUAL? [1] DLLCALL (LIST "L :win32function "L :hwnd) [
+    OUTPUT LOCALETRUE
+  ][
+    OUTPUT LOCALEFALSE
+  ]
+END
+
+TO WINDOWSETTEST.ISMINIMIZED :hwnd
+  OUTPUT WINDOWSETTEST.WINDOWPREDICATE "IsIconic :hwnd
+END
+
+TO WINDOWSETTEST.ISMAXIMIZED :hwnd
+  OUTPUT WINDOWSETTEST.WINDOWPREDICATE "IsZoomed :hwnd
+END
+
+TO WINDOWSETTEST.ISVISIBLE :hwnd
+  OUTPUT WINDOWSETTEST.WINDOWPREDICATE "IsWindowVisible :hwnd
+END
+
+TO WINDOWSETTEST.CLOSEWINDOW :hwnd
+  LOCALMAKE "WM_CLOSE 16  ; 0x0010
+  IGNORE UIAUTOMATION.SENDMESSAGE :hwnd :WM_CLOSE 0 0
+END
+
+TO WINDOWSETTEST.SMOKETEST
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  LOCAL "hwnd
+
+  UIAUTOMATION.INITIALIZE
+
+  MAKE "hwnd UIAUTOMATION.FINDWINDOW "Editor "wxWindowNR
+  IF :hwnd <> 0 [
+     ; This test assumes that there is no other window named Editor
+     ; other than the one that it opens.  Rather than run the tests and
+     ; report failures that look like bugs in WINDOWSET, we report a 
+     ; a clear message that indicates why the tests cannot be run.
+
+     ; The most likely cause of this is that a previous test opened the
+     ; editor and wxWidgets doesn't close windows until the application is
+     ; idle, which won't happen until all tests have finished running.
+     REPORTTESTFAILED "|WINDOWSETTEST.SMOKETEST cannot run because there is already a window whose name is Editor|
+     UIAUTOMATION.UNINITIALIZE
+     STOP
+  ]
+
+  ; Open an editor so that we can minimize and maximize it.
+  TRACEINSTRUCTION [ EDIT [nothing] ]
+  MAKE "hwnd UIAUTOMATION.FINDWINDOW "Editor 0
+
+  ; Confirm that the editor is neither minimized nor maximized
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; use ICON to iconify the editor
+  TRACEINSTRUCTION [ ICON "Editor ]
+
+  ; Confirm that the editor is iconified.
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; use UNICON to restore the editor
+  TRACEINSTRUCTION [ UNICON "Editor ]
+
+  ; Confirm that the editor is restored
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; Use WINDOWSET to hide the editor.
+  TRACEINSTRUCTION [ WINDOWSET "Editor 0 ]
+
+  ; Confirm that the editor is hidden
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; Use WINDOWSET to show the editor again.
+  TRACEINSTRUCTION [ WINDOWSET "Editor 5 ]
+
+  ; Confirm that the editor is now visible.
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+  
+  ; use MAXIMIZE to maximize the editor
+  TRACEINSTRUCTION [ MAXIMIZE "Editor ]
+
+  ; Confirm that the editor is maximized
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; use RESTORE to un-maximize the editor
+  TRACEINSTRUCTION [ RESTORE "Editor ]
+
+  ; Confirm that the editor is not maximized
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+  
+  ; use MINIMZIE to minimize the editor
+  TRACEINSTRUCTION [ MINIMIZE "Editor ]
+
+  ; Confirm that the editor is minimized
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; Close the editor
+  WINDOWSETTEST.CLOSEWINDOW :hwnd
+
+  UIAUTOMATION.UNINITIALIZE
+END
+
+TO WINDOWSETTEST.COMMANDER
+  ; For backward-compatibility with MSWLogo programs, ICON "Commander
+  ; should always minimize the commander, even when the commander is docked.
+  ; This is a regression test for Bug #96.
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+  
+  TRACEINSTRUCTION [ SPLITSCREEN ]
+  TRACEINSTRUCTION [ ICON "Commander ]
+
+  UIAUTOMATION.INITIALIZE
+
+  LOCALMAKE "hwnd UIAUTOMATION.FINDWINDOW "Commander "#32770
+  IFELSE EQUALP :hwnd 0 [
+    ; FINDWINDOW couldn't find the Commander.
+    ; It could be that ICON failed or that "Commander" is localized.
+    LOCALMAKE "isMinimized YESNOBOX [Question] [Is the commander minimized?]
+  ][
+    ; FINDWINDOW found the commander
+    LOCALMAKE "isMinimized WINDOWSETTEST.ISMINIMIZED :hwnd
+  ]
+
+  IFELSE :isMinimized [
+    REPORTTESTPASSED (sentence "|ICON "Commander minimized the commander when it was docked|) 
+  ][
+    REPORTTESTFAILED (sentence "|ICON "Commander did not minimize the commander when it was docked|) 
+  ]
+
+  ; Use RESTORE to un-minimize the commander.
+  ; Note that this time, lower-case is used.
+  TRACEINSTRUCTION [ RESTORE "commander ]
+
+  ; Confirm that the commander is no longer minimized.
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; Use WINDOWSET to hide the commander.
+  ; This time all upper-case is used.
+  TRACEINSTRUCTION [ WINDOWSET "COMMANDER 0 ]
+
+  ; Confirm that the commander is hidden.
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; Use WINDOWSET to show the commander again.
+  ; This time, a strange mixed case is used.
+  TRACEINSTRUCTION [ WINDOWSET "CoMManDEr 5 ]
+
+  ; Confirm that the commander is now visible.
+  FAILIFNOTTRUE  [ WINDOWSETTEST.ISVISIBLE   :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMINIMIZED :hwnd ]
+  FAILIFNOTFALSE [ WINDOWSETTEST.ISMAXIMIZED :hwnd ]
+
+  ; Redock the Commander.
+  TRACEINSTRUCTION [ SPLITSCREEN ]
+
+  UIAUTOMATION.UNINITIALIZE
+END
+
+TO WINDOWSETTEST.DOESNOTFINDBUTTON
+  ; Tests that WINDOWSET cannot hide a button.
+  ; (Internally, it should not be able to find the button)
+  ;
+  ; We have no good way to test this, but someone should notice
+  ; if the "Trace" and "Reset" buttons are missing from the commander.
+  WINDOWSET "Trace 0
+  WINDOWSET "Step  0
+END
+
+TO WINDOWSETTEST.BADINPUT
+
+  RUNNOTENOUGHINPUTSTEST [(WINDOWSET)]
+  RUNNOTENOUGHINPUTSTEST [(WINDOWSET "FMSLogo)]
+  RUNTOOMANYINPUTSTEST   [(WINDOWSET "FMSLogo 0 "toomany)]
+
+  RUNDOESNTLIKEINPUTTEST [WINDOWSET "FMSLogo [1]  ]
+  RUNDOESNTLIKEINPUTTEST [WINDOWSET "FMSLogo []   ]
+  RUNDOESNTLIKEINPUTTEST [WINDOWSET "FMSLogo {1}  ]
+  RUNDOESNTLIKEINPUTTEST [WINDOWSET "FMSLogo "one ]
+  RUNDOESNTLIKEINPUTTEST [WINDOWSET "FMSLogo -1   ]
+END
+
+TO ICONTEST.BADINPUT
+  RUNNOTENOUGHINPUTSTEST [(ICON)]
+  RUNTOOMANYINPUTSTEST   [(ICON "FMSLogo "toomany)]
+END
+
+TO UNICONTEST.BADINPUT
+  RUNNOTENOUGHINPUTSTEST [(UNICON)]
+  RUNTOOMANYINPUTSTEST   [(UNICON "FMSLogo "toomany)]
+END
+
+TO MINIMIZETEST.BADINPUT
+  RUNNOTENOUGHINPUTSTEST [(MINIMIZE)]
+  RUNTOOMANYINPUTSTEST   [(MINIMIZE "FMSLogo "toomany)]
+END
+
+TO MAXIMIZETEST.BADINPUT
+  RUNNOTENOUGHINPUTSTEST [(MAXIMIZE)]
+  RUNTOOMANYINPUTSTEST   [(MAXIMIZE "FMSLogo "toomany)]
+END
+
+TO RESTORETEST.BADINPUT
+  RUNNOTENOUGHINPUTSTEST [(RESTORE)]
+  RUNTOOMANYINPUTSTEST   [(RESTORE "FMSLogo "toomany)]
+END
+
+TO WINDOWSETTEST
+
+  WINDOWSETTEST.SMOKETEST
+  WINDOWSETTEST.COMMANDER
+  WINDOWSETTEST.DOESNOTFINDBUTTON
+  WINDOWSETTEST.BADINPUT
+
+  ICONTEST.BADINPUT
+  UNICONTEST.BADINPUT
+  MINIMIZETEST.BADINPUT
+  MAXIMIZETEST.BADINPUT
+  RESTORETEST.BADINPUT
+
+END

@@ -1,0 +1,13 @@
+; Calls the win32 function SetCurrentDirectoryW.
+; Throws an error if it fails.
+TO SETWORKINGDIRECTORY :directory
+    LOCAL "isok
+    DLLLOAD "kernel32.dll
+    MAKE "isOk (DLLCALL (LIST "L "SetCurrentDirectoryW "U :directory) "kernel32.dll)
+
+    (DllFree "kernel32.dll)
+
+    IF :isOk = [0] [
+       (THROW "ERROR (WORD "|Could not change to | :directory ". ))
+    ]
+END

@@ -1,0 +1,36 @@
+#include <windows.h>
+#include "wx/msw/wx.rc"
+
+logo-midi ICON "fmslogo.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     FMSLOGO_MAJOR_VERSION, FMSLOGO_MINOR_VERSION, FMSLOGO_MICRO_VERSION, 0
+PRODUCTVERSION  FMSLOGO_MAJOR_VERSION, FMSLOGO_MINOR_VERSION, FMSLOGO_MICRO_VERSION, 0
+FILEFLAGSMASK   0x3fL
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "CompanyName",      "Dexter U.S."
+      VALUE "FileDescription",  "Logo MIDI command-line renderer"
+      VALUE "FileVersion",      FMSLOGO_VERSION
+      VALUE "InternalName",     "logo-midi"
+      VALUE "LegalCopyright",   "FMSLogo contributors; Logo MIDI by Dexter U.S."
+      VALUE "OriginalFilename", "logo-midi64.exe"
+      VALUE "ProductName",      "Logo MIDI"
+      VALUE "ProductVersion",   FMSLOGO_VERSION
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", LOCALE, 1200
+  END
+END
+
+#define ID_MANIFEST 1
+#define RT_MANIFEST 24
+ID_MANIFEST RT_MANIFEST "fmslogo.exe.manifest"

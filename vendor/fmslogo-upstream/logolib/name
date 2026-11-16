@@ -1,0 +1,14 @@
+.macro name :name.value.input :name.variable.input
+  ; If :the.name.input is "the.name.input, then we can't access
+  ; the caller's variable because the parameter shadows it.
+  ; This is why name is a macro, to be able to access it in the caller's context.
+  if member? :name.variable.input [name.variable.input name.value.input] [
+    output (list "make word "" :name.variable.input quoted :name.value.input)
+  ]
+
+  ; common case: use a faster way
+  make :name.variable.input :name.value.input
+  output []
+end
+
+bury "name

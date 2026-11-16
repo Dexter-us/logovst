@@ -1,0 +1,238 @@
+LOAD "testlib.lgo
+
+TO RUNPARSETEST.BADINPUT
+
+   RUNDOESNTLIKEINPUTTEST [ RUNPARSE {badinput} ]
+   (RUNEXPECTERRORTEST [ RUNPARSE "ab\]cd ] 26 "|unexpected ']'|)
+   (RUNEXPECTERRORTEST [ RUNPARSE "ab\}cd ] 27 "|unexpected '}'|)
+
+   RUNNOTENOUGHINPUTSTEST [(RUNPARSE)]
+   RUNTOOMANYINPUTSTEST   [(RUNPARSE "A<B "toomany)]
+
+END
+
+TO RUNPARSETEST.RUNTEST :instruction :expectedvalue
+   ; This only makes sense for a RUNPARSE instruction
+   IF NOTEQUAL? "RUNPARSE ITEM 1 :instruction [
+     REPORTTESTBUG "|:instruction must begin with RUNPARSE.|
+     STOP
+   ]
+
+   ; Run RUNPARSE and check the output.
+   SIMPLEREPORTTEST :instruction :expectedvalue
+
+   ; RUNPARSE always outputs a normalized form (running a second time does nothing)
+   SIMPLEREPORTTEST (LIST "RUNPARSE :expectedvalue) :expectedvalue
+END
+
+TO RUNPARSETEST.MINUSSIGN
+
+   LOCAL "minustight
+   MAKE "minustight ITEM 2 RUNPARSE "--1
+
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-          ] (LIST "-                           )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-1         ] (LIST "|-1|                        )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "\ -1       ] (LIST "|-1|                        )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1-2        ] (LIST 1 "|-| "|2|                  )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\ -2      ] (LIST 1 "|-2|                      )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1-\ 2      ] (LIST 1 "- "|2|                    )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1-:two     ] (LIST 1 "- ":two                   )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\ -:two   ] (LIST 1 0 :minustight ":two        )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\ -\(3\)  ] (LIST 1 0 :minustight "|(| 3 "|)|  )
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\ \(-3\)  ] (LIST 1 "|(| "- 3 "|)|             ) 
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\(-3\)    ] (LIST 1 "|(| "- 3 "|)|             )
+
+   ; list input enables spaces to reach runparse_node
+   RUNPARSETEST.RUNTEST [ RUNPARSE (LIST "-1\ -2  )] (LIST 0 :minustight "|1 | "- 2)
+   RUNPARSETEST.RUNTEST [ RUNPARSE (LIST "1\ -2   )] (LIST "|1 | "-    2   )
+   RUNPARSETEST.RUNTEST [ RUNPARSE (LIST "1\ -\ 2 )] (LIST "|1 | "-  "| 2| )
+   RUNPARSETEST.RUNTEST [ RUNPARSE (LIST "-\      )] (LIST "-    "| | )
+
+   ; some of the below may be bugs
+   RUNPARSETEST.RUNTEST [ RUNPARSE :minustight          ] (LIST 0 :minustight "-     )
+   RUNPARSETEST.RUNTEST [ RUNPARSE WORD :minustight 2   ] (LIST 0 :minustight "- 2   )
+   RUNPARSETEST.RUNTEST [ RUNPARSE WORD 1 :minustight   ] (LIST 1 "- "-              )
+   RUNPARSETEST.RUNTEST [ RUNPARSE WORD "\  :minustight ] (LIST 0 :minustight "-     )
+   RUNPARSETEST.RUNTEST [ RUNPARSE WORD :minustight :minustight ] (LIST 0 :minustight "- "- "-)
+
+END
+
+TO RUNPARSETEST.SMOKETEST
+   ; Note that the expected values in these tests aren't given as list literals
+   ; because this procedures is, itself, runparsed.  That would only be testing that
+   ; RUNPARSE does what it does.  Instead, we construct expected values with LIST.
+
+   ; empty string
+   RUNPARSETEST.RUNTEST [ RUNPARSE "|| ] (LIST) 
+
+   ; test infix operators are tokenized separately
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1+2*3/4 ] (LIST 1 "+ 2 "* 3 "/ 4)
+
+   ; test logic operators are tokenized separately
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1<2>3=4<=5>=6<>7 ] (LIST 1 "< 2 "> 3 "= 4 "<= 5 ">= 6 "<> 7)
+
+   ; test words
+   RUNPARSETEST.RUNTEST [ RUNPARSE "a\ b                           ] (LIST "a "b)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "a\ \"b\ \c                     ] (LIST "a "\"b "c)
+   RUNPARSETEST.RUNTEST [ RUNPARSE (WORD "a CHAR 10 "b CHAR 10 "c) ] (LIST "a "b "c)
+
+   ; test all infix operators, something that can be parsed but not evaluated.
+   RUNPARSETEST.RUNTEST [ RUNPARSE "<<=>>==<>+-*/ ] (LIST "< "<= "> ">= "= "<> "+ "- "* "/)
+
+   ; test parens, which are tokenized separately
+   LOCALMAKE "openparen  "\(
+   LOCALMAKE "closeparen "\)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\(2\(3\)4\(5\)6\) ] (LIST
+       1
+       :openparen
+       2
+       :openparen
+       3
+       :closeparen
+       4
+       :openparen
+       5
+       :closeparen
+       6
+       :closeparen
+   )
+
+   ; parens do not need to be balanced to be parsed.
+   RUNPARSETEST.RUNTEST [ RUNPARSE "\)\( ] (LIST :closeparen :openparen)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "a\(b ] (LIST "a :openparen "b)
+
+   ; a missing closing bracket is fabricated (probably a bug)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "a\[b ] (LIST "a [b])
+
+   ; test vbarred words
+   RUNPARSETEST.RUNTEST [ RUNPARSE "|a\ \"b\ \c| ] (LIST "|a "b c|)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "\|a\ b\|c    ] (LIST "|a bc|  )
+
+   ; test a missing vbar
+   RUNPARSETEST.RUNTEST [ RUNPARSE "a\|b ] [] ; weird
+
+   ; vbar is preserved
+   RUNPARSETEST.RUNTEST [ RUNPARSE "|(| ] (LIST :openparen )
+   FAILIFNOTTRUE [ BACKSLASHED? ITEM 1 RUNPARSE "|(| ]
+   RUNPARSETEST.RUNTEST [ RUNPARSE "\(  ] (LIST :openparen )
+   FAILIFNOTFALSE [ BACKSLASHED? ITEM 1 RUNPARSE "\(  ]
+
+   ; variables
+   RUNPARSETEST.RUNTEST [ RUNPARSE ":ab+cd:e\ :f\( ] (LIST ":ab "+ "cd:e ":f :openparen)
+
+   ; numbers
+   RUNPARSETEST.RUNTEST [ RUNPARSE 1       ] (LIST 1)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1      ] (LIST 1)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-1     ] (LIST -1)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-1e1   ] (LIST -10)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-1E2   ] (LIST -100)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-1e+2  ] (LIST -100)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-1E10  ] (LIST -10000000000)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1e-1   ] (LIST 0.1)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "123e-2 ] (LIST 1.23)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1000   ] (LIST 1000)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.234  ] (LIST 1.234)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1e1e1  ] (LIST "1e1e1)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.100  ] (LIST 1.1)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.10.0 ] (LIST "1.10.0)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "\ 1e2  ] (LIST 100)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1e2\   ] (LIST 100)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "123e   ] (LIST 123) ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE "123e+  ] (LIST 123) ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE "123e-  ] (LIST 123) ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.     ] (LIST 1)   ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.E    ] (LIST 1)   ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.e    ] (LIST 1)   ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.E+   ] (LIST 1)   ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1.e-   ] (LIST 1)   ; probably a bug with too much compatibility risk to fix
+   RUNPARSETEST.RUNTEST [ RUNPARSE ".e1    ] (LIST ".e1)
+
+   RUNPARSETEST.RUNTEST [ RUNPARSE "-0 ]                                                 (LIST "-0)
+   RUNPARSETEST.RUNTEST [ RUNPARSE ".000000000000000000000000000000000000000000000000  ] (LIST 0)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "00.0000000000000000000000000000000000000000000000  ] (LIST 0)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "00.00000000000000000000000000000000000000000000000 ] (LIST "00.00000000000000000000000000000000000000000000000)
+
+   ; questionmark operator
+   RUNPARSETEST.RUNTEST [ RUNPARSE "?4    ] (LIST :openparen "? 4  :closeparen)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "?10   ] (LIST :openparen "? 10 :closeparen)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "??4   ] (LIST "??4)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1?2   ] (LIST "1?2)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "?     ] (LIST "?)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1?    ] (LIST "1?)
+
+   ; lists are parsed as lists, instead of as individual tokens
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\[2\[3\]4\]5 ] (LIST 1 (LIST 2 (LIST 3) 4) 5)
+
+   ; Arrays are also parsed as arrays, instead of instead of as individual tokens
+   ; Because arrays cannot be directly compared with equality, we must determine
+   ; if the correct array was returned with indirect checks.
+   LOCAL "runparsedvalue
+   TRACEINSTRUCTION [ make "runparsedvalue RUNPARSE "1\{2\{3\}4\}5 ]
+
+   ; confirm the type/count of the return value
+   SIMPLEREPORTTEST [ LIST? :runparsedvalue ] "true
+   SIMPLEREPORTTEST [ COUNT  :runparsedvalue ] 3
+   SIMPLEREPORTTEST [ ARRAY? ITEM 2 :runparsedvalue ] "true
+   SIMPLEREPORTTEST [ COUNT  ITEM 2 :runparsedvalue ] 3
+   SIMPLEREPORTTEST [ ARRAY? ITEM 2 ITEM 2 :runparsedvalue ] "true
+   SIMPLEREPORTTEST [ COUNT  ITEM 2 ITEM 2 :runparsedvalue ] 1
+
+   ; confirm the values in the returned list
+   SIMPLEREPORTTEST [ ITEM 1 :runparsedvalue ]               1
+   SIMPLEREPORTTEST [ ITEM 1 ITEM 2 :runparsedvalue ]        2
+   SIMPLEREPORTTEST [ ITEM 1 ITEM 2 ITEM 2 :runparsedvalue ] 3
+   SIMPLEREPORTTEST [ ITEM 3 ITEM 2 :runparsedvalue ]        4
+   SIMPLEREPORTTEST [ ITEM 3 :runparsedvalue ]               5
+
+   ; a missing closing brace is fabricated (probably a bug)
+   TRACEINSTRUCTION [ make "runparsedvalue RUNPARSE "a\{b ] ; outputs [ a {b} ]
+   FAILIFNOTTRUE [ LIST? :runparsedvalue ]
+   SIMPLEREPORTTEST [ COUNT  :runparsedvalue ] 2
+   SIMPLEREPORTTEST [ ITEM 1 :runparsedvalue ] "a
+   FAILIFNOTTRUE [ ARRAY? ITEM 2 :runparsedvalue ]
+   SIMPLEREPORTTEST [ COUNT  ITEM 2 :runparsedvalue ] 1
+   SIMPLEREPORTTEST [ ITEM 1 ITEM 2 :runparsedvalue ] "b
+
+   ; comments should be discarded by the parser
+   RUNPARSETEST.RUNTEST [ RUNPARSE "\; ] (LIST)
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\ 2\ 3\;\ 4\ 5\ 6 ] (LIST 1 2 3)
+
+   ; line continuation
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\~\n\2 ] (LIST 12)
+
+   ; line continuation with whitespace after it
+   RUNPARSETEST.RUNTEST [ RUNPARSE "1\~\ \n\2 ] (LIST "1~ 2)
+
+   ; backslashed non-special characters
+   RUNPARSETEST.RUNTEST [ RUNPARSE "\1\2\a\b ] (LIST "12ab)
+
+   ; list input
+   RUNPARSETEST.RUNTEST [ RUNPARSE (LIST "a<>b [c] "\d\ e) ] (LIST "a "<> "b (LIST "c) "|d e|)
+   
+   ; number input
+   RUNPARSETEST.RUNTEST [ RUNPARSE 10E2 ] (LIST 1000)
+END
+
+TO RUNPARSETEST.SHEBANG
+   ; To enable command-line logo programs on UNIX, RUNPARSE ignores a shebang line.
+   SIMPLEREPORTTEST [ RUNPARSE "|#! shebang line| ] []
+
+   ; edge cases
+   SIMPLEREPORTTEST [ RUNPARSE "#!                   ]  []
+   SIMPLEREPORTTEST [ RUNPARSE "#                    ]  [ # ]
+   SIMPLEREPORTTEST [ RUNPARSE [#!  1 2 3 ]          ]  []
+   SIMPLEREPORTTEST [ RUNPARSE [# ! 1 2 3 ]          ]  [ # ! 1 2 3 ]
+   SIMPLEREPORTTEST [ RUNPARSE "\ #!\ space\ shebang ]  []
+   SIMPLEREPORTTEST [ RUNPARSE "| #! space shebang | ]  (LIST "| #! space shebang | )
+   SIMPLEREPORTTEST [ RUNPARSE "@!\ not\ shebang     ]  (LIST "@! "not "shebang     )
+   SIMPLEREPORTTEST [ RUNPARSE "|@! not shebang|     ]  (LIST "|@! not shebang|     )
+   SIMPLEREPORTTEST [ RUNPARSE (WORD "#!shebang CHAR 10 "line2)] []
+
+END
+
+TO RUNPARSETEST
+   RUNPARSETEST.SMOKETEST
+   RUNPARSETEST.MINUSSIGN
+   RUNPARSETEST.SHEBANG
+   RUNPARSETEST.BADINPUT
+END

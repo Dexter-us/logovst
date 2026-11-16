@@ -1,0 +1,144 @@
+LOAD "testlib.lgo
+
+TO SETPOSXYZTEST.WRAP
+
+   TRACEINSTRUCTION [ WRAP ]
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ 0 0 0 ] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+   ; Z coordinate is ignored outside of PERSPECTIVE.
+   TRACEINSTRUCTION [ SETPOSXYZ [ 100 -100 50 ] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 -100 0  ]
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ -5.5 5.5 -10.5 ] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -5.5 5.5     0 ]
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ 0.1 -0.2 0.3 ] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0.1 -0.2 0   ]
+
+   ; Strings that are converted to numbers.
+   TRACEINSTRUCTION [ SETPOSXYZ (LIST "10 "1e2 "-10) ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 10 100 0 ]
+
+   ; Wrapping works.
+   TRACEINSTRUCTION [ SETPOSXYZ [2500 2500 0] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [500  500  0]
+
+   TRACEINSTRUCTION [ SETPOSXYZ [-2500 -2500 0] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [-499.999999 -499.999999 0]
+
+END
+
+TO SETPOSXYZTEST.PERSPECTIVE
+   ; Set the mode to PERSPECTIVE so that we can set the position
+   ; outside the drawing surface.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ 2000 3000 4000 ] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 2000 3000 4000 ]
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ -1e3  -1e5    1e2 ] ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -1000 -100000 100 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETPOSXYZTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(SETPOSXYZ)]
+   RUNTOOMANYINPUTSTEST   [(SETPOSXYZ [0 0 0] "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ {10 10 10}     ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ "10            ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ []             ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [1 2]          ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [1 2 3 4 ]     ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [1a   2   3  ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [[1]  2   3  ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [{1}  2   3  ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [ 1   2a  3  ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [ 1  [2]  3  ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [ 1  {2}  3  ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [ 1   2   3a ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [ 1   2  [3] ] ]
+   RUNDOESNTLIKEINPUTTEST [ SETPOSXYZ [ 1   2  {3} ] ]
+
+   ; None of the bad input should have changed the position.
+   SIMPLEREPORTTEST [ POSXYZ ] [ 51 52 53 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETPOSXYZTEST.BADINPUT.RECOVERABLE
+
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 1 2 3 ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      SETPOSXYZ [1 2]   ; list must have three elements
+   ] [
+      [ 1 2 3 4 ]   ; list has too many elements
+      {10 10 10}    ; must be a list (not an array)
+      10            ; must be a list (not a word)
+      []            ; can't be the empty list
+      [1a  2  3  ]  ; first element must be number
+      [[1] 2  3  ]  ; first element can't be a list
+      [{1} 2  3  ]  ; first element can't be an array
+      [ 1  2a 3  ]  ; second element must be number
+      [ 1 [2] 3  ]  ; second element can't be a list
+      [ 1 {2} 3  ]  ; second element can't be an array
+      [ 1  2  3a ]  ; third element must be number
+      [ 1  2 [3] ]  ; third element must be number
+      [ 1  2 {3} ]  ; third element can't be a list
+      [ 1 2 ]       ; list has too few elements (again) 
+      [ 1 2 3 4 ]   ; list has too many elements (again)
+      {10 10 10}    ; can't be an array (again)
+      10            ; can't be a word (again)
+      []            ; can't be the empty list (again)
+      [1a  2  3  ]  ; first element must be number (again)
+      [[1] 2  3  ]  ; first element can't be a list (again)
+      [{1} 2  3  ]  ; first element can't be an array (again)
+      [ 1  2a 3  ]  ; second element must be number (again)
+      [ 1 [2] 3  ]  ; second element can't be a list (again)
+      [ 1 {2} 3  ]  ; second element can't be an array (again)
+      [ 1  2  3a ]  ; third element must be number (again)
+      [ 1  2 [3] ]  ; third element must be number (again)
+      [ 1  2 {3} ]  ; third element can't be a list (again)
+      [ 10 20 30 ]  ; legal
+   ] []
+
+   SIMPLEREPORTTEST [ POSXYZ ] [ 10 20 30 ]
+
+
+   ; Test that SETPOSXYZ accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST "10 "20 "30) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETPOSXYZ [] ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 10 20 30 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETPOSXYZTEST
+   SETPOSXYZTEST.WRAP
+   SETPOSXYZTEST.PERSPECTIVE
+   SETPOSXYZTEST.BADINPUT
+   SETPOSXYZTEST.BADINPUT.RECOVERABLE
+END

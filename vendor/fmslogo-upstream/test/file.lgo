@@ -1,0 +1,2680 @@
+LOAD "testlib.lgo
+LOAD "dllcall/setclipboarddata.lgo
+
+TO FILETEST.SETACCESS :mode :filename
+   ; Changes the permission on a file.
+   ; Since there's no way to do this within FMSLogo, it's done with chmod.
+   ;
+   ; :mode
+   ;   A word that contains "r" to enable read and "w" to enable write.
+   ; :filename
+   ;   The name of the file whose permissions to be changed.
+   ;
+   LOCAL [shellcommand chmodmode]
+
+   ; Convert "rw" style mode into chmod-style mode.
+   IFELSE MEMBERP "r :mode [
+      IFELSE MEMBERP "w :mode [
+         MAKE "chmodmode "0600 ; read+write
+      ][
+         MAKE "chmodmode "0400 ; read only
+      ]
+   ][
+      IFELSE MEMBERP "w :mode [
+         MAKE "chmodmode "0200 ; write only
+      ][
+         MAKE "chmodmode "0000 ; no access
+      ]
+   ]
+
+   ; Execute something like:
+   ;   chmod 0400 myfile.txt
+   MAKE "shellcommand (LIST "chmod :chmodmode :filename)
+   FAILIFNOTTRUE (LIST "\( "SHELL QUOTED :shellcommand  QUOTED LOCALETRUE "\) )
+END
+
+TO FILETEST.SMOKETEST.HELPER :writefilename :readfilename
+
+   ; erase the file, just in case
+   ERASEFILE :writefilename
+   ERASEFILE :readfilename
+
+   ;
+   ; Write some simple data to a test file
+   ;
+   OPENWRITE :writefilename
+   FAILIFNOTTRUE [ MEMBERP :writefilename ALLOPEN ]
+   SETWRITE  :writefilename
+   SIMPLEREPORTTEST [WRITER] :writefilename
+   SIMPLEREPORTTEST [WRITEPOS] 0
+   PRINT "Hello
+   SIMPLEREPORTTEST [WRITEPOS] 10 ; BOM (3) + Hello (5) + CRLF (2)
+   PRINT [Good Bye]
+   SIMPLEREPORTTEST [WRITEPOS] 20 ; + Good Bye (8) + CRLF (2)
+
+   SETWRITE []
+   SIMPLEREPORTTEST [WRITER] []
+   CLOSE :writefilename
+
+   ;
+   ; Now, read the file using the alternate name
+   ;
+   OPENREAD :readfilename
+   SETREAD  :readfilename
+   SIMPLEREPORTTEST [READER] :readfilename
+
+   SIMPLEREPORTTEST [READPOS] 0
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READPOS] 10
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SIMPLEREPORTTEST [READPOS] 20
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE :readfilename
+
+   ; Cleanup
+   ERASEFILE :readfilename
+   ERASEFILE :writefilename
+END
+
+TO FILETEST.SMOKETEST
+   FILETEST.SMOKETEST.HELPER "smoketest.txt "smoketest.txt
+END
+
+TO FILETEST.NUMBERFILENAME
+   FILETEST.SMOKETEST.HELPER 123 "123
+END
+
+TO FILETEST.UNICODEFILENAME
+   LOCAL [greekSigma filename]
+   MAKE "greekSigma CHAR 963
+   MAKE "filename   (WORD "filetest.unicode :greekSigma ".txt)
+
+   FILETEST.SMOKETEST.HELPER :filename :filename
+END
+
+TO FILETEST.SPACESINFILENAME
+   ; Attempts to read/write a file that has spaces in its name.
+   ; This is a regression test for Bug #578.
+   FILETEST.SMOKETEST.HELPER "filetest-two\ \ spaces.txt "|filetest-two  spaces.txt|
+END
+
+TO FILETEST.CASEINSENSTIVEFILENAME
+   ; Attempts to read/write a file that has spaces in its name.
+   ; This is a regression test for Bug #578.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows 
+   FILETEST.SMOKETEST.HELPER "filetest.txt "FILETEST.TXT
+END
+
+
+
+TO FILETEST.OPENREAD.ANSI
+   ; Tests that text file with a BOM are read with the ANSI text,
+   ; as they were prior to FMSLogo 8.0.
+   LOCALMAKE "cr  CHAR 13
+   LOCALMAKE "lf  CHAR 10
+
+   WRITEBINARYDATA "filetest.openread.ascii.txt (WORD
+     "A :cr :lf      ; CRLF
+     "B :cr :cr :lf  ; CRCRLF
+     "C :cr :lf :lf  ; CRLFLF
+     CHAR 180        ; not ASCII
+     CHAR 190        ; not ASCII
+   )
+
+   ;
+   ; Now, read the file in the default mode.
+   ;
+   OPENREAD "filetest.openread.ascii.txt
+   SETREAD  "filetest.openread.ascii.txt
+   FILETEST.READERSTATETEST  0 LOCALEFALSE "A
+   FILETEST.READERSTATETEST  1 LOCALEFALSE :lf
+   FILETEST.READERSTATETEST  3 LOCALEFALSE "B
+   FILETEST.READERSTATETEST  4 LOCALEFALSE :cr
+   FILETEST.READERSTATETEST  5 LOCALEFALSE :lf
+   FILETEST.READERSTATETEST  7 LOCALEFALSE "C
+   FILETEST.READERSTATETEST  8 LOCALEFALSE :lf
+   FILETEST.READERSTATETEST 10 LOCALEFALSE :lf
+   FILETEST.READERSTATETEST 11 LOCALEFALSE CHAR 180 ; (varies by locale)
+   FILETEST.READERSTATETEST 12 LOCALEFALSE CHAR 190 ; (varies by locale)
+   FILETEST.READERSTATETEST 13  LOCALETRUE []
+   SETREAD []
+   CLOSE "filetest.openread.ascii.txt
+
+   ERASEFILE "filetest.openread.ascii.txt
+END
+
+TO FILETEST.OPENREAD.UTF8
+   ; Tests that text file encoded in UTF-8 can be read using OPENREAD.
+
+   LOCALMAKE "bom            CHAR 65279
+   LOCALMAKE "greekSigma     CHAR 963
+   LOCALMAKE "utf8Bom        (WORD CHAR 239 CHAR 187 CHAR 191)
+   LOCALMAKE "utf8GreekSigma (WORD CHAR 207 CHAR 131)
+   LOCALMAKE "crlf           (WORD CHAR 13 CHAR 10)
+
+   ;
+   ; Write the contents of UTF-8 encoded text file.
+   ; This uses characters with 1-, 2-, and 3-byte codings.
+   ;
+   WRITEBINARYDATA "filetest.unicode.txt (WORD
+     :utf8Bom
+     "Hello :utf8GreekSigma :utf8GreekSigma :crlf  ; 1- and 2-character codings
+     "|Good | :utf8Bom "| Bye| :crlf               ; 3-character coding
+   )
+
+   ;
+   ; Now, read the file in the default mode.
+   ;
+   OPENREAD "filetest.unicode.txt
+   SETREAD  "filetest.unicode.txt
+   SIMPLEREPORTTEST [READER] "filetest.unicode.txt
+
+   SIMPLEREPORTTEST [READPOS] 0 ; at the beginning
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] (LIST (WORD "Hello :greekSigma :greekSigma))
+   SIMPLEREPORTTEST [READPOS] 14 ; BOM(3) + Hello(5) + sigma(2) + sigma(2) + EOL(2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] (LIST "Good :bom "Bye)
+   SIMPLEREPORTTEST [READPOS] 28 ; 14 + "Good BOM Bye"(12) + EOL(2)
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE "filetest.unicode.txt
+
+   ERASEFILE "filetest.unicode.txt
+END
+
+TO FILETEST.OPENREAD.UTF8.VARIATIONS
+   ; Tests that character variations on reading UTF-8 encoded sequences.
+   ; This includes malformed sequences.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   LOCALMAKE "utf8Bom      (WORD CHAR 239 CHAR 187 CHAR 191)
+   LOCALMAKE "utf8Char1Min (WORD CHAR 0)
+   LOCALMAKE "utf8Char1Max (WORD CHAR 127)
+
+   LOCALMAKE "utf8Char2Nul (WORD CHAR 192 CHAR 128)
+   LOCALMAKE "utf8Char2Min (WORD CHAR 194 CHAR 128)
+   LOCALMAKE "utf8Char2Max (WORD CHAR 223 CHAR 191)
+
+   LOCALMAKE "utf8Char3Nul (WORD CHAR 224 CHAR 128 CHAR 128)
+   LOCALMAKE "utf8Char3Min (WORD CHAR 224 CHAR 160 CHAR 128)
+   LOCALMAKE "utf8Char3Max (WORD CHAR 239 CHAR 191 CHAR 191)
+
+   LOCALMAKE "utf8Char4Nul (WORD CHAR 240 CHAR 128 CHAR 128 CHAR 128)
+   LOCALMAKE "utf8Char4Min (WORD CHAR 247 CHAR 144 CHAR 128 CHAR 128)
+   LOCALMAKE "utf8Char4Max (WORD CHAR 247 CHAR 191 CHAR 191 CHAR 191)
+
+   ; UTF-8 only specifies up to 4-byte codings, but you can follow the
+   ; pattern to create illegal 5- and 6- byte codings.
+   LOCALMAKE "utf8Char5Max (WORD CHAR 251 CHAR 191 CHAR 191 CHAR 191 CHAR 191)
+   LOCALMAKE "utf8Char6Max (WORD CHAR 253 CHAR 191 CHAR 191 CHAR 191 CHAR 191 CHAR 191)
+
+   LOCALMAKE "utf8NonStartByte CHAR 187
+
+   WRITEBINARYDATA "filetest.unicode.txt (WORD
+     :utf8Bom
+     :utf8Char1Min ; min char in 1-char coding
+     :utf8Char1Max ; max char in 1-char coding
+     :utf8Char2Min ; min char in 2-char coding
+     :utf8Char2Max ; max char in 2-char coding
+     :utf8Char3Min ; min char in 3-char coding
+     :utf8Char3Max ; max char in 3-char coding
+     :utf8Char4Min ; min char in 4-char coding
+     :utf8Char4Max ; max char in 4-char coding
+
+     :utf8NonStartByte :utf8NonStartByte ; illegal sequence
+
+     :utf8Char2Min ; legal again
+
+     :utf8Char2Nul ; overlong NUL (2-bytes)
+     :utf8Char3Nul ; overlong NUL (3-bytes)
+     :utf8Char4Nul ; overlong NUL (4-bytes)
+
+     :utf8Char5Max ; illegal 5-byte sequence
+     :utf8Char6Max ; illegal 6-byte sequence
+     CHAR 254      ; 0xFE is also illegal
+     CHAR 255      ; 0xFF is also illegal
+     :utf8Char1Min ; legal 1-byte sequence
+
+     CHAR 224 ; end the file on the start of a three-byte sequence
+   )
+
+   ;
+   ; Now, read the file
+   ;
+   LOCALMAKE "char1Min CHAR 0
+   LOCALMAKE "char1Max CHAR 127
+   LOCALMAKE "char2Min CHAR 128
+   LOCALMAKE "char2Max CHAR 2047
+   LOCALMAKE "char3Min CHAR 2048
+   LOCALMAKE "char3Max CHAR 65535
+   LOCALMAKE "char4Min CHAR 65536
+   LOCALMAKE "char4Max CHAR 1114111 ; silent bug, this wraps at 0x10000.
+
+   OPENREAD "filetest.unicode.txt
+   SETREAD  "filetest.unicode.txt
+   FILETEST.READERSTATETEST  0 LOCALEFALSE :char1Min
+   FILETEST.READERSTATETEST  4 LOCALEFALSE :char1Max
+   FILETEST.READERSTATETEST  5 LOCALEFALSE :char2Min
+   FILETEST.READERSTATETEST  7 LOCALEFALSE :char2Max
+   FILETEST.READERSTATETEST  9 LOCALEFALSE :char3Min
+   FILETEST.READERSTATETEST 12 LOCALEFALSE :char3Max
+   FILETEST.READERSTATETEST 15 LOCALEFALSE :char4Min
+   FILETEST.READERSTATETEST 19 LOCALEFALSE :char4Max
+   FILETEST.READERSTATETEST 23 LOCALEFALSE :char2Min ; illegal sequences are skipped
+   FILETEST.READERSTATETEST 27 LOCALEFALSE :char1Min ; overlong UTF-8 is accepted
+   FILETEST.READERSTATETEST 29 LOCALEFALSE :char1Min ; overlong UTF-8 is accepted
+   FILETEST.READERSTATETEST 32 LOCALEFALSE :char1Min ; overlong UTF-8 is accepted
+   FILETEST.READERSTATETEST 36 LOCALEFALSE :char1Min ; illegal sequences are skipped
+
+   FILETEST.READERSTATETEST 50 LOCALEFALSE []        ; truncated sequence at EOF is not returned
+   FILETEST.READERSTATETEST 51 LOCALETRUE  []        ; now at EOF
+   SETREAD []
+   CLOSE "filetest.unicode.txt
+
+   ERASEFILE "filetest.unicode.txt
+END
+
+TO FILETEST.OPENREAD.UTF8.EOLVARIATIONS
+   ; Tests variations on the EOL sequence in a UTF-8 encoded file.
+   LOCALMAKE "cr  CHAR 13
+   LOCALMAKE "lf  CHAR 10
+
+   WRITEBINARYDATA "filetest.unicode.txt (WORD
+     CHAR 239 CHAR 187 CHAR 191 ; UTF-8 BOM
+     "A :cr :lf                 ; real EOL
+     "B :cr :cr :lf             ; real CRLF after CR
+     "C :cr :lf :lf             ; real LF after CRLF
+     "D :cr :cr                 ; real CRCR with no LF (EOF)
+   )
+
+   OPENREAD "filetest.unicode.txt
+   SETREAD  "filetest.unicode.txt
+   FILETEST.READERSTATETEST  0 LOCALEFALSE "A
+   FILETEST.READERSTATETEST  4 LOCALEFALSE :lf ; CRLF -> LF
+   FILETEST.READERSTATETEST  6 LOCALEFALSE "B
+   FILETEST.READERSTATETEST  7 LOCALEFALSE :cr ; CR in CRCRLF
+   FILETEST.READERSTATETEST  8 LOCALEFALSE :lf ; CRLF
+   FILETEST.READERSTATETEST 10 LOCALEFALSE "C
+   FILETEST.READERSTATETEST 11 LOCALEFALSE :lf ; CRLF in CRLFLF
+   FILETEST.READERSTATETEST 13 LOCALEFALSE :lf ; LF at end
+   FILETEST.READERSTATETEST 14 LOCALEFALSE "D
+   FILETEST.READERSTATETEST 15 LOCALEFALSE :cr
+   FILETEST.READERSTATETEST 16 LOCALEFALSE :cr ; CR at EOF
+   FILETEST.READERSTATETEST 17  LOCALETRUE []
+   SETREAD []
+   CLOSE "filetest.unicode.txt
+
+   ERASEFILE "filetest.unicode.txt
+END
+
+
+TO FILETEST.OPENREAD.UTF16LE
+   ; Tests a text file encoded in UTF-16LE can be read using OPENREAD.
+
+   ; Define some variables that hold UTF-16LE codings
+   LOCALMAKE "greekSigma  WORD CHAR 195 CHAR   3
+   LOCALMAKE "bom         WORD CHAR 255 CHAR 254
+   LOCALMAKE "B           WORD CHAR  66 CHAR   0
+   LOCALMAKE "G           WORD CHAR  71 CHAR   0
+   LOCALMAKE "H           WORD CHAR  72 CHAR   0
+   LOCALMAKE "d           WORD CHAR 100 CHAR   0
+   LOCALMAKE "e           WORD CHAR 101 CHAR   0
+   LOCALMAKE "l           WORD CHAR 108 CHAR   0
+   LOCALMAKE "o           WORD CHAR 111 CHAR   0
+   LOCALMAKE "y           WORD CHAR 121 CHAR   0
+   LOCALMAKE "space       WORD CHAR  32 CHAR   0
+   LOCALMAKE "cr          WORD CHAR  13 CHAR   0
+   LOCALMAKE "lf          WORD CHAR  10 CHAR   0
+
+   ; The character in native Unicode
+   LOCALMAKE "nativeGreekSigma CHAR 963
+
+   ;
+   ; Create a test file that is encoded in UTF-16LE.
+   ;
+   WRITEBINARYDATA "filetest.unicode.txt (WORD
+      :bom
+      :H :e :l :l :o :greekSigma :greekSigma :cr :lf
+      :G :o :o :d :space :greekSigma :space :B :y :e :cr :lf
+   )
+
+   ;
+   ; Now, read the file in the default mode.
+   ;
+   OPENREAD "filetest.unicode.txt
+   SETREAD  "filetest.unicode.txt
+   SIMPLEREPORTTEST [READER] "filetest.unicode.txt
+
+   SIMPLEREPORTTEST [READPOS] 0 ; at the beginning
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] (LIST (WORD "Hello :nativeGreekSigma :nativeGreekSigma))
+   SIMPLEREPORTTEST [READPOS] 20 ; BOM(2) + Hello(10) + sigma(2) + sigma(2) + EOL(4)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] (LIST "Good :nativeGreekSigma "Bye)
+   SIMPLEREPORTTEST [READPOS] 44 ; 20 + "Good SIGMA Bye"(20) + EOL(4)
+
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE "filetest.unicode.txt
+
+   ERASEFILE "filetest.unicode.txt
+
+END
+
+TO FILETEST.READERSTATETEST :expectedPosition :expectedEof :expectedCharacter 
+   SIMPLEREPORTTEST [READPOS]  :expectedPosition
+   SIMPLEREPORTTEST [EOFP]     :expectedEof
+   SIMPLEREPORTTEST [READCHAR] :expectedCharacter
+END
+
+TO FILETEST.OPENREAD.UTF16LE.EOLVARIATIONS
+   ; Tests variations on reading not-quite EOL sequences from
+   ; a file encoded in UTF-16LE.
+   LOCALMAKE "filename "filetest.openread.utf16le.eolvariations.txt
+
+   LOCALMAKE "NUL CHAR 0
+   LOCALMAKE "SOH CHAR 1
+   LOCALMAKE "TAB CHAR 9
+   LOCALMAKE "LF  CHAR 10
+   LOCALMAKE "CR  CHAR 13
+   LOCALMAKE "A   CHAR 65
+   LOCALMAKE "B   CHAR 66
+   LOCALMAKE "C   CHAR 67
+   LOCALMAKE "D   CHAR 68
+   LOCALMAKE "E   CHAR 69
+   LOCALMAKE "F   CHAR 70
+   LOCALMAKE "G   CHAR 71
+   LOCALMAKE "H   CHAR 72
+
+   ;
+   ; Write some data to a test file.
+   ;
+   WRITEBINARYDATA :filename (WORD
+      CHAR 255 CHAR 254                      ; UTF-16 BOM
+      :A :NUL  :CR :NUL  :LF  :NUL           ; real EOL
+      :B :NUL  :CR :NUL  :LF  :SOH           ; not a LF (bad low byte)
+      :C :NUL  :CR :NUL  :TAB :NUL           ; not a LF (bad high byte)
+      :D :NUL :TAB :NUL  :LF  :NUL           ; not a real CR (bad low byte)
+      :E :NUL  :CR :SOH  :CR  :NUL  :LF :NUL ; real CRLF after bad CR (bad low byte)
+      :F :NUL  :CR :NUL  :CR  :NUL  :LF :NUL ; CRCRLF
+      :G :NUL  :CR :LF                       ; CRLF in UTF-8, but 0x0A0D in UTF-16
+      :H :NUL  :CR :NUL  :LF                 ; EOF before CRLF finishes
+   )
+
+   ;
+   ; Now, read the file in the default mode.
+   ;
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST  0 LOCALEFALSE :A
+   FILETEST.READERSTATETEST  4 LOCALEFALSE :LF
+
+   FILETEST.READERSTATETEST  8 LOCALEFALSE :B
+   FILETEST.READERSTATETEST 10 LOCALEFALSE :CR
+   FILETEST.READERSTATETEST 12 LOCALEFALSE CHAR SUM 256 10 ; :LF :SOH
+
+   FILETEST.READERSTATETEST 14 LOCALEFALSE :C
+   FILETEST.READERSTATETEST 16 LOCALEFALSE :CR
+   FILETEST.READERSTATETEST 18 LOCALEFALSE :TAB
+
+   FILETEST.READERSTATETEST 20 LOCALEFALSE :D
+   FILETEST.READERSTATETEST 22 LOCALEFALSE :TAB
+   FILETEST.READERSTATETEST 24 LOCALEFALSE :LF
+
+   FILETEST.READERSTATETEST 26 LOCALEFALSE :E
+   FILETEST.READERSTATETEST 28 LOCALEFALSE CHAR SUM 256 13 ; :CR :SOH
+   FILETEST.READERSTATETEST 30 LOCALEFALSE :LF             ; CRLF -> LF
+
+   FILETEST.READERSTATETEST 34 LOCALEFALSE :F
+   FILETEST.READERSTATETEST 36 LOCALEFALSE :CR
+   FILETEST.READERSTATETEST 38 LOCALEFALSE :LF             ; CRLF -> LF
+
+   FILETEST.READERSTATETEST 42 LOCALEFALSE :G
+   FILETEST.READERSTATETEST 44 LOCALEFALSE CHAR (10*256 + 13) ; :CR :LF
+
+   FILETEST.READERSTATETEST 46 LOCALEFALSE :H
+   FILETEST.READERSTATETEST 48 LOCALEFALSE :CR ; the truncated CRLF is just a CR
+   FILETEST.READERSTATETEST 50 LOCALEFALSE []  ; EOF (the half char is never output)
+   FILETEST.READERSTATETEST 51 LOCALETRUE  []  ; EOF (the half char is never output)
+   FILETEST.READERSTATETEST 51 LOCALETRUE  []  ; EOF (the half char is never output)
+
+   SETREAD []
+   CLOSE   :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENREAD.BOMSNIFFING
+   ; Tests variations on reading a BOM from a file.
+   LOCALMAKE "filename "filetest.openread.bomsniffing.txt
+
+   ; Test: one-byte file with start of UTF-16 BOM
+   ; This should be interpreted as a one-character ANSI file containing
+   ; the character that's at code point 255 on the system code page
+   ; (varies depending on locale)
+   WRITEBINARYDATA :filename CHAR 255
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALEFALSE CHAR 255
+   FILETEST.READERSTATETEST 1 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ; Test: one-byte file with part of a UTF-16 BOM, followed by
+   ; byte that's doesn't complete the BOM.
+   ; This should be interpreted as a one-character ANSI file containing
+   ; the character that's at code point 239 on the system code page
+   ; (varies depending on locale)
+   WRITEBINARYDATA :filename WORD CHAR 255 CHAR 255
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALEFALSE CHAR 255
+   FILETEST.READERSTATETEST 1 LOCALEFALSE CHAR 255
+   FILETEST.READERSTATETEST 2 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ; Test: UTF-16 BOM with nothing after it.
+   ; This should be interpreted as an empty file.
+   WRITEBINARYDATA :filename WORD CHAR 255 CHAR 254
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+
+   ; Test: a one-byte file with the start of UTF-8 BOM
+   ; This should be interpreted as a one-character ANSI file containing
+   ; the character that's at code point 239 on the system code page
+   ; (varies depending on locale)
+   WRITEBINARYDATA :filename CHAR 239
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALEFALSE CHAR 239
+   FILETEST.READERSTATETEST 1 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ; Test: a two-byte file with the start of UTF-8 BOM.
+   ; This should be interpreted as a two-character ANSI file containing
+   ; the character that's at code point 239, followed by the one
+   ; at code point 187 (both from the system code page).
+   ; (varies depending on locale)
+   WRITEBINARYDATA :filename WORD CHAR 239 CHAR 187
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALEFALSE CHAR 239
+   FILETEST.READERSTATETEST 1 LOCALEFALSE CHAR 187
+   FILETEST.READERSTATETEST 2 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ; Test: a two-byte file with the start of UTF-8 BOM, but followed
+   ; by a second byte that isn't part of the BOM.
+   ; This should be interpreted as a two-character ANSI file containing
+   ; the character that's at code point 239, followed by the one
+   ; at code point 186 (both from the system code page).
+   ; (varies depending on locale)
+   WRITEBINARYDATA :filename WORD CHAR 239 CHAR 186
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALEFALSE CHAR 239
+   FILETEST.READERSTATETEST 1 LOCALEFALSE CHAR 186
+   FILETEST.READERSTATETEST 2 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ; Test: a two-byte file with the start of UTF-8 BOM, but whose
+   ; third byte is not part of the BOM.
+   ; This should be interpreted as a three-character ANSI file
+   ; containing the character that's at code point 239, followed by
+   ; the one at code point 186, followed by the one at code point
+   ; 192 (all from the system code page).
+   ; (varies depending on locale)
+   WRITEBINARYDATA :filename (WORD CHAR 239 CHAR 186 CHAR 192)
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALEFALSE CHAR 239
+   FILETEST.READERSTATETEST 1 LOCALEFALSE CHAR 186
+   FILETEST.READERSTATETEST 2 LOCALEFALSE CHAR 192
+   FILETEST.READERSTATETEST 3 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ; Test: a UTF-8 BOM with nothing after it.
+   ; This should be interpreted as an empty file.
+   WRITEBINARYDATA :filename (WORD CHAR 239 CHAR 187 CHAR 191)
+   OPENREAD :filename
+   SETREAD  :filename
+   FILETEST.READERSTATETEST 0 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.COPYTEXTTOCLIPBOARD :text
+   ; Native code to copy data to the clipboard.
+
+   ; size_t bufferLength = (wcslen(:text) + 1) * sizeof(wchar_t)
+   LOCALMAKE "bufferLength  PRODUCT 2 SUM 1 COUNT :text
+
+   LOCALMAKE "hMem GLOBALALLOC :text :bufferLength
+
+   LOCALMAKE "CF_UNICODETEXT 13
+   SETCLIPBOARDDATA :CF_UNICODETEXT :hMem
+
+   GLOBALFREE :hMem
+END
+
+
+TO FILETEST.COPYTEXTFROMCLIPBOARD
+   ; Native code to read text data from the clipboard.
+   LOCAL [isOk CF_UNICODETEXT hText clipboardBuffer bufferSize contents]
+
+   ; BOOLEAN isOk = OpenClipboard(NULL);
+   DLLLOAD "user32.dll
+   MAKE "isOk FIRST DLLCALL [L OpenClipboard L 0]
+   IFELSE :isOk = 0 [
+      MAKE "contents [] ; cannot open clipboard
+   ][
+      ; HANDLE hText = ::GetClipboardData(CF_UNICODETEXT);
+      MAKE "CF_UNICODETEXT 13
+      MAKE "hText FIRST DLLCALL (LIST "L "GetClipboardData "L :CF_UNICODETEXT)
+      IFELSE EQUAL? :hText 0 [
+         MAKE "contents [] ; clipboard doesn't hold text.
+      ][
+         ; PVOID clipboardBuffer = GlobalLock(hText);
+         DLLLOAD "kernel32.dll
+         MAKE "clipboardBuffer FIRST DLLCALL (LIST "L "GlobalLock "L :hText)
+
+         ; int bufferSize = GlobalSize(HText);
+         MAKE "bufferSize FIRST DLLCALL (LIST "L "GlobalSize "L :hText);
+
+         ; Copy everything except the trailing NUL character (-2).
+         ; wchar_t * contents = malloc(bufferSize - 2)
+         ; memcpy(contents, clipboardBuffer, bufferSize - 2);
+         DLLLOAD "msvcrt.dll
+         MAKE "contents FIRST DLLCALL (
+            LIST "V "memcpy
+                 "L (:bufferSize - 2)  ; length
+                 "L :clipboardBuffer   ; source
+                 "B (:bufferSize - 2)  ; malloc+dest
+         )
+         (DLLFREE "msvcrt.dll)
+
+         ; GlobalUnlock(hText);
+         DLLCALL (LIST "V "GlobalUnlock "L :hText)
+         (DLLFREE "kernel32.dll)
+      ]
+
+      ; CloseClipboard();
+      DLLCALL [V CloseClipboard]
+   ]
+   (DLLFREE "user32.dll)
+
+   IF WORD? :contents [
+      ; Because we requested the data as CF_UNICODETEXT, we must convert it
+      ; from a sequence of UTF16LE bytes into native Unicode.
+      MAKE "contents CONVERTUTF16LEWORD :contents
+   ]
+
+   OUTPUT :contents
+END
+
+TO FILETEST.OPENREAD.CLIPBOARD.TEXT
+   ; Tests that OPENREAD can read from the clipboard.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write some known data to the clipboard, replacing whatever is there.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "Hello CHAR 13 CHAR 10
+     "Clipboard CHAR 13 CHAR 10
+     "|Good Bye|
+   )
+
+   ; Now, read from the clipboard
+   OPENREAD "clipboard
+
+   ; The file should have been added to the "open file" list.
+   FAILIFNOTTRUE [ MEMBERP "clipboard ALLOPEN ]
+
+   SETREAD  "clipboard
+
+   SIMPLEREPORTTEST [READPOS] 0
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READPOS] 10 ; BOM (2) + hello (5) + CRLF (2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Clipboard]
+   SIMPLEREPORTTEST [READPOS] 21 ; 10 + clipboard (9) + CRLF (2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SIMPLEREPORTTEST [READPOS] 29 ; 21 + Good Bye (8)
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE "clipboard
+
+   ; Reading from the clipboard should not have changed it.
+   ; That is, we should be able to read the exact same content.
+   OPENREAD "clipboard
+   SETREAD  "clipboard
+
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READPOS] 10
+   SIMPLEREPORTTEST [READLIST] [Clipboard]
+   SIMPLEREPORTTEST [READPOS] 21
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SIMPLEREPORTTEST [READPOS] 29
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE "clipboard
+END
+
+TO FILETEST.OPENREAD.CLIPBOARD.UNICODECONTENT
+   ; Tests that OPENREAD can read non-ASCII text from the clipboard.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write some known data to the clipboard, replacing whatever is there.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "|Sigma | CHAR 931   CHAR 13 CHAR 10
+     "|Aleph | CHAR 1488  CHAR 13 CHAR 10
+   )
+
+   ; Now, read from the clipboard
+   OPENREAD "clipboard
+   SETREAD  "clipboard
+
+   SIMPLEREPORTTEST [READPOS] 0
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READWORD] (WORD "|Sigma | CHAR 931)
+   SIMPLEREPORTTEST [READPOS] 13 ; BOM (3) + text (8) + CRLF (2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READWORD] (WORD "|Aleph | CHAR 1488)
+   SIMPLEREPORTTEST [READPOS] 23 ; 13 + text (8) + CRLF (2)
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE "clipboard
+
+   ; Reading from the clipboard should not have changed it.
+   ; That is, we should be able to read the exact same content.
+   OPENREAD "clipboard
+   SETREAD  "clipboard
+
+   SIMPLEREPORTTEST [READPOS] 0
+   SIMPLEREPORTTEST [READWORD] (WORD "|Sigma | CHAR 931)
+   SIMPLEREPORTTEST [READPOS] 13
+   SIMPLEREPORTTEST [READWORD] (WORD "|Aleph | CHAR 1488)
+   SIMPLEREPORTTEST [READPOS] 23
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE "clipboard
+END
+
+TO FILETEST.OPENREAD.CLIPBOARD.BINARYMODE
+   ; Tests that OPENREAD can read from the clipboard in binary mode.
+   ; This is a regression test for bug #530 (access violation)
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Copy some known data to the clipboard, replacing whatever is there.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "Hello     CHAR 13 CHAR 10
+     "|Good Bye|
+   )
+
+   ; Open the clipboard for binary reading
+   TRACEINSTRUCTION [ (OPENREAD "clipboard LOCALETRUE) ]
+
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+
+   ; Read the contents of the clipboard.
+   FILETEST.READERSTATETEST  0 LOCALEFALSE 239       ; UTF-8 BOM byte 1
+   FILETEST.READERSTATETEST  1 LOCALEFALSE 187       ; UTF-8 BOM byte 2
+   FILETEST.READERSTATETEST  2 LOCALEFALSE 191       ; UTF-8 BOM byte 3
+   FILETEST.READERSTATETEST  3 LOCALEFALSE ASCII "H
+   FILETEST.READERSTATETEST  4 LOCALEFALSE ASCII "e
+   FILETEST.READERSTATETEST  5 LOCALEFALSE ASCII "l
+   FILETEST.READERSTATETEST  6 LOCALEFALSE ASCII "l
+   FILETEST.READERSTATETEST  7 LOCALEFALSE ASCII "o
+   FILETEST.READERSTATETEST  8 LOCALEFALSE 13
+   FILETEST.READERSTATETEST  9 LOCALEFALSE 10
+   FILETEST.READERSTATETEST 10 LOCALEFALSE ASCII "G
+   FILETEST.READERSTATETEST 11 LOCALEFALSE ASCII "o
+   FILETEST.READERSTATETEST 12 LOCALEFALSE ASCII "o
+   FILETEST.READERSTATETEST 13 LOCALEFALSE ASCII "d
+   FILETEST.READERSTATETEST 14 LOCALEFALSE ASCII "| |
+   FILETEST.READERSTATETEST 15 LOCALEFALSE ASCII "B
+   FILETEST.READERSTATETEST 16 LOCALEFALSE ASCII "y
+   FILETEST.READERSTATETEST 17 LOCALEFALSE ASCII "e
+   FAILIFNOTTRUE [EOFP]
+
+   ; Close the file
+   TRACEINSTRUCTION [ SETREAD [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+   ; Reading from the clipboard in binary mode should not have changed it.
+   ; That is, we should be able to read the exact same content.
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READPOS]  10
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SIMPLEREPORTTEST [READPOS]  18
+   FAILIFNOTTRUE    [EOFP]
+
+   TRACEINSTRUCTION [ SETREAD []       ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+END
+
+TO FILETEST.OPENREAD.CLIPBOARD.NONTEXT
+   ; Tests when OPENREAD reads from the clipboard and it doesn't contain text.
+
+   ; Copy a bit map to the clipboard
+   SETBITINDEX 0
+   BITCOPY 100 100
+
+   ; Now, read from the clipboard
+   OPENREAD "clipboard
+   SETREAD  "clipboard
+
+   SIMPLEREPORTTEST [READPOS] 0
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [No Text in Clipboard]
+   SIMPLEREPORTTEST [READPOS] 23 ; BOM (3) + text (20)
+   FAILIFNOTTRUE    [EOFP]
+
+   SETREAD []
+   SIMPLEREPORTTEST [READER] []
+
+   CLOSE "clipboard
+END
+
+TO FILETEST.OPENREAD.CLIPBOARD.CASEINSENSITIVE
+   ; Tests that the name of the special file "clipboard is case insensitive
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write some known data to the clipboard, replacing whatever is there.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "Hello CHAR 13 CHAR 10
+     "|Good Bye|
+   )
+
+   ; Open the file with strange capitialization
+   OPENREAD "ClipBOARD
+
+   ; Try to set the reader using a different case.
+   ; This should fail (with no side-effects)
+   LOCALMAKE "oldreader READER
+   RUNFILESYSTEMERRORTEST [SETREAD "CLIPBOARD]
+   SIMPLEREPORTTEST [READER] :oldreader
+
+   ; Set the reader with the same capitalization.
+   SETREAD  "ClipBOARD
+
+   ; Read the clipboard
+   SIMPLEREPORTTEST [READPOS] 0
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   FAILIFNOTTRUE    [EOFP]
+
+   ; Try to close the file with different capitialization.
+   ; This should fail (with no side-effects)
+   RUNFILESYSTEMERRORTEST [CLOSE "CLIPBOARD]
+   SIMPLEREPORTTEST [READER] "ClipBOARD
+
+   ; Close the clipboard the same capitialization
+   CLOSE "ClipBOARD
+END
+
+TO FILETEST.OPENREAD.EMPTYFILE
+   ; Tests the behavior of OPENREAD when reading empty file (zero bytes)
+
+   ; Create an empty file.
+   WRITEBINARYDATA "empty.txt "||
+
+   ; Read the empty file
+   TRACEINSTRUCTION [ OPENREAD "empty.txt ]
+   TRACEINSTRUCTION [ SETREAD  "empty.txt ]
+
+   ; The file should be immediately recognized as empty.
+   FILETEST.READERSTATETEST 0 LOCALETRUE []
+
+   ; After failing to read a character, the stream should
+   ; still be at the end of the file.
+   FILETEST.READERSTATETEST 0 LOCALETRUE []
+
+   SETREAD []
+   CLOSE "empty.txt
+
+   ; Cleanup
+   ERASEFILE "empty.txt
+END
+
+TO FILETEST.OPENREAD.NOFILE
+   ; Calls OPENREAD with the filename of a non-existing file.
+
+   ; Make sure the file doesn't exist.
+   TRACEINSTRUCTION [ ERASEFILE "filetest.openread.doesnotexist ]
+
+   ; OPENREAD should throw an error
+   RUNFILESYSTEMERRORTEST [ OPENREAD "filetest.openread.doesnotexist ]
+
+   ; The file should not be open
+   FAILIFNOTFALSE [ MEMBERP "filetest.openread.doesnotexist ALLOPEN ]
+END
+
+TO FILETEST.OPENREAD.SETWRITE
+   ; Attempts to write to a file that was open for reading.
+   LOCALMAKE "filename "filetest.openread.setwrite.txt
+
+   ; Populate some content in the file.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT [This is the original content of a test file.]
+   SETWRITE []
+   CLOSE :filename
+
+   ; Open the existing file with OPENREAD.
+   TRACEINSTRUCTION [ OPENREAD :filename ]
+
+   ; Try to write to the file.
+   ; For legacy reasons, this acts as a no-op, instead of being
+   ; an error.
+   TRACEINSTRUCTION [ SETWRITE :filename ]
+   SIMPLEREPORTTEST [ WRITER   ] :filename
+   SIMPLEREPORTTEST [ WRITEPOS ] 0
+   TRACEINSTRUCTION [ PRINT [Some new content] ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 21 ; WRITEPOS thinks it worked
+
+   TRACEINSTRUCTION [ SETWRITEPOS 10 ] ; seeking thinks it works
+   SIMPLEREPORTTEST [ WRITEPOS  ] 10
+   TRACEINSTRUCTION [ PRINT [NEW CONTENT] ]
+
+   SETWRITE []
+   CLOSE :filename
+
+   ; Despite there being no errors when printing, nothing was written.
+   OPENREAD :filename
+   SETREAD :filename
+   SIMPLEREPORTTEST [READLIST] [This is the original content of a test file.]
+   SIMPLEREPORTTEST [READLIST] "||
+   FAILIFNOTTRUE    [EOF?]
+   SETREAD []
+   CLOSE :filename
+
+   ; Cleanup
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENWRITE.CLIPBOARD.TEXT
+   ; Tests that OPENWRITE can write to the clipboard.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write to the clipboard
+   TRACEINSTRUCTION [ OPENWRITE "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE  "clipboard ]
+   TRACEINSTRUCTION [ PRINT "Hello         ]
+   TRACEINSTRUCTION [ PRINT [Good Bye]     ]
+   TRACEINSTRUCTION [ SETWRITE []          ]
+   TRACEINSTRUCTION [ CLOSE "clipboard     ]
+
+   ; Read the contents directly from the clipboard.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello      CHAR 13 CHAR 10
+     "|Good Bye| CHAR 13 CHAR 10)
+
+   ; Read the contents through the file API
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   TRACEINSTRUCTION [ SETREAD []       ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+END
+
+TO FILETEST.OPENWRITE.CLIPBOARD.UNICODECONTENT
+   ; Tests that OPENWRITE can write non-ASCII text to the clipboard.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write some data to the clipboard, expecting it to be replaced.
+   FILETEST.COPYTEXTTOCLIPBOARD "|Some Text To Be Replaced|
+
+   ; Write some unicode content to the clipboard, replacing whatever is there.
+   TRACEINSTRUCTION [ OPENWRITE "clipboard               ]
+   TRACEINSTRUCTION [ SETWRITE  "clipboard               ]
+   TRACEINSTRUCTION [ PRINT WORD "|Sigma: |    CHAR 931  ]
+   TRACEINSTRUCTION [ PRINT WORD "|Aleph: |    CHAR 1488 ]
+   TRACEINSTRUCTION [ PRINT WORD "|Shamrock: | CHAR 9752 ]
+   TRACEINSTRUCTION [ SETWRITE []                        ]
+   TRACEINSTRUCTION [ CLOSE "clipboard                   ]
+
+   ; Read the contents directly from the clipboard.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "|Sigma: |    CHAR 931     CHAR 13 CHAR 10
+     "|Aleph: |    CHAR 1488    CHAR 13 CHAR 10
+     "|Shamrock: | CHAR 9752    CHAR 13 CHAR 10
+   )
+
+   ; Read the contents through the file API
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   SIMPLEREPORTTEST [READWORD] WORD "|Sigma: |    CHAR 931
+   SIMPLEREPORTTEST [READWORD] WORD "|Aleph: |    CHAR 1488
+   SIMPLEREPORTTEST [READWORD] WORD "|Shamrock: | CHAR 9752
+   SIMPLEREPORTTEST [READWORD] []
+   TRACEINSTRUCTION [ SETREAD [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+END
+
+TO FILETEST.OPENWRITE.CLIPBOARD.NONTEXT
+   ; Tests when OPENWRITE writes to the clipboard when it doesn't contain text.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Copy a bit map to the clipboard
+   TRACEINSTRUCTION [ SETBITINDEX 0   ]
+   TRACEINSTRUCTION [ BITCOPY 100 100 ]
+
+   ; Now write to the clipboard.
+   TRACEINSTRUCTION [ OPENWRITE "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE  "clipboard ]
+   TRACEINSTRUCTION [ PRINT "Hello         ]
+   TRACEINSTRUCTION [ PRINT [Good Bye]     ]
+   TRACEINSTRUCTION [ SETWRITE []          ]
+   TRACEINSTRUCTION [ CLOSE "clipboard     ]
+
+   ; Read the contents directly from the clipboard.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello      CHAR 13 CHAR 10
+     "|Good Bye| CHAR 13 CHAR 10)
+
+   ; Read the contents through the file API
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   TRACEINSTRUCTION [ SETREAD []       ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+END
+
+TO FILETEST.OPENWRITE.CLIPBOARD.BINARYMODE
+   ; Tests that OPENWRITE can write to the clipboard.
+   ; This is a regression test for bug #530 (access violation)
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+
+   ; Write to the clipboard in binary mode
+   TRACEINSTRUCTION [ (OPENWRITE "clipboard LOCALETRUE) ]
+   TRACEINSTRUCTION [ SETWRITE  "clipboard ]
+   TRACEINSTRUCTION [ PRINT "Hello         ]
+   TRACEINSTRUCTION [ PRINT [Good Bye]     ]
+   TRACEINSTRUCTION [ SETWRITE []          ]
+   TRACEINSTRUCTION [ CLOSE "clipboard     ]
+
+   ; Read the contents directly from the clipboard.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello      CHAR 13 CHAR 10
+     "|Good Bye| CHAR 13 CHAR 10)
+
+   ; Read the contents through the file API
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SETREAD []
+   CLOSE "clipboard
+END
+
+TO FILETEST.OPENWRITE.FILEEXISTS
+   ; Tests that OPENWRITE truncates any existing file.
+
+   LOCALMAKE "filename "filetest.openwrite.fileexists.txt
+
+   ; Populate some content in the file.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT [This is the contents before the file is re-opened.]
+   PRINT [This has more content that will be written to it later.]
+   PRINT [The entire contents of the file should be discarded.]
+   SETWRITE []
+   CLOSE :filename
+
+   ; Now open the existing file with OPENWRITE.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT [New Contents]
+   SETWRITE []
+   CLOSE :filename
+
+   ; Confirm that the file was overwritten with the new contents.
+   ; We open it in binary mode to confirm the UTF-8 BOM was added
+   ; and the line ending was written a CRLF.
+   (OPENREAD :filename "true)
+   SETREAD :filename
+   FILETEST.READERSTATETEST  0 LOCALEFALSE 239       ; UTF-8 BOM byte 1
+   FILETEST.READERSTATETEST  1 LOCALEFALSE 187       ; UTF-8 BOM byte 2
+   FILETEST.READERSTATETEST  2 LOCALEFALSE 191       ; UTF-8 BOM byte 3
+   FILETEST.READERSTATETEST  3 LOCALEFALSE ASCII "N
+   FILETEST.READERSTATETEST  4 LOCALEFALSE ASCII "e
+   FILETEST.READERSTATETEST  5 LOCALEFALSE ASCII "w
+   FILETEST.READERSTATETEST  6 LOCALEFALSE 32        ; space
+   FILETEST.READERSTATETEST  7 LOCALEFALSE ASCII "C
+   FILETEST.READERSTATETEST  8 LOCALEFALSE ASCII "o
+   FILETEST.READERSTATETEST  9 LOCALEFALSE ASCII "n
+   FILETEST.READERSTATETEST 10 LOCALEFALSE ASCII "t
+   FILETEST.READERSTATETEST 11 LOCALEFALSE ASCII "e
+   FILETEST.READERSTATETEST 12 LOCALEFALSE ASCII "n
+   FILETEST.READERSTATETEST 13 LOCALEFALSE ASCII "t
+   FILETEST.READERSTATETEST 14 LOCALEFALSE ASCII "s
+   FILETEST.READERSTATETEST 15 LOCALEFALSE 13        ; CR
+   FILETEST.READERSTATETEST 16 LOCALEFALSE 10        ; LF
+   FILETEST.READERSTATETEST 17 LOCALETRUE  []
+   SETREAD []
+   CLOSE :filename
+
+   ; Now open the existing file with OPENWRITE.
+   ; This time, we write nothing and test the positions.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   SIMPLEREPORTTEST [WRITEPOS] 0
+   SETWRITE []
+   CLOSE :filename
+
+   ; The file should be empty (truncated)
+   OPENREAD :filename
+   SETREAD :filename
+   SIMPLEREPORTTEST [READLIST] "||
+   FAILIFNOTTRUE    [EOF?]
+   SETREAD []
+   CLOSE :filename
+
+   ; Cleanup
+   ERASEFILE :filename
+
+END
+
+TO FILETEST.OPENWRITE.BINARY
+   ; Tests the behavior of writing in binary mode.
+
+   LOCALMAKE "filename "filetest.openwrite.binary.txt
+
+   ; Open the file OPENWRITE in binary mode
+   (OPENWRITE :filename LOCALETRUE)
+   SETWRITE  :filename
+
+   ; Write all characters from 0 - 0xFFFF
+   TRACEINSTRUCTION [ TYPE CHAR 0 ]
+   TRACEINSTRUCTION [ REPEAT 65535 [ TYPE CHAR REPCOUNT ] ]
+
+   SETWRITE []
+   CLOSE :filename
+
+   ; A word of all chars from 0 - 255
+   LOCALMAKE "expecteddata APPLY "WORD MAP "CHAR ISEQ 0 255
+
+   ; Confirm that the file was written correctly.
+   ; All bits over 255 should have been ignored.
+   (OPENREAD :filename "true)
+   SETREAD :filename
+   REPEAT 256 [
+      SIMPLEREPORTTEST [READCHARS 256] :expecteddata
+   ]
+   FAILIFNOTTRUE [EOF?]
+   SETREAD []
+   CLOSE :filename
+
+   ; Cleanup
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENWRITE.SETREAD
+   ; Attempts to read from a file that was open for writing.
+   LOCALMAKE "filename "filetest.openwrite.setread.txt
+
+   ; Populate some content in the file.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT [This is the content of a test file.]
+   SETWRITE []
+   CLOSE :filename
+
+   ; Open the existing file with OPENWRITE.
+   TRACEINSTRUCTION [ OPENWRITE :filename ]
+
+   ; Try to read from the file.
+   ; For legacy reasons, this acts as a no-op, instead of being
+   ; an error.
+   TRACEINSTRUCTION [ SETREAD :filename ]
+   SIMPLEREPORTTEST [ READER   ] :filename
+   SIMPLEREPORTTEST [ READLIST ] []
+   SIMPLEREPORTTEST [ READLIST ] []
+   SIMPLEREPORTTEST [ READLIST ] []
+   SIMPLEREPORTTEST [ READPOS  ] 0
+   FAILIFNOTFALSE   [ EOFP     ] ; EOFP outputs false
+
+   TRACEINSTRUCTION [ SETREADPOS 100 ] ; seeking works (kind of)
+   SIMPLEREPORTTEST [ READPOS  ] 100
+   FAILIFNOTFALSE   [ EOFP     ] ; EOFP outputs false
+
+   SETREAD []
+   CLOSE :filename
+
+   ; Cleanup
+   ERASEFILE :filename
+END
+
+
+TO FILETEST.SETREADPOS
+
+   LOCALMAKE "filename "setreadpostest.txt
+
+   ; Create a text file
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT "Hello
+   PRINT [Good Bye]
+   SETWRITE []
+   CLOSE :filename
+
+   ; Read the first line of the text file.
+   OPENREAD :filename
+   SETREAD :filename
+   SIMPLEREPORTTEST [READLIST] [Hello]
+
+   ; Reset to the beginning
+   SETREADPOS 0
+
+   ; Re-read the first line from the text file.
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.SETREADPOS.COMMANDER
+   ; The commander should always have a READPOS of -1
+   TRACEINSTRUCTION [ SETREAD [] ]
+   SIMPLEREPORTTEST [READPOS] -1
+
+   ; Setting the READPOS of the commander is a no-op.
+   TRACEINSTRUCTION [ SETREADPOS 0 ]
+   SIMPLEREPORTTEST [READPOS] -1
+   TRACEINSTRUCTION [ SETREADPOS 100 ]
+   SIMPLEREPORTTEST [READPOS] -1
+END
+
+TO FILETEST.SETREADPOS.RETAINSENCODING
+   ; Tests that when SETREADPOS switches files, it also
+   ; switches the binary mode and the encoding.
+
+   ; To set up, we create files with various encodings.
+   LOCAL [binaryfile ansifile utf8file utf16file]
+   MAKE "binaryfile "filetest.setreadpos.retainsencoding.bin
+   MAKE "ansifile   "filetest.setreadpos.retainsencoding.ansi.txt
+   MAKE "utf8file   "filetest.setreadpos.retainsencoding.utf8.txt
+   MAKE "utf16file  "filetest.setreadpos.retainsencoding.utf16.txt
+
+   WRITEBINARYDATA :binaryfile (WORD
+      "Hello CHAR 13 CHAR 10
+      CHAR 200
+   )
+
+   WRITEBINARYDATA :ansifile (WORD
+      "Hello CHAR 13 CHAR 10
+      CHAR 200
+   )
+
+   WRITEBINARYDATA :utf8file (WORD
+      CHAR 239 CHAR 187 CHAR 191 ; utf-bom
+      CHAR 207 CHAR 131          ; greek sigma
+      CHAR  13 CHAR 10           ; CRLF
+   )
+
+   WRITEBINARYDATA :utf16file (WORD
+      CHAR 255 CHAR 254 ; UTF-16 BOM
+      "H CHAR 0
+      "e CHAR 0
+      "l CHAR 0
+      "l CHAR 0
+      "o CHAR 0
+      CHAR 195 CHAR 3 ; greek sigma
+      CHAR  13 CHAR 0 ; CR
+      CHAR  10 CHAR 0 ; LF
+   )
+
+   ; open each file without reading anything
+   TRACEINSTRUCTION [ (OPENREAD :binaryfile "true) ]
+   TRACEINSTRUCTION [ OPENREAD :ansifile  ]
+   TRACEINSTRUCTION [ OPENREAD :utf8file  ]
+   TRACEINSTRUCTION [ OPENREAD :utf16file ]
+
+   ; read one character from each file
+   TRACEINSTRUCTION [ SETREAD :binaryfile ]
+   FILETEST.READERSTATETEST 0 LOCALEFALSE ASCII "H
+
+   TRACEINSTRUCTION [ SETREAD :ansifile ]
+   FILETEST.READERSTATETEST 0 LOCALEFALSE "H
+
+   TRACEINSTRUCTION [ SETREAD :utf8file ]
+   FILETEST.READERSTATETEST 0 LOCALEFALSE CHAR 963 ; greek Sigma
+
+   TRACEINSTRUCTION [ SETREAD :utf16file ]
+   FILETEST.READERSTATETEST 0 LOCALEFALSE "H
+
+   TRACEINSTRUCTION [ SETREAD [] ]
+
+   ; read a second character from each file (different order)
+   TRACEINSTRUCTION [ SETREAD :ansifile ]
+   FILETEST.READERSTATETEST 1 LOCALEFALSE "e
+
+   TRACEINSTRUCTION [ SETREAD :utf16file ]
+   FILETEST.READERSTATETEST 4 LOCALEFALSE "e
+
+   TRACEINSTRUCTION [ SETREAD :binaryfile ]
+   FILETEST.READERSTATETEST 1 LOCALEFALSE ASCII "e
+
+   TRACEINSTRUCTION [ SETREAD :utf8file ]
+   FILETEST.READERSTATETEST 5 LOCALEFALSE CHAR 10
+
+   ; read the read from each file
+   TRACEINSTRUCTION [ SETREAD :ansifile ]
+   SIMPLEREPORTTEST [ READWORD ] "llo
+   SIMPLEREPORTTEST [ READWORD ] CHAR 200 ; varies by locale
+   SIMPLEREPORTTEST [ READWORD ] []
+
+   TRACEINSTRUCTION [ SETREAD :utf16file ]
+   SIMPLEREPORTTEST [ READWORD ] WORD "llo CHAR 963
+   SIMPLEREPORTTEST [ READWORD ] []
+
+   TRACEINSTRUCTION [ SETREAD :binaryfile ]
+   SIMPLEREPORTTEST [ READWORD ] WORD "llo CHAR 13
+   SIMPLEREPORTTEST [ READWORD ] CHAR 200
+   SIMPLEREPORTTEST [ READWORD ] []
+
+   TRACEINSTRUCTION [ SETREAD :utf8file ]
+   SIMPLEREPORTTEST [ READWORD ] []
+
+   SETREAD []
+   CLOSE :binaryfile
+   CLOSE :ansifile
+   CLOSE :utf8file
+   CLOSE :utf16file
+
+   ERASEFILE :binaryfile
+   ERASEFILE :ansifile
+   ERASEFILE :utf8file
+   ERASEFILE :utf16file
+END
+
+TO FILETEST.SETWRITEPOS
+
+   LOCALMAKE "filename "setwritepostest.txt
+ 
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT "Hello
+   SETWRITEPOS 3 ; after BOM
+   TYPE "J
+   SETWRITE []
+   CLOSE :filename
+
+   OPENREAD :filename
+   SETREAD :filename
+   SIMPLEREPORTTEST [READLIST] [Jello]
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.SETWRITEPOS.COMMANDER
+   ; The commander should always have a WRITEPOS of -1
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   SIMPLEREPORTTEST [WRITEPOS] -1
+
+   ; Setting the WRITEPOS of the commander is a no-op.
+   TRACEINSTRUCTION [ SETWRITEPOS 0 ]
+   SIMPLEREPORTTEST [WRITEPOS] -1
+   TRACEINSTRUCTION [ SETWRITEPOS 100 ]
+   SIMPLEREPORTTEST [WRITEPOS] -1
+END
+
+TO FILETEST.ALLOPEN
+   LOCALMAKE "filename1 "filealltest-1.txt
+   LOCALMAKE "filename2 "filealltest-2.txt
+
+   TRACEINSTRUCTION [OPENWRITE :filename1]
+   TRACEINSTRUCTION [OPENWRITE :filename2]
+
+   ; make sure that ALLOPEN returns both open files
+   FAILIFNOTTRUE [ MEMBERP :filename1 ALLOPEN ]
+   FAILIFNOTTRUE [ MEMBERP :filename2 ALLOPEN ]
+
+   TRACEINSTRUCTION [CLOSE :filename1]
+   TRACEINSTRUCTION [CLOSE :filename2]
+
+   ; make sure that ALLOPEN returns neither file
+   FAILIFNOTFALSE [ MEMBERP :filename1 ALLOPEN ]
+   FAILIFNOTFALSE [ MEMBERP :filename2 ALLOPEN ]
+
+   ; cleanup
+   ERASEFILE :filename1
+   ERASEFILE :filename2
+END
+
+TO FILETEST.CLOSEALL
+   ; This can't be run within this FMSLogo instance because it
+   ; would close the file to which the test results are written.
+
+   RUNLOGOPROGRAM (WORD
+     "|TO RUNTEST\n|
+     "|  MAKE "filename1 "FILETEST.CLOSEALL-1.txt\n|
+     "|  MAKE "filename2 "FILETEST.CLOSEALL-2.txt\n|
+     "|\n|
+     "|  OPENWRITE :filename1\n|
+     "|  OPENWRITE :filename2\n|
+     "|\n|
+     "|  ; ALLOPEN should return both files.\n|
+     "|  MAKE "openbefore1 MEMBERP :filename1 ALLOPEN\n|
+     "|  MAKE "openbefore2 MEMBERP :filename2 ALLOPEN\n|
+     "|\n|
+     "|  ; Run the unit-under-test\n|
+     "|  CLOSEALL\n|
+     "|\n|
+     "|  ; ALLOPEN should return neither file.\n|
+     "|  MAKE "openafter1 MEMBERP :filename1 ALLOPEN\n|
+     "|  MAKE "openafter2 MEMBERP :filename2 ALLOPEN\n|
+     "|\n|
+     "|  ; Cleanup\n|
+     "|  ERASEFILE :filename2\n|
+     "|  ERASEFILE :filename1\n|
+     "|\n|
+     "|  ; Write Results to filetest.closeall.results\n|
+     "|  OPENWRITE "filetest.closeall.results\n|
+     "|  SETWRITE  "filetest.closeall.results\n|
+     "|  SHOW      :openbefore1\n|
+     "|  SHOW      :openbefore2\n|
+     "|  SHOW      :openafter1\n|
+     "|  SHOW      :openafter2\n|
+     "|  SETWRITE  []\n|
+     "|  CLOSE     "filetest.closeall.results\n|
+     "|END\n|
+     "|\n|
+     "|MAKE "startup [RUNTEST BYE]\n|
+   )
+
+   ; Process the results
+   IFELSE FILEEXISTS "filetest.closeall.results [
+     OPENREAD "filetest.closeall.results
+     SETREAD  "filetest.closeall.results
+     SIMPLEREPORTTEST [READWORD] LOCALETRUE   ; :openbefore1
+     SIMPLEREPORTTEST [READWORD] LOCALETRUE   ; :openbefore2
+     SIMPLEREPORTTEST [READWORD] LOCALEFALSE  ; :openafter1
+     SIMPLEREPORTTEST [READWORD] LOCALEFALSE  ; :openafter2
+     SIMPLEREPORTTEST [READWORD] [] ; EOF
+     CLOSE    "filetest.closeall.results
+
+     ERASEFILE "filetest.closeall.results
+   ][
+     REPORTTESTFAILED [FILETEST.CLOSEALL did not run correctly.]
+   ]
+
+END
+
+TO FILETEST.CLOSEALL.READERWRITER
+   ; Tests that CLOSEALL resets the reader and writer stream,
+   ; as CLOSE does.
+   ;
+   ; This can't be run within this FMSLogo instance because it
+   ; would close the file to which the test results are written.
+
+   RUNLOGOPROGRAM (WORD
+     "|TO RUNTEST\n|
+     "|  MAKE "filename1 "FILETEST.CLOSEALL.READERWRITER-1.txt\n|
+     "|  MAKE "filename2 "FILETEST.CLOSEALL.READERWRITER-2.txt\n|
+     "|\n|
+     "|  ; Create a file and then re-open it for reading.\n|
+     "|  OPENWRITE  :filename1\n|
+     "|  SETWRITE   :filename1\n|
+     "|  PRINT      [Contents]\n|
+     "|  CLOSE      :filename1\n|
+     "|  OPENREAD   :filename1\n|
+     "|  SETREAD    :filename1\n|
+     "|\n|
+     "|  ; Open a file for writing\n|
+     "|  OPENWRITE  :filename2\n|
+     "|  SETWRITE   :filename2\n|
+     "|\n|
+     "|  ; Confirm that the reader and writer streams are set correctly.\n|
+     "|  MAKE "beforereader READER\n|
+     "|  MAKE "beforewriter WRITER\n|
+     "|\n|
+     "|  ; Close all open files.\n|
+     "|  CLOSEALL\n|
+     "|\n|
+     "|  ; Confirm that the reader and writer streams were reset.\n|
+     "|  MAKE "afterreader READER\n|
+     "|  MAKE "afterwriter WRITER\n|
+     "|\n|
+     "|  ; Cleanup\n|
+     "|  ERASEFILE :filename2\n|
+     "|  ERASEFILE :filename1\n|
+     "|\n|
+     "|  ; Write Results to filetest.closeall.readerwriter.results\n|
+     "|  OPENWRITE "filetest.closeall.readerwriter.results\n|
+     "|  SETWRITE  "filetest.closeall.readerwriter.results\n|
+     "|  SHOW      :beforereader\n|
+     "|  SHOW      :beforewriter\n|
+     "|  SHOW      :afterreader\n|
+     "|  SHOW      :afterwriter\n|
+     "|  SETWRITE  []\n|
+     "|  CLOSE     "filetest.closeall.readerwriter.results\n|
+     "|END\n|
+     "|\n|
+     "|MAKE "startup [RUNTEST BYE]\n|
+   )
+
+   ; Process the results
+   IFELSE FILEEXISTS "filetest.closeall.readerwriter.results [
+     OPENREAD "filetest.closeall.readerwriter.results
+     SETREAD  "filetest.closeall.readerwriter.results
+     SIMPLEREPORTTEST [READWORD] "FILETEST.CLOSEALL.READERWRITER-1.txt ; :beforereader
+     SIMPLEREPORTTEST [READWORD] "FILETEST.CLOSEALL.READERWRITER-2.txt ; :beforewriter
+     SIMPLEREPORTTEST [READWORD] "|[]|                                 ; :afterreader
+     SIMPLEREPORTTEST [READWORD] "|[]|                                 ; :afterwriter
+     SIMPLEREPORTTEST [READWORD] [] ; EOF
+     CLOSE    "filetest.closeall.readerwriter.results
+
+     ERASEFILE "filetest.closeall.readerwriter.results
+   ][
+     REPORTTESTFAILED [FILETEST.CLOSEALL.READERWRITER did not run correctly.]
+   ]
+END
+
+TO FILETEST.OPENAPPEND.UTF8
+   ; Test OPENAPPEND on a file that is encoded in UTF-8 (with a BOM).
+   LOCALMAKE "filename       "openappendtest.txt
+   LOCALMAKE "greekSigma     CHAR 963
+   LOCALMAKE "utf8Bom        (WORD CHAR 239 CHAR 187 CHAR 191)
+   LOCALMAKE "crlf           (WORD CHAR 13 CHAR 10)
+
+   ;
+   ; Write the contents of UTF-8 encoded text file.
+   ;
+   WRITEBINARYDATA :filename (WORD
+     :utf8Bom
+     "Hello :crlf
+   )
+
+   ; Open the file with OPENAPPEND and append Unicode.
+   TRACEINSTRUCTION [ OPENAPPEND :filename ]
+   TRACEINSTRUCTION [ SETWRITE  :filename ]
+   TRACEINSTRUCTION [ PRINT (LIST "Good "Bye :greekSigma) ]
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE :filename ]
+
+   ; Read the entire file to confirm that the contents were appended correctly.
+   OPENREAD :filename
+   SETREAD :filename
+   SIMPLEREPORTTEST [READWORD] "Hello
+   SIMPLEREPORTTEST [READWORD] WORD "|Good Bye | :greekSigma
+   SIMPLEREPORTTEST [READWORD] []
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENAPPEND.ASCII
+   ; Test OPENAPPEND on a file that is pure ASCII with no BOM.
+   LOCALMAKE "crlf     WORD CHAR 13 CHAR 10
+   LOCALMAKE "filename "openappendtest.txt
+ 
+   ; Write the initial contents in binary to avoid adding a BOM.
+   WRITEBINARYDATA :filename WORD "Hello :crlf
+ 
+   ; Open the file with OPENAPPEND and add to it.
+   TRACEINSTRUCTION [ OPENAPPEND :filename ]
+   TRACEINSTRUCTION [ SETWRITE  :filename ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 7 ; Hello(5) + CRLF(2)
+   PRINT [Good Bye]
+   SIMPLEREPORTTEST [ WRITEPOS ] 17 ; 7 + Good Bye(8) + CRLF(2)
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE :filename ]
+
+   ; Read the entire file to confirm that the contents were appended correctly.
+   OPENREAD :filename
+   SETREAD :filename
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENAPPEND.BINARY
+
+   LOCALMAKE "filename "openappendtest.bin
+
+   ; Create a file with some binary data.
+   WRITEBINARYDATA :filename (WORD CHAR 100 CHAR 200 CHAR 210)
+
+   ; Append to the file.
+   TRACEINSTRUCTION [ (OPENAPPEND :filename "true) ]
+   TRACEINSTRUCTION [ SETWRITE  :filename ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 3 ; the 3 bytes written above
+   TYPE CHAR 220
+   SIMPLEREPORTTEST [ WRITEPOS ] 4 ; 3+1
+   TYPE CHAR 230
+   SIMPLEREPORTTEST [ WRITEPOS ] 5 ; 3+2
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE :filename ]
+
+   ; Confirm that the content was appened to the end.
+   TRACEINSTRUCTION [ (OPENREAD :filename "true) ]
+   TRACEINSTRUCTION [ SETREAD :filename ]
+   SIMPLEREPORTTEST [READCHAR] 100 ; old content
+   SIMPLEREPORTTEST [READCHAR] 200 ; old content
+   SIMPLEREPORTTEST [READCHAR] 210 ; old content
+   SIMPLEREPORTTEST [READCHAR] 220 ; appended content
+   SIMPLEREPORTTEST [READCHAR] 230 ; appended content
+   SIMPLEREPORTTEST [READCHAR] []
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENAPPEND.NOFILE
+   ; Tests that OPENAPPEND creates an empty file if the file doesn't exist.
+   ; The file should be created with a UTF-8 encoding.
+   LOCALMAKE "greekSigma CHAR 963
+   LOCALMAKE "filename   "filetest.openappend.nofile.txt
+
+   ;
+   ; Call OPENUPDATE to write some non-ASCII data to non-existing file.
+   ;
+   TRACEINSTRUCTION [ ERASEFILE  :filename ]
+   TRACEINSTRUCTION [ OPENAPPEND :filename ]
+   TRACEINSTRUCTION [ SETWRITE   :filename ]
+   TRACEINSTRUCTION [ PRINT WORD "Hello :greekSigma ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 12 ; BOM(3) + Hello(5) + Sigma(2) + EOL(2)
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE :filename ]
+
+   ; Confirm binary contents
+   TRACEINSTRUCTION [(OPENREAD :filename "true)]
+   TRACEINSTRUCTION [ SETREAD  :filename ]
+   SIMPLEREPORTTEST [ READCHAR ] 239 ; UTF-8 BOM(1)
+   SIMPLEREPORTTEST [ READCHAR ] 187 ; UTF-8 BOM(2)
+   SIMPLEREPORTTEST [ READCHAR ] 191 ; UTF-8 BOM(3)
+   SIMPLEREPORTTEST [ READCHAR ] 72  ; H
+   SIMPLEREPORTTEST [ READCHAR ] 101 ; e
+   SIMPLEREPORTTEST [ READCHAR ] 108 ; l
+   SIMPLEREPORTTEST [ READCHAR ] 108 ; l
+   SIMPLEREPORTTEST [ READCHAR ] 111 ; o
+   SIMPLEREPORTTEST [ READCHAR ] 207 ; UTF-8 Sigma(1)
+   SIMPLEREPORTTEST [ READCHAR ] 131 ; UTF-8 Sigma(2)
+   SIMPLEREPORTTEST [ READCHAR ] 13 ; CR
+   SIMPLEREPORTTEST [ READCHAR ] 10 ; LF
+   SIMPLEREPORTTEST [ READCHAR ] []
+   SIMPLEREPORTTEST [READLIST] "||
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENAPPEND.CLIPBOARD.TEXT
+   ; Tests that OPENAPPEND can append to the clipboard.
+   ; This is a regression test for bug #530 (access violation)
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write some known data to the clipboard, replacing whatever is there.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "Hello CHAR 13 CHAR 10
+     "|Good Bye|
+   )
+
+   ; Now, open the clipboard for appending.
+   TRACEINSTRUCTION [ OPENAPPEND "clipboard ]
+
+   ; The file should have been added to the "open file" list.
+   FAILIFNOTTRUE [ MEMBERP "clipboard ALLOPEN ]
+
+   ; Close the clipboard without appending anything.
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+   FAILIFNOTFALSE   [ MEMBERP "clipboard ALLOPEN ]
+
+   ; Confirm that the contents of the clipboard did not change.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello CHAR 13 CHAR 10
+     "|Good Bye|)
+
+   ;
+   ; Now use OPENAPPEND to append to the clipboard.
+   ;
+   TRACEINSTRUCTION [ OPENAPPEND "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE "clipboard ]
+
+   ; OPENAPPEND starts at the end of the file.
+   SIMPLEREPORTTEST [WRITEPOS] 18
+   ;FAILIFNOTTRUE   [EOFP] ; BUG: this outputs FALSE
+
+   ; Write something.
+   TRACEINSTRUCTION [ PRINT [Added by Test] ]
+
+   ; The clipboard is not updated until the file is closed.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello CHAR 13 CHAR 10
+     "|Good Bye|)
+
+   ; Close the clipboard.
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+   ; Confirm that the clipboard contains the new contents.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello                   CHAR 13 CHAR 10
+     "|Good ByeAdded by Test| CHAR 13 CHAR 10)
+END
+
+TO FILETEST.OPENAPPEND.CLIPBOARD.UNICODECONTENT
+   ; Tests that OPENAPPEND can write non-ASCII text to the clipboard.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Set the clipboard to have known text content.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "|Pre-existing Text| CHAR 13 CHAR 10
+     "|More Text|
+   )
+
+   ; Append some unicode content to the clipboard.
+   TRACEINSTRUCTION [ OPENAPPEND "clipboard              ]
+   TRACEINSTRUCTION [ SETWRITE  "clipboard               ]
+   TRACEINSTRUCTION [ PRINT WORD "|Sigma: |    CHAR 931  ]
+   TRACEINSTRUCTION [ PRINT WORD "|Aleph: |    CHAR 1488 ]
+   TRACEINSTRUCTION [ PRINT WORD "|Shamrock: | CHAR 9752 ]
+   TRACEINSTRUCTION [ SETWRITE []                        ]
+   TRACEINSTRUCTION [ CLOSE "clipboard                   ]
+
+   ; Read the content directly from the clipboard.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "|Pre-existing Text|      CHAR 13 CHAR 10
+     "|More Text|              ; no newline
+     "|Sigma: |    CHAR 931    CHAR 13 CHAR 10
+     "|Aleph: |    CHAR 1488   CHAR 13 CHAR 10
+     "|Shamrock: | CHAR 9752   CHAR 13 CHAR 10
+   )
+
+   ; Read the contents through the file API
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   SIMPLEREPORTTEST [READWORD] "|Pre-existing Text|
+   SIMPLEREPORTTEST [READWORD] WORD "|More TextSigma: | CHAR 931
+   SIMPLEREPORTTEST [READWORD] WORD "|Aleph: |          CHAR 1488
+   SIMPLEREPORTTEST [READWORD] WORD "|Shamrock: |       CHAR 9752
+   SIMPLEREPORTTEST [READWORD] []
+   TRACEINSTRUCTION [ SETREAD [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+END
+
+TO FILETEST.OPENAPPEND.CLIPBOARD.NONTEXT
+   ; Tests when OPENAPPEND appends to the clipboard when it doesn't contain text.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Copy a bit map to the clipboard
+   TRACEINSTRUCTION [ SETBITINDEX 0   ]
+   TRACEINSTRUCTION [ BITCOPY 100 100 ]
+
+   ; Now write to the clipboard.
+   TRACEINSTRUCTION [ OPENAPPEND "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE   "clipboard ]
+   TRACEINSTRUCTION [ PRINT "Hello          ]
+   TRACEINSTRUCTION [ SETWRITE []           ]
+   TRACEINSTRUCTION [ CLOSE "clipboard      ]
+
+   ; Read the contents directly from the clipboard.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello CHAR 13 CHAR 10)
+
+   ; Read the contents through the file API
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   TRACEINSTRUCTION [ SETREAD []       ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+END
+
+
+TO FILETEST.OPENUPDATE.ASCII
+   ; Test OPENUPDATE on a file that is pure ASCII with no BOM.
+   LOCALMAKE "crlf     WORD CHAR 13 CHAR 10
+   LOCALMAKE "filename "openupdatetest.txt
+
+   ; Write the initial contents in binary to avoid adding a BOM.
+   WRITEBINARYDATA :filename (WORD 
+      "Hello      :crlf
+      "|Good Bye| :crlf
+   )
+
+   ; Open the file with OPENUPDATE
+   TRACEINSTRUCTION [ OPENUPDATE :filename ]
+   TRACEINSTRUCTION [ SETREAD :filename ]
+
+   ; The read position starts at the end of the file.
+   FAILIFNOTTRUE    [ EOFP ]
+   SIMPLEREPORTTEST [ READPOS ] 17
+
+   ; Rewind to the beginning of the file.
+   TRACEINSTRUCTION [ SETREADPOS 0 ]
+   FAILIFNOTFALSE   [ EOFP ]
+   SIMPLEREPORTTEST [ READPOS ] 0
+
+   ; Read the first line
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [ READPOS ] 7 ; Hello (5) + CRLF (2)
+
+   ; The read/write positions are shared
+   TRACEINSTRUCTION [ SETWRITE :filename ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 7
+
+   ; Overwrite the second line.
+   TRACEINSTRUCTION [ SETWRITEPOS READPOS ]
+   TRACEINSTRUCTION [ PRINT [And how are you today] ]
+   SIMPLEREPORTTEST [ READPOS  ] 30
+   SIMPLEREPORTTEST [ WRITEPOS ] 30
+
+   SETWRITE []
+
+   ; Rewind to the beginning of the file and read
+   ; the updated contents.
+   TRACEINSTRUCTION [SETREADPOS 0]
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [And how are you today]
+   SIMPLEREPORTTEST [READLIST] "||
+
+   SETREAD []
+
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENUPDATE.NOFILE
+   ; Tests that OPENUPDATE requires that the file exists.
+   LOCALMAKE "filename "filetest.openupdate.nofile.txt
+
+   ; Delete the file, in case it exists.
+   ERASEFILE :filename
+
+   ; Run OPENUPDATE on the non-existing file.
+   RUNFILESYSTEMERRORTEST [ OPENUPDATE :filename ]
+
+   ; Run OPENUPDATE again, this time in binary mode.
+   RUNFILESYSTEMERRORTEST [ (OPENUPDATE :filename "true) ]
+
+   ; Confirm that the file wasn't added to the "open file" list.
+   FAILIFNOTFALSE [ MEMBERP :filename ALLOPEN ]
+
+   ; Confirm that the file wasn't created.
+   FAILIFNOTFALSE [ FILEEXISTS :filename ]
+
+END
+
+TO FILETEST.OPENUPDATE.CLIPBOARD.TEXT
+   ; Tests that OPENUPDATE can read/write from the clipboard.
+   ; This is a regression test for bug #530 (access violation)
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write some known data to the clipboard, replacing whatever is there.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "Hello CHAR 13 CHAR 10
+     "Clipboard CHAR 13 CHAR 10
+     "|Good Bye|
+   )
+
+   ; Now, open the clipboard for updating.
+   TRACEINSTRUCTION [ OPENUPDATE "clipboard ]
+
+   ; The file should have been added to the "open file" list.
+   FAILIFNOTTRUE [ MEMBERP "clipboard ALLOPEN ]
+
+   ; Read the contents of the clipboard (with writing anything)
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE "clipboard ]
+
+   ; OPENUPDATE sets the file position to the end of the file.
+   FAILIFNOTTRUE    [ EOFP ]
+   SIMPLEREPORTTEST [ READPOS  ] 29
+   SIMPLEREPORTTEST [ WRITEPOS ] 29
+
+   ; Rewind to the beginning.
+   TRACEINSTRUCTION [ SETREADPOS 0 ]
+
+   ; Read the entire contents of the clipboard.
+   SIMPLEREPORTTEST [READPOS] 0
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READPOS] 10 ; BOM (2) + hello (5) + CRLF (2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Clipboard]
+   SIMPLEREPORTTEST [READPOS] 21 ; 10 + clipboard (9) + CRLF (2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SIMPLEREPORTTEST [READPOS] 29 ; 21 + Good Bye (8)
+   FAILIFNOTTRUE    [EOFP]
+
+   ; Close the clipboard.
+   TRACEINSTRUCTION [ SETREAD []  ]
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+   FAILIFNOTFALSE   [ MEMBERP "clipboard ALLOPEN ]
+
+   ; Confirm that the contents of the clipboard did not change.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello      CHAR 13 CHAR 10
+     "Clipboard  CHAR 13 CHAR 10
+     "|Good Bye|)
+
+   ; Reading from the clipboard without writing to it should not
+   ; have changed its contents.  Therefore, we should be able to
+   ; re-read the exact same contents.
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+
+   SIMPLEREPORTTEST [READPOS] 0
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READPOS] 10
+   SIMPLEREPORTTEST [READLIST] [Clipboard]
+   SIMPLEREPORTTEST [READPOS] 21
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SIMPLEREPORTTEST [READPOS] 29
+   SIMPLEREPORTTEST [READLIST] "||
+   FAILIFNOTTRUE    [EOFP]
+
+   TRACEINSTRUCTION [ SETREAD []       ]
+   SIMPLEREPORTTEST [ READER           ] []
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+   ;
+   ; Now use OPENUPDATE to read and write from the clipboard.
+   ;
+   TRACEINSTRUCTION [ OPENUPDATE "clipboard ]
+
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE "clipboard ]
+
+   ; OPENUPDATE starts at the end of the file.
+   SIMPLEREPORTTEST [WRITEPOS] 29
+   FAILIFNOTTRUE    [EOFP]
+
+   ; Write something.
+   TRACEINSTRUCTION [ PRINT [Added by Test] ]
+   ;FAILIFNOTTRUE   [EOFP] ; BUG? This outputs FALSE and writes something
+
+   ; Rewind to the beginning and read the complete contents
+   ; without closing/reopening the clipboard.
+   TRACEINSTRUCTION [ SETREADPOS 0 ]
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [Clipboard]
+   SIMPLEREPORTTEST [READLIST] [Good ByeAdded by Test]
+   SIMPLEREPORTTEST [READLIST] "||
+   FAILIFNOTTRUE    [EOFP]
+
+   ; The clipboard is not updated until the file is closed.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello     CHAR 13 CHAR 10
+     "Clipboard CHAR 13 CHAR 10
+     "|Good Bye|)
+
+   ; Close the clipboard.
+   TRACEINSTRUCTION [ SETREAD []  ]
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+   ; Confirm that the clipboard contains the new contents.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello                   CHAR 13 CHAR 10
+     "Clipboard               CHAR 13 CHAR 10
+     "|Good ByeAdded by Test| CHAR 13 CHAR 10)
+END
+
+TO FILETEST.OPENUPDATE.CLIPBOARD.UNICODECONTENT
+   ; Tests that OPENUPDATE can read/write non-ASCII text to/from the clipboard.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Write some non-ASCII text to the clipboard, replacing whatever is there.
+   FILETEST.COPYTEXTTOCLIPBOARD (WORD
+     "Sigma:     CHAR 931    CHAR 13 CHAR 10
+     "Shamrock:  CHAR 9752
+   )
+
+   ; Now, open the clipboard for updating.
+   TRACEINSTRUCTION [ OPENUPDATE "clipboard ]
+
+   ; Read the contents of the clipboard (with writing anything)
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE "clipboard ]
+
+   ; OPENUPDATE sets the file position to the end of the file.
+   ; POSITION =
+   ; BOM(3) + Sigma:(6) + SIGMA(2) + CRLF(2) + Shamrock:(9) + SHAMROCK(3)
+   ; =25
+   FAILIFNOTTRUE    [ EOFP ]
+   SIMPLEREPORTTEST [ READPOS  ] 25
+   SIMPLEREPORTTEST [ WRITEPOS ] 25
+
+   ; Rewind to the beginning.
+   TRACEINSTRUCTION [ SETREADPOS 0 ]
+
+   ; Read the entire contents of the clipboard.
+   SIMPLEREPORTTEST [READPOS] 0
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READWORD] (WORD "Sigma: CHAR 931)
+   SIMPLEREPORTTEST [READPOS] 13 ; BOM (3) + Sigma:(6) + SIGMA(2) + CRLF (2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READWORD] (WORD "Shamrock: CHAR 9752)
+   SIMPLEREPORTTEST [READPOS] 25 ; 13 + Shamrock:(9) + SHAMROCK(3)
+   FAILIFNOTTRUE    [EOFP]
+
+   ; Close the clipboard.
+   TRACEINSTRUCTION [ SETREAD []  ]
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+   ; Confirm that the contents of the clipboard did not change.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Sigma:     CHAR 931    CHAR 13 CHAR 10
+     "Shamrock:  CHAR 9752
+   )
+
+   ; Reading from the clipboard without writing to it should not
+   ; have changed its contents.  Therefore, we should be able to
+   ; re-read the exact same contents.
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+
+   SIMPLEREPORTTEST [READPOS] 0
+   SIMPLEREPORTTEST [READWORD] (WORD "Sigma:    CHAR 931)
+   SIMPLEREPORTTEST [READWORD] (WORD "Shamrock: CHAR 9752)
+   FAILIFNOTTRUE    [EOFP]
+
+   TRACEINSTRUCTION [ SETREAD []       ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+   ;
+   ; Now use OPENUPDATE to append some non-ASCII text to the clipboard.
+   ;
+   TRACEINSTRUCTION [ OPENUPDATE "clipboard          ]
+   TRACEINSTRUCTION [ SETWRITE   "clipboard          ]
+   TRACEINSTRUCTION [ PRINT (WORD "Aleph: CHAR 1488) ]
+
+   ; Rewind to the beginning and read the complete contents
+   ; without closing/reopening the clipboard.
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   TRACEINSTRUCTION [ SETREADPOS 0 ]
+   SIMPLEREPORTTEST [READWORD] (WORD "Sigma:    CHAR 931)
+   SIMPLEREPORTTEST [READWORD] (WORD "Shamrock: CHAR 9752 "Aleph: CHAR 1488)
+   SIMPLEREPORTTEST [READWORD] []
+   FAILIFNOTTRUE    [EOFP]
+
+   ; Close the clipboard.
+   TRACEINSTRUCTION [ SETREAD []  ]
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+   ; Confirm that the clipboard contains the new contents.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Sigma:    CHAR 931    CHAR 13 CHAR 10
+     "Shamrock: CHAR 9752   ; no EOL
+     "Aleph:    CHAR 1488   CHAR 13 CHAR 10
+   )
+END
+
+TO FILETEST.OPENUPDATE.CLIPBOARD.NONTEXT
+   ; Tests when OPENUPDATE writes to the clipboard when it doesn't contain text.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Copy a bit map to the clipboard
+   TRACEINSTRUCTION [ SETBITINDEX 0   ]
+   TRACEINSTRUCTION [ BITCOPY 100 100 ]
+
+   ; Open the clipboard for reading/writing.
+   TRACEINSTRUCTION [ OPENUPDATE "clipboard ]
+   TRACEINSTRUCTION [ SETWRITE   "clipboard ]
+
+   ; The clipboard should be empty.
+   SIMPLEREPORTTEST [WRITEPOS] 0
+   TRACEINSTRUCTION [ PRINT "Hello          ]
+
+   ; Close the clipboard
+   TRACEINSTRUCTION [ SETWRITE []           ]
+   TRACEINSTRUCTION [ CLOSE "clipboard      ]
+
+   ; Read the contents directly from the clipboard.
+   SIMPLEREPORTTEST [ FILETEST.COPYTEXTFROMCLIPBOARD ] (WORD
+     "Hello CHAR 13 CHAR 10)
+
+   ; Read the contents through the file API
+   TRACEINSTRUCTION [ OPENREAD "clipboard ]
+   TRACEINSTRUCTION [ SETREAD  "clipboard ]
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   TRACEINSTRUCTION [ SETREAD []       ]
+   TRACEINSTRUCTION [ CLOSE "clipboard ]
+END
+
+
+TO FILETEST.OPENAPPEND.SETWRITEPOS
+   ; Tests trying to set the write posistion of a file that
+   ; was opened with OPENAPPEND.
+   LOCALMAKE "filename "filetest.openappend.setwritepos.txt
+
+   ; Create a file with known contents.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT "Hello
+   SETWRITE []
+   CLOSE :filename
+
+   ; Open the file for appending.
+   OPENAPPEND :filename
+   SETWRITE  :filename
+
+   ; The position should start at the end.
+   SIMPLEREPORTTEST [ WRITEPOS ] 10 ; BOM(3) + Hello(5) + CRLF(2)
+
+   ; Seek to the beginning.
+   TRACEINSTRUCTION [ SETWRITEPOS 0 ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 0
+
+   ; write some data
+   TRACEINSTRUCTION [ PRINT [Good Bye] ]
+   SETWRITE []
+   CLOSE :filename
+
+   ; Confirm that SETWRITEPOS was ignored.
+   OPENREAD :filename
+   SETREAD :filename
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [Good Bye]
+   SIMPLEREPORTTEST [READLIST] "||
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENAPPEND.CANNOTREAD
+   ; Tests trying to append to a file which cannot be read.
+   ; Conceptually, this should be possible, but because FMSLogo
+   ; must read the file to read the unicode signature to determine
+   ; the file's encoding, if the file cannot be read, then it
+   ; cannot be appended to.
+
+   LOCALMAKE "filename "filetest.openappend.cannotread.txt
+
+   ; Create a file with known contents.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT "Hello
+   SETWRITE []
+   CLOSE :filename
+
+   ; Revoke read permission from the file.
+   FILETEST.SETACCESS "w :filename
+
+   ; Attempt to open the file for Open the file for appending.
+   RUNFILESYSTEMERRORTEST [OPENAPPEND :filename]
+
+   ; Confirm that the file wasn't added to the "open file" list.
+   FAILIFNOTFALSE [ MEMBERP :filename ALLOPEN ]
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENUPDATE.FILEEXISTS
+
+   LOCALMAKE "filename "openupdatetest.txt
+
+   ; Create a file with known contents.
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT "Hello
+   PRINT [Good Bye]
+   SETWRITE []
+   CLOSE :filename
+
+   OPENUPDATE :filename
+   SETREAD :filename
+   SETREADPOS 0
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SETWRITE :filename
+   SETWRITEPOS 10 ; BOM(3) + Hello(5) + CRLF(2)
+   PRINT [And how are you today]
+   SETWRITE []
+   SETREAD :filename
+
+   SETREADPOS 0
+   SIMPLEREPORTTEST [READLIST] [Hello]
+   SIMPLEREPORTTEST [READLIST] [And how are you today]
+
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENUPDATE.UTF8
+   LOCALMAKE "filename "openupdatetest.txt
+
+   LOCALMAKE "greekSigma     CHAR 963
+   LOCALMAKE "utf8Bom        (WORD CHAR 239 CHAR 187 CHAR 191)
+   LOCALMAKE "utf8GreekSigma (WORD CHAR 207 CHAR 131)
+   LOCALMAKE "crlf           (WORD CHAR 13 CHAR 10)
+
+   ; Create a test file encoded in UTF-8.
+   WRITEBINARYDATA :filename (WORD
+      :utf8Bom
+      "Hello :utf8GreekSigma :utf8GreekSigma :crlf
+      "|Good | :utf8GreekSigma "| Bye|       :crlf
+   )
+
+   ; Open the file with OPENUPDATE and read the first line
+   OPENUPDATE :filename
+   SETREAD :filename
+   SETREADPOS 0
+   SIMPLEREPORTTEST [READLIST] (LIST (WORD "Hello :greekSigma :greekSigma))
+
+   ; Start writing at the point we read up to.
+   SETWRITE :filename
+   SETWRITEPOS READPOS
+   PRINT WORD "|How are you | :greekSigma
+   SETWRITE []
+
+   ; Read it from the beginning
+   SETREADPOS 0
+   SIMPLEREPORTTEST [READPOS] 0
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] (LIST (WORD "Hello :greekSigma :greekSigma))
+   SIMPLEREPORTTEST [READPOS] 14 ; BOM(3) + Hello(5) + sigma(2) + sigma(2) + EOL(2)
+   FAILIFNOTFALSE   [EOFP]
+
+   SIMPLEREPORTTEST [READLIST] (LIST "How "are "you :greekSigma)
+   SIMPLEREPORTTEST [READPOS] 30 ; 14 + "How are you "(12) + sigma(2) + EOL(2)
+   FAILIFNOTTRUE    [EOFP]
+
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.OPENUPDATE.FILEEXISTS.BINARY
+
+   LOCALMAKE "filename "openupdatetest.txt
+
+   ; Create a file that begins with a UTF-8 BOM
+   WRITEBINARYDATA :filename (WORD
+      CHAR 239 ; UTF-8 BOM byte 1
+      CHAR 187 ; UTF-8 BOM byte 2
+      CHAR 191 ; UTF-8 BOM byte 3
+      CHAR 100
+   )
+
+   ; Append to the file.
+   TRACEINSTRUCTION [ (OPENUPDATE :filename "true) ]
+   TRACEINSTRUCTION [ SETWRITE  :filename ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 4 ; the 4 bytes written above
+   TRACEINSTRUCTION [ TYPE CHAR 220 ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 5 ; 4+1
+   TRACEINSTRUCTION [ TYPE CHAR 230 ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 6 ; 5+1
+   TRACEINSTRUCTION [ PRINT "e ]
+   SIMPLEREPORTTEST [ WRITEPOS ] 8 ; 6 + e(1) + LF(1)
+
+   ; Seek back to the beginning of the file.
+   TRACEINSTRUCTION [ SETREAD :filename ]
+   TRACEINSTRUCTION [ SETREADPOS 0 ]
+   SIMPLEREPORTTEST [READCHAR] 239 ; old content
+   SIMPLEREPORTTEST [READCHAR] 187 ; old content
+   SIMPLEREPORTTEST [READCHAR] 191 ; old content
+   SIMPLEREPORTTEST [READCHAR] 100 ; old content
+   SIMPLEREPORTTEST [READCHAR] 220 ; appended content (byte 1)
+   SIMPLEREPORTTEST [READCHAR] 230 ; appended content (byte 2)
+   SIMPLEREPORTTEST [READCHAR] 101 ; appended content ("e)
+   SIMPLEREPORTTEST [READCHAR] 10  ; LF (no CRLF conversion)
+   SIMPLEREPORTTEST [READCHAR] []
+
+   ; Close the file.
+   TRACEINSTRUCTION [ SETREAD [] ]
+   TRACEINSTRUCTION [ SETWRITE [] ]
+   TRACEINSTRUCTION [ CLOSE :filename ]
+
+   ; Read the file again to confirm its contents.
+   TRACEINSTRUCTION [ (OPENREAD :filename "true) ]
+   TRACEINSTRUCTION [ SETREAD :filename ]
+   SIMPLEREPORTTEST [READCHAR] 239 ; old content
+   SIMPLEREPORTTEST [READCHAR] 187 ; old content
+   SIMPLEREPORTTEST [READCHAR] 191 ; old content
+   SIMPLEREPORTTEST [READCHAR] 100 ; old content
+   SIMPLEREPORTTEST [READCHAR] 220 ; appended content (byte 1)
+   SIMPLEREPORTTEST [READCHAR] 230 ; appended content (byte 2)
+   SIMPLEREPORTTEST [READCHAR] 101 ; appended content ("e)
+   SIMPLEREPORTTEST [READCHAR] 10  ; LF (no CRLF conversion)
+   SIMPLEREPORTTEST [READCHAR] []
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO FILETEST.BADINPUT
+
+   ; a long file name used to overflow an internal buffer
+   LOCALMAKE "longfilename REPEATWORD "A 5000
+
+   ; bad value for "binary parameter"
+   RUNDOESNTLIKEINPUTTEST [(OPENREAD   "testfile.txt 1)]
+   RUNDOESNTLIKEINPUTTEST [(OPENWRITE  "testfile.txt 1)]
+   RUNDOESNTLIKEINPUTTEST [(OPENAPPEND "testfile.txt 1)]
+   RUNDOESNTLIKEINPUTTEST [(OPENUPDATE "testfile.txt 1)]
+   
+   ; not enough inputs
+   RUNNOTENOUGHINPUTSTEST [(OPENREAD)]
+   RUNNOTENOUGHINPUTSTEST [(OPENWRITE)]
+   RUNNOTENOUGHINPUTSTEST [(OPENAPPEND)]
+   RUNNOTENOUGHINPUTSTEST [(OPENUPDATE)]
+
+   ; too many inputs
+   RUNTOOMANYINPUTSTEST [(OPENREAD   "testfile.txt LOCALETRUE "toomany)]
+   RUNTOOMANYINPUTSTEST [(OPENWRITE  "testfile.txt LOCALETRUE "toomany)]
+   RUNTOOMANYINPUTSTEST [(OPENAPPEND "testfile.txt LOCALETRUE "toomany)]
+   RUNTOOMANYINPUTSTEST [(OPENUPDATE "testfile.txt LOCALETRUE "toomany)]
+
+   ; empty list is bad input
+   RUNFILESYSTEMERRORTEST [OPENREAD   []]
+   RUNFILESYSTEMERRORTEST [OPENWRITE  []]
+   RUNFILESYSTEMERRORTEST [OPENAPPEND []]
+   RUNFILESYSTEMERRORTEST [OPENUPDATE []]
+
+   ; an array is bad input
+   RUNFILESYSTEMERRORTEST [OPENREAD   {1}]
+   RUNFILESYSTEMERRORTEST [OPENWRITE  {1}]
+   RUNFILESYSTEMERRORTEST [OPENAPPEND {1}]
+   RUNFILESYSTEMERRORTEST [OPENUPDATE {1}]
+
+   ; try to overflow an internal buffer
+   RUNFILESYSTEMERRORTEST [OPENREAD   :longfilename]
+   RUNFILESYSTEMERRORTEST [OPENWRITE  :longfilename]
+   RUNFILESYSTEMERRORTEST [OPENAPPEND :longfilename]
+   RUNFILESYSTEMERRORTEST [OPENUPDATE :longfilename]
+
+   ; test CLOSE
+   RUNFILESYSTEMERRORTEST [CLOSE :longfilename]
+   RUNFILESYSTEMERRORTEST [CLOSE "nonexistent.txt]
+   RUNDOESNTLIKEINPUTTEST [CLOSE [] ] ; bug #240
+   RUNDOESNTLIKEINPUTTEST [CLOSE [testfile.txt] ]
+   RUNDOESNTLIKEINPUTTEST [CLOSE {testfile.txt} ]
+   RUNNOTENOUGHINPUTSTEST [(CLOSE)]
+   RUNTOOMANYINPUTSTEST   [(CLOSE "testfile.txt "many)]
+
+   ; test ERASEFILE
+   RUNNOTENOUGHINPUTSTEST [(ERASEFILE)]
+   RUNTOOMANYINPUTSTEST   [(ERASEFILE "too "many)]
+
+   ; test CLOSEALL
+   RUNTOOMANYINPUTSTEST   [(CLOSEALL "toomany)]
+
+   ; test ALLOPEN
+   RUNTOOMANYINPUTSTEST   [(ALLOPEN "toomany)]
+
+   ; test EOFP
+   RUNTOOMANYINPUTSTEST   [(EOFP "toomany)]
+
+   ; test SETREAD
+   RUNFILESYSTEMERRORTEST [SETREAD    {1}]
+   RUNFILESYSTEMERRORTEST [SETREAD    :longfilename]
+   RUNNOTENOUGHINPUTSTEST [(SETREAD)]
+   RUNTOOMANYINPUTSTEST   [(SETREAD "file.txt "toomany)]
+
+   ; test SETWRITE
+   RUNFILESYSTEMERRORTEST [SETWRITE   {1}]
+   RUNFILESYSTEMERRORTEST [SETWRITE   :longfilename]
+   RUNNOTENOUGHINPUTSTEST [(SETWRITE)]
+   RUNTOOMANYINPUTSTEST   [(SETWRITE "file.txt "toomany)]
+
+END
+
+TO FILETEST.ERASEFILE
+
+   ; try to erase a non-existent file (should fail silently)
+   ERASEFILE "nonexistent
+
+   ; try to erase a file that does exist
+   OPENWRITE "mytestfile
+   ERASEFILE "mytestfile
+   FAILIFNOTTRUE [MEMBERP "mytestfile FILES]
+   CLOSE     "mytestfile
+   ERASEFILE "mytestfile
+   FAILIFNOTFALSE [MEMBERP "mytestfile FILES]
+
+   ; erase a device (should fail silently)
+   ERASEFILE "NUL
+
+   ; erase a directory (should fail silently)
+   MKDIR "mytestdir
+   POPDIR
+   ERASEFILE "mytestdir
+   FAILIFNOTTRUE [MEMBERP "mytestdir DIRECTORIES]
+   RMDIR     "mytestdir
+
+   ; erase a long file name to overflow an internal buffer
+   LOCALMAKE "longfilename REPEATWORD "A 5000
+   ERASEFILE :longfilename
+END
+
+TO FILETEST.OPENOPENFILE.HELPER
+   ; prerequisite: caller must open my-test-file.
+   FAILIFNOTTRUE [ MEMBERP "my-test-file ALLOPEN ]
+
+   ; We can't open a file that is already open
+   RUNFILESYSTEMERRORTEST [ OPENREAD   "my-test-file ]
+   RUNFILESYSTEMERRORTEST [ OPENWRITE  "my-test-file ]
+   RUNFILESYSTEMERRORTEST [ OPENAPPEND "my-test-file ]
+   RUNFILESYSTEMERRORTEST [ OPENUPDATE "my-test-file ]
+
+   ; ...unless we change the case of the filename
+   TRACEINSTRUCTION [ OPENREAD   "my-Test-file ]
+   TRACEINSTRUCTION [ OPENWRITE  "my-tEst-file ]
+   TRACEINSTRUCTION [ OPENAPPEND "my-teSt-file ]
+   TRACEINSTRUCTION [ OPENUPDATE "my-tesT-file ]
+
+   ; cleanup
+   TRACEINSTRUCTION [ CLOSE "my-test-file ]
+   TRACEINSTRUCTION [ CLOSE "my-Test-file ]
+   TRACEINSTRUCTION [ CLOSE "my-tEst-file ]
+   TRACEINSTRUCTION [ CLOSE "my-teSt-file ]
+   TRACEINSTRUCTION [ CLOSE "my-tesT-file ]
+END
+
+TO FILETEST.OPENOPENFILE
+
+   ; Test opening a file that has been opened with OPENWRITE
+   TRACEINSTRUCTION [OPENWRITE "my-test-file]
+   FILETEST.OPENOPENFILE.HELPER
+
+   ; Test opening a file that has been opened with OPENREAD
+   TRACEINSTRUCTION [OPENREAD "my-test-file]
+   FILETEST.OPENOPENFILE.HELPER
+
+   ; cleanup
+   ERASEFILE "my-test-file
+   FAILIFNOTFALSE [MEMBERP "my-test-file FILES]
+
+END
+
+TO FILETEST.OPENDIRECTORYASFILE
+
+   ; can't open a directory as file
+   MKDIR  "testdir
+   POPDIR
+
+   RUNFILESYSTEMERRORTEST [OPENREAD   "testdir]
+   RUNFILESYSTEMERRORTEST [OPENWRITE  "testdir]
+   RUNFILESYSTEMERRORTEST [OPENAPPEND "testdir]
+   RUNFILESYSTEMERRORTEST [OPENUPDATE "testdir]
+
+   RMDIR "testdir
+   FAILIFNOTFALSE [MEMBERP "mytestfile DIRECTORIES]
+END
+
+
+TO FILETEST.CLOSEREADER
+   ; Closes the active reader and writer.
+   ; This is a regression test for bug #241.
+   LOCALMAKE "filename  "closereadertest.txt
+
+   OPENWRITE :filename
+   SETWRITE  :filename
+   PRINT [This is line 1]
+
+   ; closing the active writer should switch the writer to stdout
+   TRACEINSTRUCTION [ CLOSE WRITER ]
+   SIMPLEREPORTTEST [WRITER] []
+
+   PRINT [This goes to stdout]
+
+
+   ; now open the file for reading and do the same thing
+   OPENREAD  :filename
+   SETREAD   :filename
+   SIMPLEREPORTTEST [READWORD] "|This is line 1|
+
+   ; closing the active reader should switch the reader to stdin
+   TRACEINSTRUCTION [ CLOSE READER ]
+   SIMPLEREPORTTEST [READER] []
+
+   ; cleanup
+   ERASEFILE :filename
+
+END
+
+TO FILETEST.SETREAD.CLOSEDFILE
+
+   ; Sets the READER/WRITER to a closed file.
+
+   LOCALMAKE "openfile    "openfile.txt
+   LOCALMAKE "closedfile  "closedfile.txt
+
+   ; set the reader/writer to something
+   OPENAPPEND :openfile
+   SETREAD    :openfile
+   SETWRITE   :openfile
+
+   ; create the file that we will close
+   OPENWRITE :closedfile
+   CLOSE     :closedfile
+
+   ; try to set the writer to the closed file
+   RUNFILESYSTEMERRORTEST [SETWRITE :closedfile]
+   SIMPLEREPORTTEST       [WRITER]  :openfile
+
+   OPENREAD  :closedfile
+   CLOSE     :closedfile
+
+   RUNFILESYSTEMERRORTEST [SETREAD :closedfile]
+   SIMPLEREPORTTEST       [READER] :openfile
+
+   CLOSE     :openfile
+
+   ; cleanup
+   ERASEFILE :openfile
+   ERASEFILE :closedfile
+END
+
+TO FILETEST.SETREAD.CASESENSITIVE
+   ; Tests that SETREAD and SETWRITE are case-sensitive, even if filenames are not
+   LOCALMAKE "oldreader READER
+   LOCALMAKE "oldwriter WRITER
+
+   LOCALMAKE "filename "CaseSensitiveTest.txt
+
+   ; Open a file using mixed case
+   OPENAPPEND :filename
+
+   ; Try to set the reader/writer to the file using a different case
+   RUNFILESYSTEMERRORTEST [SETWRITE LOWERCASE :filename]
+   RUNFILESYSTEMERRORTEST [SETWRITE UPPERCASE :filename]
+   RUNFILESYSTEMERRORTEST [SETREAD  LOWERCASE :filename]
+   RUNFILESYSTEMERRORTEST [SETREAD  UPPERCASE :filename]
+
+   ; Confirm that nothing changed
+   SIMPLEREPORTTEST [WRITER] :oldwriter
+   SIMPLEREPORTTEST [READER] :oldreader
+
+   ; cleanup
+   CLOSE     :filename
+   ERASEFILE :filename
+END
+
+TO FILETEST.CLOSE.CASESENSITIVE
+   ; Tests that CLOSE is case-sensitive, even if filenames are not
+ 
+   ; Open a file for reading/writing using mixed case
+   LOCALMAKE "filename "CaseSensitiveTest.txt
+   OPENAPPEND :filename
+
+   ; Try to set the reader/writer to the file using a different case
+   RUNFILESYSTEMERRORTEST [CLOSE LOWERCASE :filename]
+   RUNFILESYSTEMERRORTEST [CLOSE UPPERCASE :filename]
+
+   ; Confirm that we can still set the reader/writer to the file (it wasn't closed)
+   SETREAD  :filename
+   SETWRITE :filename
+
+   ; cleanup
+   CLOSE     :filename
+   ERASEFILE :filename
+END
+
+TO FILETEST.EOFPONSTDIN
+    IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+    LOCALMAKE "oldreader READER
+
+    ; change the reader to STDIN
+    TRACEINSTRUCTION [ SETREAD [] ]
+
+    ; EOFP should return false
+    FAILIFNOTFALSE [ EOFP ]
+    FAILIFNOTFALSE [ EOF? ]
+
+    ; restore the original reader
+    SETREAD :oldreader
+END
+
+
+TO FILETEST
+  ; This tests the basic functionality of the following procedures
+  ; OPENWRITE, SETWRITE, WRITER, WRITEPOS, READER, READPOS, EOFP,
+  ; ALLOPEN, and CLOSEALL.
+
+  FILETEST.SMOKETEST
+  FILETEST.NUMBERFILENAME
+  FILETEST.UNICODEFILENAME
+  FILETEST.SPACESINFILENAME
+  FILETEST.CASEINSENSTIVEFILENAME
+  FILETEST.CLOSEREADER
+
+  FILETEST.OPENREAD.CLIPBOARD.TEXT
+  FILETEST.OPENREAD.CLIPBOARD.UNICODECONTENT
+  FILETEST.OPENREAD.CLIPBOARD.NONTEXT
+  FILETEST.OPENREAD.CLIPBOARD.BINARYMODE
+  FILETEST.OPENREAD.CLIPBOARD.CASEINSENSITIVE
+  FILETEST.OPENREAD.NOFILE
+  FILETEST.OPENREAD.EMPTYFILE
+  FILETEST.OPENREAD.SETWRITE
+  FILETEST.OPENREAD.ANSI
+  FILETEST.OPENREAD.UTF8
+  FILETEST.OPENREAD.UTF8.VARIATIONS
+  FILETEST.OPENREAD.UTF8.EOLVARIATIONS
+  FILETEST.OPENREAD.UTF16LE
+  FILETEST.OPENREAD.UTF16LE.EOLVARIATIONS
+  FILETEST.OPENREAD.BOMSNIFFING
+
+  FILETEST.OPENWRITE.CLIPBOARD.TEXT
+  FILETEST.OPENWRITE.CLIPBOARD.UNICODECONTENT
+  FILETEST.OPENWRITE.CLIPBOARD.NONTEXT
+  FILETEST.OPENWRITE.CLIPBOARD.BINARYMODE
+  FILETEST.OPENWRITE.FILEEXISTS
+  FILETEST.OPENWRITE.BINARY
+  FILETEST.OPENWRITE.SETREAD
+
+  FILETEST.SETREADPOS
+  FILETEST.SETREADPOS.COMMANDER
+  FILETEST.SETREADPOS.RETAINSENCODING
+  FILETEST.SETWRITEPOS
+  FILETEST.SETWRITEPOS.COMMANDER
+
+  FILETEST.ALLOPEN
+
+  FILETEST.CLOSEALL
+  FILETEST.CLOSEALL.READERWRITER
+
+  FILETEST.OPENUPDATE.FILEEXISTS
+  FILETEST.OPENUPDATE.FILEEXISTS.BINARY
+  FILETEST.OPENUPDATE.NOFILE
+  FILETEST.OPENUPDATE.ASCII
+  FILETEST.OPENUPDATE.UTF8
+  FILETEST.OPENUPDATE.CLIPBOARD.TEXT
+  FILETEST.OPENUPDATE.CLIPBOARD.UNICODECONTENT
+  FILETEST.OPENUPDATE.CLIPBOARD.NONTEXT
+
+  FILETEST.OPENAPPEND.UTF8
+  FILETEST.OPENAPPEND.ASCII
+  FILETEST.OPENAPPEND.BINARY
+  FILETEST.OPENAPPEND.NOFILE
+  FILETEST.OPENAPPEND.SETWRITEPOS
+  FILETEST.OPENAPPEND.CANNOTREAD
+  FILETEST.OPENAPPEND.CLIPBOARD.TEXT
+  FILETEST.OPENAPPEND.CLIPBOARD.UNICODECONTENT
+  FILETEST.OPENAPPEND.CLIPBOARD.NONTEXT
+
+  FILETEST.ERASEFILE
+  FILETEST.OPENOPENFILE
+  FILETEST.OPENDIRECTORYASFILE
+
+  FILETEST.EOFPONSTDIN
+
+  FILETEST.BADINPUT
+  FILETEST.SETREAD.CLOSEDFILE
+  FILETEST.SETREAD.CASESENSITIVE
+  FILETEST.CLOSE.CASESENSITIVE
+
+END

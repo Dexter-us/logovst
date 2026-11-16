@@ -1,0 +1,112 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO BYETEST.SMOKETEST
+   ; We cannot run BYE in this instance without halting the test pass.
+   ; Instead, we start a child instance of FMSLogo and run BYE in it.
+   RUNLOGOPROGRAM (WORD
+       "|TO RUNTEST\n|
+       "|  PRINT [This instance was started by BYETEST.SMOKETEST]\n|
+       "|  PRINT [It should be closed automatically]\n|
+       "|  BYE\n|
+       "|  ; Control flow should not reach here (bug #138).\n|
+       "|  TONE 1000 10000\n|
+       "|END\n|
+       "|MAKE "startup [RUNTEST]\n|
+   )
+END
+
+TO BYETEST.ATTOPLEVEL
+   ; To run anything at the toplevel, it must be done in a
+   ; separate instance of FMSLogo.
+   RUNLOGOPROGRAM (WORD
+       "|PRINT [This instance was started by BYETEST.ATTOPLEVEL]\n|
+       "|PRINT [It should be closed automatically]\n|
+       "|BYE\n|
+       "|; Control flow should not reach here (bug #484).\n|
+       "|TONE 1000 10000\n|
+   )
+END
+
+TO BYETEST.PENDINGEVENTS
+   ; This test exits FMSLogo when there are pending "callthing" events.
+   ; It is a regression test for bug #557.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; Start in a known state.
+   ERASEFILE "byetest.pendingevents.editfile.txt
+   ERASEFILE "byetest.pendingevents.exitfile.txt
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+      ; We cannot run BYE in this instance without halting the test pass.
+      ; Instead, we start a child instance of FMSLogo and run BYE in it.
+      WRITEBINARYDATA "byetest.pendingevents.lgo (WORD
+         "|TO RUNTEST\n|
+         "|  PRINT [This instance was started by BYETEST.PENDINGEVENTS]\n|
+         "|  PRINT [It should be closed automatically]\n|
+         "|\n|
+         "|  WINDOWFILEEDIT "byetest.pendingevents.editfile.txt [\n|
+         "|    TEXTSCREEN\n|
+         "|    OPENWRITE "byetest.pendingevents.exitfile.txt\n|
+         "|  ]\n|
+         "|\n|
+         "|  BYE\n|
+         "|END\n|
+         "|\n|
+         "|MAKE "startup [RUNTEST]\n|
+        )
+
+      ; Run the program in a separate FMSLogo instance without waiting for it.
+      TRACEINSTRUCTION [ SHELL [ fmslogo byetest.pendingevents.lgo ] ]
+
+      ; Wait until the editor's error message is shown.
+      LOCALMAKE "hwnd 0
+      REPEAT 120 [
+         IF EQUAL? :hwnd 0 [ 
+            WAIT 10
+            MAKE "hwnd UIAUTOMATION.FINDWINDOW [An Edit session is running] 0
+         ]
+      ]
+      IF EQUAL? :hwnd 0 [
+         REPORTTESTBUG "|Window about exiting with editor did not appear in 2 second|
+      ]
+
+      ; Dismiss the warning message.
+      UIAUTOMATION.SENDBUTTONPUSHTOWINDOW [An Edit session is running] "OK
+
+      ; There's no direct way to confirm that FMSLogo didn't crash.
+      ; Instead we wait a second and see if Windows displays a "FMSLogo has crashed" dialog.
+      ; On windows 10, this dialog has the same title as the program's description.
+      WAIT 60
+      SIMPLEREPORTTEST [ UIAUTOMATION.FINDWINDOW [The FMSLogo programming environment] 0 ] 0
+   ]
+
+   IGNORE FAILIFERROR "BYETEST.PENDINGEVENTS
+
+   UIAUTOMATION.UNINITIALIZE
+
+   ; Confirm that the other FMSLogo opened an editor.
+   FAILIFNOTTRUE  [ FILEEXISTS "byetest.pendingevents.editfile.txt ]
+
+   ; Confirm that the other FMSLogo did not run the "on close" instructions.
+   FAILIFNOTFALSE [ FILEEXISTS "byetest.pendingevents.exitfile.txt ]
+
+   ; Cleanup
+   ERASEFILE "byetest.pendingevents.lgo
+   ERASEFILE "byetest.pendingevents.editfile.txt
+   ERASEFILE "byetest.pendingevents.exitfile.txt
+END
+
+
+TO BYETEST.BADINPUT
+   RUNTOOMANYINPUTSTEST [(BYE "toomany)]
+END
+
+TO BYETEST
+   BYETEST.SMOKETEST
+   BYETEST.ATTOPLEVEL
+   BYETEST.PENDINGEVENTS
+   BYETEST.BADINPUT
+END

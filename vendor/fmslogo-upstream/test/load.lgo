@@ -1,0 +1,329 @@
+LOAD "testlib.lgo
+
+TO LOADTEST.BADINPUT
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(LOAD)]
+   RUNTOOMANYINPUTSTEST   [(LOAD "testlib.lgo "toomany)]
+
+   ; bad inputs
+   RUNFILESYSTEMERRORTEST [LOAD  "doesnotexist.lgo ]
+   RUNFILESYSTEMERRORTEST [LOAD  "||               ]
+   RUNFILESYSTEMERRORTEST [LOAD  { "testlib.lgo }  ]
+END
+
+TO LOADTEST.SMOKETEST
+   ; load a file explicitly.
+   TRACEINSTRUCTION [ERASE "procedureinworkingdirectory]
+   TRACEINSTRUCTION [LOAD "procedureinworkingdirectory.lgo ]
+
+   ; The definition should exactly match what's in the file.
+   LOCAL "definition
+   TRACEINSTRUCTION [MAKE "definition FULLTEXT "procedureinworkingdirectory ]
+   SIMPLEREPORTTEST [ITEM 1 :definition] "|TO procedureinworkingdirectory|
+   SIMPLEREPORTTEST [ITEM 2 :definition] "|   ; Define a procedure that is automatically loaded|
+   SIMPLEREPORTTEST [ITEM 3 :definition] "|   ; when the programmer runs PROCEDUREINWORKINGDIRECTORY|
+   SIMPLEREPORTTEST [ITEM 4 :definition] "||
+   SIMPLEREPORTTEST [ITEM 5 :definition] "|   OUTPUT 123|
+   SIMPLEREPORTTEST [ITEM 6 :definition] "|END|
+END
+
+TO LOADTEST.WITHSTARTUP
+   ; Runs LOAD on a file which includes a MAKE "STARTUP.
+
+   LOCAL [counter startup]
+   WRITEBINARYDATA "LOADTEST.WITHSTARTUP.TXT (WORD
+     "|MAKE "STARTUP [ MAKE "counter SUM :counter 1 ]|
+   )
+
+   ; Initialize a counter.
+   TRACEINSTRUCTION [ MAKE "counter 0 ]
+
+   ; Load the file.
+   TRACEINSTRUCTION [LOAD "LOADTEST.WITHSTARTUP.TXT ]
+
+   ; The counter should have been incremented by loading the file.
+   SIMPLEREPORTTEST [:counter] 1
+
+   ; Cleanup
+   ERASEFILE "LOADTEST.WITHSTARTUP.TXT
+END
+
+TO LOADTEST.EOLVARIATIONS.ANSI
+   ; Runs LOAD on a file which includes variations on CRLF.
+
+   LOCAL [a b c d cr lf]
+
+   MAKE "cr CHAR 13
+   MAKE "lf CHAR 10
+
+   WRITEBINARYDATA "LOADTEST.EOLVARIATIONS.TXT (WORD
+     "|MAKE "a "x\\ny|                :cr :lf ; \n to be replaced with newline
+     "|MAKE "b "\|x| :cr :lf     "y\| :cr :lf ; CRLF in vbar word
+     "|MAKE "c "\|x| :cr :cr :lf "y\| :cr :lf ; CRCRLF in vbar word
+     "|MAKE "d "\|x| :cr :lf :lf "y\| :cr :lf ; CRLFLF in vbar word
+   )
+
+   ; Load the file.
+   TRACEINSTRUCTION [LOAD "LOADTEST.EOLVARIATIONS.TXT ]
+
+   SIMPLEREPORTTEST [:a] (WORD "x :lf "y)
+   SIMPLEREPORTTEST [:b] (WORD "x :lf "y)
+   SIMPLEREPORTTEST [:c] (WORD "x :cr :lf "y)
+   SIMPLEREPORTTEST [:d] (WORD "x :lf :lf "y)
+
+   ; Cleanup
+   ERASEFILE "LOADTEST.EOLVARIATIONS.TXT
+END
+
+TO LOADTEST.UTF8
+   ; Runs LOAD on a file which is encoded in UTF-8.
+
+   LOCAL [greekSigma utf8Bom utf8GreekSigma crlf loadtestvar]
+   MAKE "greekSigma     CHAR 963
+   MAKE "utf8Bom        (WORD CHAR 239 CHAR 187 CHAR 191)
+   MAKE "utf8GreekSigma (WORD CHAR 207 CHAR 131)
+   MAKE "crlf           (WORD CHAR 13 CHAR 10)
+
+   ; Create a Logo file that's encoded in UTF-8.
+   WRITEBINARYDATA "LOADTEST.UTF8.LGO (WORD
+      :utf8Bom
+      "|MAKE "loadtestvar "Hello| :utf8GreekSigma :crlf
+   )
+
+   ; Load the file.
+   TRACEINSTRUCTION [LOAD "LOADTEST.UTF8.LGO]
+
+   ; Confirm that the UTF-8 character in the file was
+   ; interpreted correctly.
+   SIMPLEREPORTTEST [:loadtestvar] (WORD "Hello :greekSigma)
+
+   ; Cleanup
+   ERASEFILE "LOADTEST.UTF8.LGO
+END
+
+TO LOADTEST.UTF16LE
+   ; Runs LOAD on a file which is encoded in UTF-16LE.
+
+   LOCAL [bom greekSigma m a d k e t s v r H l o space quote cr lf]
+   LOCAL [nativeGreekSigma loadtestvar]
+
+   MAKE "nativeGreekSigma CHAR 963
+   MAKE "bom              WORD CHAR 255 CHAR 254
+   MAKE "greekSigma       WORD CHAR 195 CHAR   3
+   MAKE "H                WORD CHAR  72 CHAR   0
+   MAKE "a                WORD CHAR  97 CHAR   0
+   MAKE "d                WORD CHAR 100 CHAR   0
+   MAKE "e                WORD CHAR 101 CHAR   0
+   MAKE "k                WORD CHAR 107 CHAR   0
+   MAKE "l                WORD CHAR 108 CHAR   0
+   MAKE "m                WORD CHAR 109 CHAR   0
+   MAKE "o                WORD CHAR 111 CHAR   0
+   MAKE "r                WORD CHAR 114 CHAR   0
+   MAKE "s                WORD CHAR 115 CHAR   0
+   MAKE "t                WORD CHAR 116 CHAR   0
+   MAKE "v                WORD CHAR 118 CHAR   0
+   MAKE "space            WORD CHAR  32 CHAR   0
+   MAKE "quote            WORD CHAR  34 CHAR   0
+   MAKE "cr               WORD CHAR  13 CHAR   0
+   MAKE "lf               WORD CHAR  10 CHAR   0
+
+   ; Create a Logo file that's encoded in UTF-16.
+   WRITEBINARYDATA "LOADTEST.UTF16LE.LGO (WORD
+      :bom
+      :m :a :k :e :space
+      :quote :l :o :a :d :t :e :s :t :v :a :r :space
+      :quote :H :e :l :l :o :greekSigma
+      :cr :lf
+   )
+
+   ; Load the file.
+   TRACEINSTRUCTION [LOAD "LOADTEST.UTF16LE.LGO]
+
+   ; Confirm that the UTF-16 character in the file was
+   ; interpreted correctly.
+   SIMPLEREPORTTEST [:loadtestvar] WORD "Hello :nativeGreekSigma
+
+   ; Cleanup
+   ERASEFILE "LOADTEST.UTF16LE.LGO
+END
+
+TO LOADTEST.CHAINEDLOAD.DIFFERENTENCODING
+   ; Tests when LOAD loads a file with one encoding which,
+   ; in turn, loads another file with a different encoding
+   ; that all of the encodings are honored correctly.
+   LOCAL [utf16Bom utf16GreekSigma utf16Cr utf16Lf]
+   LOCAL [space quote dot]
+   LOCAL [a b c d e g h i k l m n o r s t v]
+
+   MAKE "utf16Bom         WORD CHAR 255 CHAR 254
+   MAKE "utf16GreekSigma  WORD CHAR 195 CHAR   3
+   MAKE "utf16Cr          WORD CHAR  13 CHAR   0
+   MAKE "utf16Lf          WORD CHAR  10 CHAR   0
+   MAKE "space            WORD CHAR  32 CHAR   0
+   MAKE "quote            WORD CHAR  34 CHAR   0
+   MAKE "dot              WORD ".  CHAR 0
+   MAKE "a                WORD "a  CHAR 0
+   MAKE "b                WORD "b  CHAR 0
+   MAKE "c                WORD "c  CHAR 0
+   MAKE "d                WORD "d  CHAR 0
+   MAKE "e                WORD "e  CHAR 0
+   MAKE "g                WORD "g  CHAR 0
+   MAKE "h                WORD "h  CHAR 0
+   MAKE "i                WORD "i  CHAR 0
+   MAKE "k                WORD "k  CHAR 0
+   MAKE "l                WORD "l  CHAR 0
+   MAKE "m                WORD "m  CHAR 0
+   MAKE "n                WORD "n  CHAR 0
+   MAKE "o                WORD "o  CHAR 0
+   MAKE "r                WORD "r  CHAR 0
+   MAKE "s                WORD "s  CHAR 0
+   MAKE "t                WORD "t  CHAR 0
+   MAKE "v                WORD "v  CHAR 0
+
+   WRITEBINARYDATA "loadtest.chainedload.a.lgo (WORD
+      :utf16Bom ; BOM
+
+      ; make "loadtestvarA "a[Sigma]
+      :m :a :k :e :space
+         :quote :l :o :a :d :t :e :s :t :v :a :r :a :space
+         :quote :a :utf16GreekSigma
+         :utf16Cr :utf16Lf
+
+      ; LOAD "loadtest.chainedload.b.lgo
+      :l :o :a :d :space
+         :quote :l :o :a :d :t :e :s :t :dot
+         :c :h :a :i :n :e :d :l :o :a :d :dot :b :dot :l :g :o
+         :utf16Cr :utf16Lf
+
+      ; make "loadtestvarC "c[Sigma]
+      :m :a :k :e :space
+         :quote :l :o :a :d :t :e :s :t :v :a :r :c :space
+         :quote :c :utf16GreekSigma
+         :utf16Cr :utf16Lf
+   )
+
+   LOCAL [utf8Bom utf8GreekSigma utf8CrLf]
+   MAKE "utf8Bom        (WORD CHAR 239 CHAR 187 CHAR 191)
+   MAKE "utf8GreekSigma (WORD CHAR 207 CHAR 131)
+   MAKE "utf8CrLf       (WORD CHAR 13 CHAR 10)
+
+   WRITEBINARYDATA "loadtest.chainedload.b.lgo (WORD
+      :utf8Bom ; BOM
+      "|make "loadtestvarB "b| :utf8GreekSigma :utf8CrLf
+   )
+
+   ; Load the UTF-16 encoded "A" file, which loads the UTF-8 encoded "B" file.
+   LOCAL [nativeGreekSigma loadtestvarA loadtestvarB loadtestvarC]
+   MAKE "nativeGreekSigma CHAR 963
+   TRACEINSTRUCTION [LOAD "loadtest.chainedload.a.lgo]
+
+   ; Test for side-effects which show that the encodings were honored.
+   SIMPLEREPORTTEST [:loadtestvarA] WORD "a :nativeGreekSigma
+   SIMPLEREPORTTEST [:loadtestvarB] WORD "b :nativeGreekSigma
+   SIMPLEREPORTTEST [:loadtestvarC] WORD "c :nativeGreekSigma
+
+   ERASEFILE "loadtest.chainedload.a.lgo
+   ERASEFILE "loadtest.chainedload.b.lgo
+
+END
+
+
+TO LOADTEST.LOADBYRUNNINGPROCEDURE
+   ; load a file by running a procedure with the same name
+   TRACEINSTRUCTION [ERASE "procedureinworkingdirectory]
+   SIMPLEREPORTTEST [procedureinworkingdirectory] 123
+
+   ; The definition should exactly match what's in the file.
+   LOCAL "definition
+   TRACEINSTRUCTION [MAKE "definition FULLTEXT "procedureinworkingdirectory ]
+   SIMPLEREPORTTEST [ITEM 1 :definition] "|TO procedureinworkingdirectory|
+   SIMPLEREPORTTEST [ITEM 2 :definition] "|   ; Define a procedure that is automatically loaded|
+   SIMPLEREPORTTEST [ITEM 3 :definition] "|   ; when the programmer runs PROCEDUREINWORKINGDIRECTORY|
+   SIMPLEREPORTTEST [ITEM 4 :definition] "||
+   SIMPLEREPORTTEST [ITEM 5 :definition] "|   OUTPUT 123|
+   SIMPLEREPORTTEST [ITEM 6 :definition] "|END|
+
+   ; load the same file running the procedure with a different case.
+   TRACEINSTRUCTION [ERASE "procedureinworkingdirectory]
+   SIMPLEREPORTTEST [PROCEDUREINWORKINGDIRECTORY] 123
+
+   ; The "to" line should still be lower-case.
+   TRACEINSTRUCTION [MAKE "definition FULLTEXT "procedureinworkingdirectory ]
+   SIMPLEREPORTTEST [ITEM 1 :definition] "|TO procedureinworkingdirectory|
+END
+
+TO LOADTEST.PARSEERROR
+   ; Test that when LOAD fails because the file contains a parse error,
+   ; that everything before the failure is successfully parsed.
+   TRACEINSTRUCTION [ ERASE [FileWithParseError ProcedureWithError ProcedureThatShouldNotBeDefined] ]
+   RUNEXPECTERRORTEST [LOAD "filewithparseerror.lgo] 26
+   SIMPLEREPORTTEST [ DEFINED? "FileWithParseError              ] LOCALETRUE
+   SIMPLEREPORTTEST [ DEFINED? "ProcedureWithError              ] LOCALEFALSE
+   SIMPLEREPORTTEST [ DEFINED? "ProcedureThatShouldNotBeDefined ] LOCALEFALSE
+END
+
+TO LOADTEST.OUTPUTATTOPLEVEL
+   ; Test what happens when loading a file that outputs a value at the top level.
+   ; I'm not sure exactly what should happen,  but this at least exercises the
+   ; code path.
+   RUNEXPECTERRORTEST [LOAD "outputattoplevel.lgo] 30
+END
+
+TO LOADTEST.REDEFINEWHILETREEIFYING
+   ; This is a regression test for bug #249, which is a memory leak
+   ; when treeiying a procedure (which happens when it's first run)
+   ; causes a file to load that redefines that procedure.
+   ; This is similar to EVALTEST.SILENTLOADFROMTREEIFY, except that
+   ; this test is designed only to test the memory leak.
+
+   ; Create a Logo program that defines and runs another procedure that
+   ; isn't defined.
+   WRITEBINARYDATA "file1.lgo (WORD
+      "|TO REDEFINED\n|
+      "|  ; load another file that redefines this procedure\n|
+      "|  FILE2\n|
+      "|END\n|
+      "|\n|
+      "|MAKE "startup [ REDEFINED ]\n|
+      "|\n|
+   )
+
+   ; file2.lgo is loaded when REDEFINED is treefied and the treeifier
+   ; sees that it calls FILE2, which is not defined.
+   WRITEBINARYDATA "file2.lgo (WORD
+      "|; The running procedure must be redefined.\n|
+      "|TO REDEFINED\n|
+      "|END\n|
+      "|\n|
+      "|TO FILE2\n|
+      "|END\n|
+   )
+
+   ; Make sure that FILE2 isn't defined.
+   ERASE "FILE2
+
+   ; Load file1.lgo, which starts the process.
+   LOAD "file1.lgo
+
+   ; Clean up.
+   ERASE [REDEFINED FILE2]
+   ERASEFILE "file1.lgo
+   ERASEFILE "file2.lgo
+END
+
+TO LOADTEST
+   LOADTEST.BADINPUT
+
+   LOADTEST.SMOKETEST
+   LOADTEST.WITHSTARTUP
+   LOADTEST.LOADBYRUNNINGPROCEDURE
+   LOADTEST.PARSEERROR
+   LOADTEST.OUTPUTATTOPLEVEL
+
+   LOADTEST.EOLVARIATIONS.ANSI
+   LOADTEST.UTF8
+   LOADTEST.UTF16LE
+   LOADTEST.CHAINEDLOAD.DIFFERENTENCODING
+
+   LOADTEST.REDEFINEWHILETREEIFYING
+END

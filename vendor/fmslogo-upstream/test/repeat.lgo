@@ -1,0 +1,166 @@
+LOAD "testlib.lgo
+
+TO REPEATTEST.OUTPUTINREPEAT
+
+   LOCAL "myvalue
+
+   REPEAT 100 [ 
+      MAKE "myvalue REPCOUNT
+      IF EQUAL? :myvalue 50 [ OUTPUT REPCOUNT ]
+      MAKE "myvalue 0
+   ]
+END
+
+TO REPEATTEST.STOPINREPEAT
+
+   LOCAL "myvalue
+
+   REPEAT 100 [ 
+      MAKE "myvalue REPCOUNT
+      IF EQUAL? :myvalue 50 [ STOP ]
+      MAKE "myvalue 0
+   ]
+
+   REPORTTESTFAILED [STOP didn't exit REPEAT]
+END
+
+TO REPEATTEST.ERRORINREPEAT
+
+   LOCAL "myvalue
+
+   REPEAT 100 [ 
+      MAKE "myvalue REPCOUNT
+      IF EQUAL? :myvalue 50 [ THROW "ERROR ]
+      MAKE "myvalue 0
+   ]
+
+   REPORTTESTFAILED [THROW "ERROR didn't exit REPEAT]
+END
+
+
+TO REPEATTEST.SINGLEUNCONSUMEDVALUE
+  ; 10 is an error.  It should be reported in this procedure.
+  REPEAT 1 [ 10 ]
+END
+
+
+TO REPEATTEST.INCREMENT
+   MAKE "myvalue :myvalue + 1
+END
+
+
+TO REPEATTEST.SMOKETEST
+
+  LOCAL "list
+
+  ; simple REPEAT command
+  TRACEINSTRUCTION [ MAKE "list [] ]
+  TRACEINSTRUCTION [ REPEAT 5 [ MAKE "list LPUT REPCOUNT :list ] ]
+  SIMPLEREPORTTEST [ :list ] [1 2 3 4 5]
+
+  ; repeat 0 shouldn't execute the body
+  TRACEINSTRUCTION [ REPEAT 0 [ REPORTTESTFAILED [ REPEAT 0 executed the body ] ] ]
+
+  ; nested REPEAT commands
+  TRACEINSTRUCTION [ MAKE "list [] ]
+  TRACEINSTRUCTION [ REPEAT 2 [ MAKE "list LPUT "X :list REPEAT 3 [ MAKE "list LPUT "Y :list ] ] ]
+  SIMPLEREPORTTEST [ :list ] [X Y Y Y X Y Y Y]
+
+  ; stop in the middle of a REPEAT
+  TRACEINSTRUCTION [ REPEATTEST.STOPINREPEAT ] 
+
+  ; output in the middle of a REPEAT
+  SIMPLEREPORTTEST [ REPEATTEST.OUTPUTINREPEAT ] 50
+
+  ; throw a user-exception in the middle of a REPEAT
+  RUNEXPECTERRORTEST [ REPEATTEST.ERRORINREPEAT ] 21
+
+  ; REPEAT ends in a value that is not consumed
+  (RUNEXPECTERRORTEST
+      [ REPEATTEST.SINGLEUNCONSUMEDVALUE ]
+      9
+      "|You don't say what to do with 10|
+      "REPEATTEST.SINGLEUNCONSUMEDVALUE
+      [ REPEAT 1 [10] ])
+
+  ; REPEAT accepts the name of a procedure for the instruction list.
+  LOCAL "myvalue
+  TRACEINSTRUCTION [ MAKE "myvalue 0 ]
+  TRACEINSTRUCTION [ REPEAT 100 "REPEATTEST.INCREMENT ]
+  SIMPLEREPORTTEST [ :myvalue ] 100
+
+  ; REPEAT can convert a number given as a word to a number.
+  TRACEINSTRUCTION [ MAKE "myvalue 0 ]
+  TRACEINSTRUCTION [ REPEAT WORD "1 "0 [ MAKE "myvalue SUM :myvalue REPCOUNT ] ]
+  SIMPLEREPORTTEST [ :myvalue ] 55
+
+END
+
+TO REPEATTEST.BADINPUT
+  ; Set a value so that we can confirm that repeat doesn't run.
+  LOCAL "value
+  TRACEINSTRUCTION [ MAKE "value 0 ]
+
+  RUNTOOMANYINPUTSTEST   [(REPCOUNT "toomany)]
+
+  RUNNOTENOUGHINPUTSTEST [(REPEAT 100)]
+  RUNTOOMANYINPUTSTEST   [(REPEAT 100 [MAKE "value 1] "toomany)]
+
+  ; bad first input
+  RUNDOESNTLIKEINPUTTEST [REPEAT "word [MAKE "value 1]]
+  RUNDOESNTLIKEINPUTTEST [REPEAT [1]   [MAKE "value 1]]
+  RUNDOESNTLIKEINPUTTEST [REPEAT {1}   [MAKE "value 1]]
+  RUNDOESNTLIKEINPUTTEST [REPEAT 12.3  [MAKE "value 1]]
+  RUNDOESNTLIKEINPUTTEST [REPEAT -1    [MAKE "value 1]]
+
+  ; bad second input
+  RUNDOESNTLIKEINPUTTEST [REPEAT  1    {MAKE "value 1}]
+
+  ; None of the bad instructions should have changed the value.
+  SIMPLEREPORTTEST [:value] 0
+END
+
+TO REPEATTEST.BADINPUT.RECOVERABLE
+   LOCAL "value
+   TRACEINSTRUCTION [ MAKE "value 0 ]
+ 
+   ; Confirm that the recoverable errors are really recoverable.
+   RUNRECOVERABLEERRORTEST [
+      REPEAT {} {} ; neither input can be an array
+   ][
+      "word      ; first input can't be a word
+      [1]        ; first input can't be a list
+      []         ; first input can't be the empty list
+      {1}        ; first input can't be an array (again)
+      "10x       ; first input can't be a word (again)
+      [10]       ; first input can't be a list (again)
+      []         ; first input can't be the empty list (again)
+      10         ; legal first input
+      {1}        ; second input can't be an array (again)
+      [MAKE "value :value + 1] ; legal second input
+   ] ~
+   []
+
+   ; Confirm that the instruction was run 10 times.
+   SIMPLEREPORTTEST [:value] 10
+   
+
+   ; Test that REPEAT accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "1 "e "1) ] ]
+   TRACEINSTRUCTIONNOCATCH [ REPEAT [] [MAKE "value :value +1 ] ]
+   SIMPLEREPORTTEST [:value] 20
+
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST "MAKE QUOTED "value "SUM ":value 1) ] ] 
+   TRACEINSTRUCTIONNOCATCH [ REPEAT 10 {} ]
+   SIMPLEREPORTTEST [:value] 30
+
+END
+
+TO REPEATTEST
+
+  REPEATTEST.SMOKETEST
+  REPEATTEST.BADINPUT
+  REPEATTEST.BADINPUT.RECOVERABLE
+
+END

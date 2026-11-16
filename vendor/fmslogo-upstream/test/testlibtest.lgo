@@ -1,0 +1,223 @@
+LOAD "testlib.lgo
+; Includes tests for some helpers in testlib.lgo
+; There is no testing for when an instruction is expected to log an error,
+; so it can be included in the full test pass.
+
+TO TESTLIBTEST.LOGGABLEWORD
+   LOCAL [word array input output]
+
+   ; words
+   SIMPLEREPORTTEST [ LOGGABLEWORD "a ]       "a
+   SIMPLEREPORTTEST [ LOGGABLEWORD CHAR 0 ]  "\\0
+   SIMPLEREPORTTEST [ LOGGABLEWORD CHAR 10 ] "\\n
+   SIMPLEREPORTTEST [ LOGGABLEWORD CHAR 13 ] "\\r
+   TRACEINSTRUCTION [ MAKE "word (WORD "a CHAR 0 CHAR 10 CHAR 13 CHAR 0 CHAR 10 CHAR 13 "b) ]
+   SIMPLEREPORTTEST [ LOGGABLEWORD :word ] "a\\0\\n\\r\\0\\n\\rb
+
+   ; lists
+   SIMPLEREPORTTEST [ LOGGABLEWORD []                 ] []
+   SIMPLEREPORTTEST [ LOGGABLEWORD [ abc xyz     ]    ] [abc xyz]
+   SIMPLEREPORTTEST [ LOGGABLEWORD [ [abc] [xyz] ]    ] [ [abc] [xyz] ]
+   SIMPLEREPORTTEST [ LOGGABLEWORD [ [abc] [] [xyz] ] ] [ [abc] [] [xyz] ]
+   SIMPLEREPORTTEST [ LOGGABLEWORD (LIST CHAR 0 CHAR 10 CHAR 13) ] [ \\0 \\n \\r ]
+
+   ; arrays
+   TRACEINSTRUCTION  [ MAKE "output LOGGABLEWORD {} ] 
+   FAILIFNOTTRUE     [ ARRAYP :output ]
+   SIMPLEREPORTTEST  [ COUNT  :output ] 0
+
+   TRACEINSTRUCTION  [ MAKE "output LOGGABLEWORD {abc xyz} ]
+   FAILIFNOTTRUE     [ ARRAYP :output ]
+   SIMPLEREPORTTEST  [ COUNT  :output ] 2
+   SIMPLEREPORTTEST  [ ITEM 1 :output ] "abc
+   SIMPLEREPORTTEST  [ ITEM 2 :output ] "xyz
+
+   TRACEINSTRUCTION  [ MAKE "array ARRAY 1 ]
+   TRACEINSTRUCTION  [ SETITEM 1 :array :word ]
+   TRACEINSTRUCTION  [ MAKE "output LOGGABLEWORD :array ]
+   FAILIFNOTTRUE     [ ARRAYP :output ]
+   SIMPLEREPORTTEST  [ COUNT  :output ] 1
+   SIMPLEREPORTTEST  [ ITEM 1 :output ] "a\\0\\n\\r\\0\\n\\rb
+
+   ; deep structure
+   TRACEINSTRUCTION  [ MAKE "input (LIST :array (LIST "|| (LIST :word [abc] :word {abc} ) ) ) ]
+   TRACEINSTRUCTION  [ MAKE "output LOGGABLEWORD :input ]
+   FAILIFNOTTRUE     [ LISTP :output ]
+   SIMPLEREPORTTEST  [ COUNT :output ] 2
+   FAILIFNOTTRUE     [ ARRAYP ITEM 1 :output ]
+   SIMPLEREPORTTEST  [ COUNT  ITEM 1 :output ] 1
+   SIMPLEREPORTTEST  [ ITEM 1 ITEM 1 :output ] "a\\0\\n\\r\\0\\n\\rb
+   FAILIFNOTTRUE     [ LISTP  ITEM 2 :output ]
+   SIMPLEREPORTTEST  [ COUNT  ITEM 2 :output ] 2
+   SIMPLEREPORTTEST  [ ITEM 1 ITEM 2 :output ] "||
+   FAILIFNOTTRUE     [ LISTP  ITEM 2 ITEM 2 :output ]
+   SIMPLEREPORTTEST  [ COUNT  ITEM 2 ITEM 2 :output ] 4
+   SIMPLEREPORTTEST  [ ITEM 1 ITEM 2 ITEM 2 :output ] "a\\0\\n\\r\\0\\n\\rb
+   SIMPLEREPORTTEST  [ ITEM 2 ITEM 2 ITEM 2 :output ] [abc]
+   SIMPLEREPORTTEST  [ ITEM 3 ITEM 2 ITEM 2 :output ] "a\\0\\n\\r\\0\\n\\rb
+   FAILIFNOTTRUE     [ ARRAYP ITEM 4 ITEM 2 ITEM 2 :output ]
+   SIMPLEREPORTTEST  [ COUNT  ITEM 4 ITEM 2 ITEM 2 :output ] 1
+   SIMPLEREPORTTEST  [ ITEM 1 ITEM 4 ITEM 2 ITEM 2 :output ] "abc
+
+END
+
+TO TESTLIBTEST.REPEATWORD
+    ; repeat empty string
+    SIMPLEREPORTTEST [REPEATWORD "|| 0  ] "||
+    SIMPLEREPORTTEST [REPEATWORD "|| 100] "||
+
+    ; repeat single char word
+    SIMPLEREPORTTEST [REPEATWORD "a  0] "||
+    SIMPLEREPORTTEST [REPEATWORD "a  1] "a
+    SIMPLEREPORTTEST [REPEATWORD "a  2] "aa
+    SIMPLEREPORTTEST [REPEATWORD "a  3] "aaa
+    SIMPLEREPORTTEST [REPEATWORD "a  4] "aaaa
+    SIMPLEREPORTTEST [REPEATWORD "a  5] "aaaaa
+    SIMPLEREPORTTEST [REPEATWORD "a  6] "aaaaaa
+    SIMPLEREPORTTEST [REPEATWORD "a  7] "aaaaaaa
+    SIMPLEREPORTTEST [REPEATWORD "a  8] "aaaaaaaa
+    SIMPLEREPORTTEST [REPEATWORD "a  9] "aaaaaaaaa
+    SIMPLEREPORTTEST [REPEATWORD "a 10] "aaaaaaaaaa
+
+    ; repeat two char word
+    SIMPLEREPORTTEST [REPEATWORD "ab  0] "||
+    SIMPLEREPORTTEST [REPEATWORD "ab  1] "ab
+    SIMPLEREPORTTEST [REPEATWORD "ab  2] "abab
+    SIMPLEREPORTTEST [REPEATWORD "ab  3] "ababab
+    SIMPLEREPORTTEST [REPEATWORD "ab  4] "abababab
+    SIMPLEREPORTTEST [REPEATWORD "ab  5] "ababababab
+    SIMPLEREPORTTEST [REPEATWORD "ab  6] "abababababab
+    SIMPLEREPORTTEST [REPEATWORD "ab  7] "ababababababab
+    SIMPLEREPORTTEST [REPEATWORD "ab  8] "abababababababab
+    SIMPLEREPORTTEST [REPEATWORD "ab  9] "ababababababababab
+    SIMPLEREPORTTEST [REPEATWORD "ab 10] "abababababababababab
+
+    ; repeat binary word
+    SIMPLEREPORTTEST [REPEATWORD CHAR 0 5] (WORD CHAR 0 CHAR 0 CHAR 0 CHAR 0 CHAR 0)
+    SIMPLEREPORTTEST [REPEATWORD CHAR 1 5] (WORD CHAR 1 CHAR 1 CHAR 1 CHAR 1 CHAR 1)
+
+END
+
+TO TESTLIBTEST.WRITERLARGEFILE :filename :data :repcount
+   LOCAL "previouswriter
+   MAKE "previouswriter WRITER
+
+   (OPENWRITE :filename LOCALETRUE)
+   SETWRITE :filename
+   REPEAT :repcount [ TYPE :data ]
+   CLOSE :filename
+
+   SETWRITE :previouswriter
+END
+
+TO TESTLIBTEST.FILESAREEQUAL
+   ; Tests for FILESAREEQUAL
+   LOCAL [allbytes]
+
+   ; Test empty files
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.a "|| ]
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.b "|| ]
+
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.a "testlibtest.file.b]
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.b "testlibtest.file.a]
+
+   ; Add a space to file b.  This should make the files not equal.
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.b "| | ]
+   FAILIFNOTFALSE [FILESAREEQUAL "testlibtest.file.a "testlibtest.file.b]
+   FAILIFNOTFALSE [FILESAREEQUAL "testlibtest.file.b "testlibtest.file.a]
+
+   ; Add a space to file a.  This should make the files equal.
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.a "| | ]
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.a "testlibtest.file.b]
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.b "testlibtest.file.a]
+
+   ; Confirm that binary files are checked for strict equality.
+   ; A newline is not equal to a CRLF sequence.
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.a (WORD CHAR 10)         ]
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.b (WORD CHAR 13 CHAR 10) ]
+   FAILIFNOTFALSE [FILESAREEQUAL "testlibtest.file.a "testlibtest.file.b]
+   FAILIFNOTFALSE [FILESAREEQUAL "testlibtest.file.b "testlibtest.file.a]
+
+   ; Confirm all binary bytes (equal files)
+   TRACEINSTRUCTION [ MAKE "allbytes APPLY "WORD MAP "CHAR ISEQ 0 255 ]
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.a :allbytes ]
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.b :allbytes ]
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.a "testlibtest.file.b]
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.b "testlibtest.file.a]
+
+   ; Confirm all binary bytes (unequal files)
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.a (WORD :allbytes "a) ]
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file.b (WORD :allbytes "b) ]
+   FAILIFNOTFALSE [FILESAREEQUAL "testlibtest.file.a "testlibtest.file.b]
+   FAILIFNOTFALSE [FILESAREEQUAL "testlibtest.file.b "testlibtest.file.a]
+
+   TRACEINSTRUCTION [ TESTLIBTEST.WRITERLARGEFILE "testlibtest.file.a :allbytes 10000 ]
+   TRACEINSTRUCTION [ TESTLIBTEST.WRITERLARGEFILE "testlibtest.file.b :allbytes 10000 ]
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.a "testlibtest.file.b]
+   FAILIFNOTTRUE [FILESAREEQUAL "testlibtest.file.b "testlibtest.file.a]
+
+   ; Cleanup
+   ERASEFILE "testlibtest.file.a
+   ERASEFILE "testlibtest.file.b
+END
+
+TO TESTLIBTEST.FILEEXISTS
+   ; Start in a known state (file does not exist).
+   TRACEINSTRUCTION [ ERASEFILE "testlibtest.file  ]
+   FAILIFNOTFALSE   [ FILEEXISTS "testlibtest.file ]
+
+   ; Test when the file exists (and is empty).
+   TRACEINSTRUCTION [ WRITEBINARYDATA "testlibtest.file "|| ]
+   FAILIFNOTTRUE [FILEEXISTS "testlibtest.file ]
+
+   ; Test when the file is open for reading.
+   TRACEINSTRUCTION [ OPENREAD   "testlibtest.file ]
+   FAILIFNOTTRUE    [ FILEEXISTS "testlibtest.file ]
+   TRACEINSTRUCTION [ CLOSE      "testlibtest.file ]
+
+   ; Test when the file is open for writing
+   TRACEINSTRUCTION [ OPENWRITE  "testlibtest.file ]
+   FAILIFNOTTRUE    [ FILEEXISTS "testlibtest.file ]
+   TRACEINSTRUCTION [ CLOSE      "testlibtest.file ]
+
+   ; Test when the file a directory.
+   TRACEINSTRUCTION       [ ERASEFILE  "testlibtest.file        ]
+   TRACEINSTRUCTION       [ MKDIR      "testlibtest.file POPDIR ]
+   FAILIFNOTFALSE         [ FILEEXISTS "testlibtest.file        ]
+   TRACEINSTRUCTION       [ RMDIR      "testlibtest.file        ]
+END
+
+
+TO TESTLIBTEST.CONVERTUTF16LEWORD
+   ; empty string
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD "|| ] "||
+
+   ; one character
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR  97 CHAR 0   ] "a
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR  98 CHAR 0   ] "b
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR 195 CHAR 3   ] CHAR 963 ; greek sigma
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR  0  CHAR 0   ] CHAR 0     ; min
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR 255 CHAR 255 ] CHAR 65535 ; max
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR 1   CHAR 0   ] CHAR 1
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR 0   CHAR 1   ] CHAR 256
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD WORD CHAR 1   CHAR 1   ] CHAR 257
+
+   ; two characters
+   SIMPLEREPORTTEST [ CONVERTUTF16LEWORD (WORD CHAR 97 CHAR 0 CHAR 98 CHAR 0) ] "ab
+
+   ; bad input
+   RUNNONRECOVERABLEDOESNTLIKEINPUTTEST [ CONVERTUTF16LEWORD "a    ] ; odd number of chars (1)
+   RUNNONRECOVERABLEDOESNTLIKEINPUTTEST [ CONVERTUTF16LEWORD "abc  ] ; odd number of chars (3)
+   RUNDOESNTLIKEINPUTTEST [ CONVERTUTF16LEWORD []    ] ; empty list
+   RUNDOESNTLIKEINPUTTEST [ CONVERTUTF16LEWORD [a b] ] ; non-empty list
+   RUNDOESNTLIKEINPUTTEST [ CONVERTUTF16LEWORD {}    ] ; empty array
+   RUNDOESNTLIKEINPUTTEST [ CONVERTUTF16LEWORD {a b} ] ; non-empty array
+END
+
+TO TESTLIBTEST
+    TESTLIBTEST.LOGGABLEWORD
+    TESTLIBTEST.REPEATWORD
+    TESTLIBTEST.FILESAREEQUAL
+    TESTLIBTEST.FILEEXISTS
+    TESTLIBTEST.CONVERTUTF16LEWORD
+END

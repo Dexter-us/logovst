@@ -1,0 +1,1180 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This file contains tests for the following basic bitmap procedures:
+; BITSAVE, BITLOAD, BITLOADSIZE, BITINDEX, SETBITINDEX, BITCOPY, BITCUT,
+; BITPASTE, BITPASTETOINDEX, and BITSIZE.
+;
+; Some tests assume that BITINDEX 41 does not have a valid bitmap.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+LOAD "testlib.lgo
+LOAD "dllcall/setclipboarddata.lgo
+
+TO BITMAPTEST.RUNCUTFAILEDTEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1901 "|Cut failed, possibly not enough memory|)
+END
+
+TO BITMAPTEST.RUNNOTHINGTOPASTETEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1902 "|Nothing to paste|)
+END
+
+TO BITMAPTEST.RUNINDEXOUTOFRANGETEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1903 "|BitMap Index out of range|)
+END
+
+TO BITMAPTEST.RUNNOTARGETBITMAPTEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1904 "|BitMap at Index must be initialized with a bitmap|)
+END
+
+
+
+TO BITLOADSIZETEST :width :height :bitdepth
+  ; this is a regression test for Bug #1
+
+  IF NOT ISWINDOWS [ STOP ] ; BITSAVE for low bit depths currently only runs on Windows
+
+  CLEARSCREEN
+  HIDETURTLE
+  REPEAT 500 [ FORWARD REPCOUNT RIGHT 91 ]
+  SHOWTURTLE
+  PENUP
+  HOME
+  PENDOWN
+
+  ; save the bitmap
+  LOCALMAKE "oldactivearea ACTIVEAREA
+  SETACTIVEAREA (list 0 0 :width :height)
+  (BITSAVE "bitmap-test.bmp :bitdepth)
+
+  CLEARSCREEN
+  SIMPLEREPORTTEST [ BITLOADSIZE "bitmap-test.bmp ] (list :width :height)
+
+  ; Test that BITLOADSIZE only read the size of the image and draw
+  ; it to the screen.
+  CHECKSCREEN "blankscreen
+
+  ERASEFILE "bitmap-test.bmp
+
+  ; restore the previous active area
+  SETACTIVEAREA :oldactivearea
+END
+
+
+TO PASTEINCIRCLE :imagewidth :radius
+
+  REPEAT 18 [
+    RIGHT   20
+    FORWARD :radius
+
+    ; move such that the paste will be centered
+    LOCALMAKE "x XCOR
+    LOCALMAKE "y YCOR
+    SETXY :x - :imagewidth :y - :imagewidth
+    BITPASTE 
+    SETXY :x :y
+
+    BACK    :radius
+  ]
+END
+
+
+; smoke test for BITCUT, BITCOPY, and BITPASTE
+TO BITCOPYTEST
+
+  CLEARSCREEN
+  SETBITMODE 1
+  PENDOWN
+
+  ; draw a red pattern
+  SETPENSIZE [2 2]
+  REPEAT 72 [
+    REPEAT 4 [FORWARD 100 RIGHT 90] 
+    SETPENCOLOR (LIST REPCOUNT*3 0 0)
+    RIGHT 5
+  ]
+
+  ; cut out part of the pattern to the clipboard
+  PENUP
+  SETXY -50 -50
+  SETBITINDEX 0
+  BITCUT 100 100
+
+  ; draw a green pattern
+  CLEARSCREEN
+  PENDOWN
+  SETPENSIZE [1 1]
+  REPEAT 36 [
+    REPEAT 4 [FORWARD 100 RIGHT 90] 
+    SETPENCOLOR (LIST 0 REPCOUNT*6 0)
+    RIGHT 10
+  ]
+
+  ; cut out the green pattern to index 1
+  PENUP
+  SETXY -20 -20
+  SETBITINDEX 1
+  BITCUT 40 40
+
+
+  ; erase everything
+  CLEARSCREEN
+
+  ; paste the red pattern in a circle
+  SETBITINDEX 0
+  PASTEINCIRCLE 50 150
+
+  ; paste the green pattern in a smaller circle
+  SETBITINDEX 1
+  PASTEINCIRCLE 20 50
+
+  ; copy and paste some of the image
+  SETBITINDEX 2
+  BITCOPY 200 200
+  RIGHT    90
+  FORWARD  200
+  BITPASTE
+
+  CHECKSCREEN "bitpaste-pattern
+
+  PENDOWN
+  
+END
+
+TO BITCUTTEST.BADINPUT
+    ; Set BITINDEX to something that isn't the clipboard.
+    TRACEINSTRUCTION [ SETBITINDEX 1  ]
+
+    RUNNOTENOUGHINPUTSTEST [ (BITCUT 100)              ]
+    RUNTOOMANYINPUTSTEST   [ (BITCUT 100 100 "toomany) ]
+
+    ; Try to cut a larger image than we have memory to store.
+    BITMAPTEST.RUNCUTFAILEDTEST [ BITCUT 1000000 1000000 ]
+
+    RUNDOESNTLIKEINPUTTEST [ BITCUT -1   100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT 1.5  100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT "1a  100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT []   100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT [1]  100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT {1}  100  ]
+
+    RUNDOESNTLIKEINPUTTEST [ BITCUT 100  -1   ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT 100  1.5  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT 100  "1a  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT 100  []   ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT 100  [1]  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCUT 100  {1}  ]
+END
+
+TO BITCOPYTEST.BADINPUT
+    ; Set BITINDEX to something that isn't the clipboard.
+    TRACEINSTRUCTION [ SETBITINDEX 1  ]
+
+    RUNNOTENOUGHINPUTSTEST [ (BITCOPY 100)              ]
+    RUNTOOMANYINPUTSTEST   [ (BITCOPY 100 100 "toomany) ]
+
+    ; Try to copy a larger image than we have memory to store.
+    BITMAPTEST.RUNCUTFAILEDTEST [ BITCOPY 1000000 1000000 ]
+
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY -1   100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY 1.5  100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY "1a  100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY []   100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY [1]  100  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY {1}  100  ]
+
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY 100  -1   ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY 100  1.5  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY 100  "1a  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY 100  []   ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY 100  [1]  ]
+    RUNDOESNTLIKEINPUTTEST [ BITCOPY 100  {1}  ]
+END
+
+TO BITPASTETEST.BADINPUT
+    ; Paste from an index that has no bitmap.
+    TRACEINSTRUCTION [ SETBITINDEX 41 ]
+    BITMAPTEST.RUNNOTHINGTOPASTETEST [ BITPASTE ]
+
+    ; Set the BITINDEX to something which has a bitmap.
+    TRACEINSTRUCTION [ SETBITINDEX 1   ]
+    TRACEINSTRUCTION [ BITCOPY 100 100 ]
+
+    RUNTOOMANYINPUTSTEST [ (BITPASTE "toomany) ]
+END
+
+
+TO BITPASTETOINDEXTEST.SMOKETEST
+
+    LOCALMAKE "savedScreenColor SCREENCOLOR
+
+    LOCALMAKE "sprite     1
+    LOCALMAKE "background 2
+    LOCALMAKE "backbuffer 3
+
+    ; create a recognizable shape to copy & paste
+    TRACEINSTRUCTION [ SETSCREENCOLOR 3 ]
+    TRACEINSTRUCTION [ SETPENCOLOR    4 ]
+    TRACEINSTRUCTION [ CLEARSCREEN      ]
+    TRACEINSTRUCTION [ REPEAT 3 [ FORWARD 20  RIGHT 120 ] ]
+
+    ; initialize bitindex 1 to the sprite
+    TRACEINSTRUCTION [ SETBITINDEX :sprite ]
+    TRACEINSTRUCTION [ BITCUT 25 25 ]
+
+    ; initialize bitindex 2 to the background
+    TRACEINSTRUCTION [ SETBITINDEX :background  ]
+    TRACEINSTRUCTION [ SETPENCOLOR 1  ]
+    TRACEINSTRUCTION [ REPEAT 20 [ CIRCLE2 100 RIGHT 18 ] ]
+    TRACEINSTRUCTION [ BITCUT 100 100 ]
+
+    ; initialize bitindex 3 to the drawing surface
+    TRACEINSTRUCTION [ SETBITINDEX :backbuffer ]
+    TRACEINSTRUCTION [ BITCUT 100 100 ]
+
+    ; create a simple animation
+    TRACEINSTRUCTION [ SETSCREENCOLOR 5 ]
+    TRACEINSTRUCTION [ HIDETURTLE       ]
+
+    REPEAT 12 [ 
+
+       ; clear the back-buffer to the background image
+       TRACEINSTRUCTION [ SETBITINDEX :background ]
+       TRACEINSTRUCTION [ BITPASTETOINDEX :backbuffer 0 0 ]
+
+       ; copy the sprites into position
+       TRACEINSTRUCTION [ SETBITINDEX :sprite ]
+       TRACEINSTRUCTION [ BITPASTETOINDEX :backbuffer          50            (10 - REPCOUNT) * 10 ]
+       TRACEINSTRUCTION [ BITPASTETOINDEX :backbuffer (REPCOUNT - 2) * 10            0            ]
+
+       ; copy the back buffer to the screen
+       TRACEINSTRUCTION [ SETBITINDEX :backbuffer ]
+       TRACEINSTRUCTION [ BITPASTE ]
+       TRACEINSTRUCTION [ WAIT 10  ]
+    ]
+
+    TRACEINSTRUCTION [ SHOWTURTLE ]
+
+    SETSCREENCOLOR :savedScreenColor
+END
+
+TO BITPASTETOINDEXTEST.BADINPUT
+
+    ; initialize bitindex 1 and fill it with a valid bitmap
+    TRACEINSTRUCTION [ SETBITINDEX 1  ]
+    TRACEINSTRUCTION [ BITCUT 100 100 ]
+
+    RUNNOTENOUGHINPUTSTEST [ (BITPASTETOINDEX 1 0)            ]
+    RUNTOOMANYINPUTSTEST   [ (BITPASTETOINDEX 1 0 0 "toomany) ]
+
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX -1   0   0 ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX 1.5  0   0 ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX [1]  0   0 ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX {1}  0   0 ]
+
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1  1.5  0 ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1  [0]  0 ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1  {0}  0 ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1  "one 0 ]
+
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1   0  1.5  ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1   0  [0]  ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1   0  {0}  ]
+    RUNDOESNTLIKEINPUTTEST [ BITPASTETOINDEX  1   0  "one ]
+
+    ; Target index is out of range (higher than max ever set)
+    BITMAPTEST.RUNINDEXOUTOFRANGETEST [ BITPASTETOINDEX 10000 0 0 ]
+
+    ; Copy from a bitmap that is not initialized.
+    TRACEINSTRUCTION                 [ SETBITINDEX 41  ]
+    BITMAPTEST.RUNNOTHINGTOPASTETEST [ BITPASTETOINDEX 1 0 0 ]
+
+    ; Copy a valid bitmap to an index that is not initialized.
+    TRACEINSTRUCTION                 [ SETBITINDEX 1   ]
+    BITMAPTEST.RUNNOTARGETBITMAPTEST [ BITPASTETOINDEX 41 0 0 ]
+
+END
+
+TO BITSAVE.TESTHELPER :bitdepth :activearea :pictureinstructions
+    LOCAL [savedActiveArea savedPenColor filename expectedDimensions]
+    MAKE "savedActiveArea ACTIVEAREA
+    MAKE "savedPenColor   PENCOLOR
+    MAKE "filename (
+        WORD "bitsave_
+            ITEM 1 :activeArea
+            "_
+            ITEM 2 :activeArea
+            "_
+            ITEM 3 :activeArea
+            "_
+            ITEM 4 :activeArea
+            "_
+            :bitdepth
+            "bpp.bmp)
+
+    ; Draw a distinctive picture.
+    CLEARSCREEN
+    HIDETURTLE
+    RUN :pictureinstructions
+    SHOWTURTLE
+
+    ; Save the picture.
+    ERASEFILE :filename
+    SETACTIVEAREA :activearea
+    (BITSAVE :filename :bitdepth)
+
+    ; Check that the bitmap was saved correctly.
+    IF FILEEXISTS :filename [
+       MAKE "expectedDimensions (LIST 
+           (ITEM 3 :activearea) - (ITEM 1 :activearea)
+           (ITEM 4 :activearea) - (ITEM 2 :activearea))
+
+       SIMPLEREPORTTEST [ BITLOADSIZE :filename ] :expectedDimensions
+    ]
+    CHECKFILEAGAINSTBASELINE :filename (word "testimage- :filename)
+
+    ; cleanup
+    SETACTIVEAREA :savedActiveArea
+    SETPENCOLOR   :savedPenColor
+END
+
+TO BITSAVE.1BPP
+    IF NOT ISWINDOWS [ STOP ] ; BITSAVE for low bit depths currently only runs on Windows
+
+    ; Use a width that isn't DWORD-aligned to test that
+    ; BITSAVE adds the necessary padding.
+    LOCALMAKE "activearea [ -100 -100 103 203 ]
+
+    ; Draw the picture in blue to make it obvious that it gets
+    ; saved in monochrome.
+    LOCALMAKE "pictureinstructions [
+       SETPENCOLOR 1
+       REPEAT 500 [ FORWARD REPCOUNT RIGHT 90 ]
+    ]
+
+    ; Run the test
+    BITSAVE.TESTHELPER 1 :activearea :pictureinstructions
+END
+
+TO BITSAVE.4BPP
+    IF NOT ISWINDOWS [ STOP ] ; BITSAVE for low bit depths currently only runs on Windows
+
+    ; Use a width that isn't DWORD-aligned to test that
+    ; BITSAVE adds the necessary padding.
+    LOCALMAKE "activearea [ -50 -50 103 203 ]
+
+    ; Draw the picture with 16 colors to make it obvious
+    ; that it gets saved in four colors.
+    LOCALMAKE "pictureinstructions [
+       REPEAT 500 [ FORWARD REPCOUNT RIGHT 90 SETPENCOLOR REPCOUNT ]
+    ]
+
+    BITSAVE.TESTHELPER 4 :activearea :pictureinstructions
+END
+
+TO BITSAVE.HIGHBPP :bitdepth
+    ; Use a width that isn't DWORD-aligned to test that
+    ; BITSAVE adds the necessary padding.
+    LOCALMAKE "activearea [ -200 -200 203 203 ]
+
+    ; Draw a picture with 24-bit colors to make it obvious
+    ; if it gets saved with a lower bit-depth.
+    LOCALMAKE "counter 0
+    LOCALMAKE "pictureinstructions [
+
+        PENUP
+        REPEAT 512 [
+            SETXY REPCOUNT-210 -210
+            REPEAT 512 [
+                SETPIXEL (LIST
+                    BITAND 255 (SUM 128 ASHIFT :counter -16)
+                    BITAND 255 ASHIFT :counter -8
+                    BITAND 255 :counter)
+                FORWARD 1
+                MAKE "counter :counter + 1
+            ]
+        ]
+        PENDOWN
+    ]
+
+    BITSAVE.TESTHELPER :bitdepth :activearea :pictureinstructions
+END
+
+TO BITSAVE.8BPP
+    IF NOT ISWINDOWS [ STOP ] ; BITSAVE for low bit depths currently only runs on Windows
+    BITSAVE.HIGHBPP 8
+END
+
+TO BITSAVE.8BPP.FULLSCREEN
+    IF NOT ISWINDOWS [ STOP ] ; BITSAVE for low bit depths currently only runs on Windows
+
+    ; Use an ACTIVEAREA that exactly matches the screen extents.
+    ; There's an optimization for this at low bit depths.
+    LOCAL [activearea pictureinstructions]
+    MAKE "activearea [ -500 -500 500 500 ]
+
+    ; Draw a picture with 24-bit colors to make it obvious
+    ; if when it gets saved with a lower bit-depth.
+    MAKE "pictureinstructions [
+       PENUP
+       SETXY -500 500
+       SETHEADING 90 ; face right
+       PENDOWN
+
+       ; draw two lines, back and forth
+       REPEAT 1000 [
+           ; A new color
+           SETPENCOLOR (LIST
+               BITAND 255 SUM 128 REPCOUNT
+               BITAND 255 SUM 64  REPCOUNT
+               BITAND 255 REPCOUNT
+           )
+
+           ; Draw a horizontal line (wrapping)
+           FORWARD 1000
+
+           ; Down one line
+           RIGHT 90
+           FORWARD 1
+           LEFT 90
+       ]
+    ]
+
+    BITSAVE.TESTHELPER 8 :activearea :pictureinstructions
+END
+
+TO BITSAVE.16BPP
+    BITSAVE.HIGHBPP 16
+END
+
+TO BITSAVE.24BPP
+    BITSAVE.HIGHBPP 24
+END
+
+TO BITSAVE.32BPP
+    BITSAVE.HIGHBPP 32
+END
+
+TO BITSAVE.WITHACTIVEAREA
+    ; This is a regression test for bug #301.
+    LOCALMAKE "savedActiveArea ACTIVEAREA
+    LOCALMAKE "savedPenColor   PENCOLOR
+
+    CLEARSCREEN
+    REPEAT 500 [ FORWARD REPCOUNT RIGHT 91 SETPENCOLOR REPCOUNT ]
+    
+    SETACTIVEAREA [ 0 0 200 200 ]
+    BITSAVE "bitsave-withactivearea.bmp
+
+    CLEARSCREEN
+    BITLOAD  "bitsave-withactivearea.bmp
+
+    ; did the image get restored correctly?
+    CHECKSCREEN "bitsave-200x200
+
+    ; cleanup
+    SETACTIVEAREA :savedActiveArea
+    SETPENCOLOR   :savedPenColor
+    ERASEFILE     "bitsave-withactivearea.bmp
+END
+
+TO BITSAVE.LARGEBITMAP
+    ; This is a regression test for bug #425
+    IF NOT ISWINDOWS [ STOP ] ; BITSAVE for low bit depths currently only runs on Windows
+
+    LOCAL [width height]
+    MAKE "width  6614
+    MAKE "height 4677
+
+    ; Run a program to save a large bitmap in a separate FMSLogo instance.
+    ; This is done in a separate instance because saving it requires
+    ; a custom width and height and these cannot be changed after startup.
+    WRITEBINARYDATA "bitsave-largebitmap.lgo (WORD
+        "|TO BITSAVE.LARGEBITMAP\n|
+        "|  ; Set the active area to whatever was passed in on the command line.\n|
+        "|  MAKE "width  (ITEM 3 MACHINE)\n|
+        "|  MAKE "height (ITEM 4 MACHINE)\n|
+        "|  SETACTIVEAREA (LIST\n|
+        "|    -(INT :width  / 2)\n|
+        "|    -(INT :height / 2)\n|
+        "|     (INT :width  / 2)\n|
+        "|     (INT :height / 2))\n|
+        "|\n|
+        "|  ; Draw something on the screen.\n|
+        "|  HIDETURTLE\n|
+        "|  REPEAT 5000 [ SETPENCOLOR REPCOUNT FORWARD REPCOUNT RIGHT 90 ]\n|
+        "|\n|
+        "|  ; Save the picture\n|
+        "|  (BITSAVE "bitsave-largebitmap-24bpp.bmp 24)\n|
+        "|  (BITSAVE "bitsave-largebitmap-1bpp.bmp  1)\n|
+        "|\n|
+        "|  ; Quit\n|
+        "|  BYE\n|
+        "|END\n|
+        "|\n|
+        "|MAKE "startup [BITSAVE.LARGEBITMAP]\n|
+    )
+
+    ; Spawn an instance of FMSLogo with a large with and height that will
+    ; create a bitmap.
+    SIMPLEREPORTTEST [
+        (SHELL (LIST "fmslogo "-W :width "-H :height "-L "bitsave-largebitmap.lgo) LOCALETRUE)
+    ] LOCALETRUE
+
+    ; Confirm that both bitmaps were saved as expected.
+    CHECKFILEAGAINSTBASELINE "bitsave-largebitmap-1bpp.bmp  "testimage-bitsave-largebitmap-1bpp.bmp
+    CHECKFILEAGAINSTBASELINE "bitsave-largebitmap-24bpp.bmp "testimage-bitsave-largebitmap-24bpp.bmp
+
+    ; Cleanup
+    ERASEFILE "bitsave-largebitmap.lgo
+    ERASEFILE "bitsave-largebitmap-1bbp.bmp
+    ERASEFILE "bitsave-largebitmap-24bbp.bmp
+END
+
+
+TO BITSAVE.FILEEXISTS
+    ; Calls BITSAVE when the file already exists to test
+    ; that the existing file is over-written.
+
+    LOCALMAKE "savedActiveArea ACTIVEAREA
+    LOCALMAKE "savedPenColor   PENCOLOR
+    LOCALMAKE "filename        "bitsavetest-existingfile.bmp
+
+    ; Write some data to the file.
+    TRACEINSTRUCTION [ WRITEBINARYDATA :filename "|Some existing data| ]
+
+    ; Draw a distinctive picture.
+    CLEARSCREEN
+    HIDETURTLE
+    REPEAT 100 [ FORWARD REPCOUNT LEFT 90 SETPENCOLOR REPCOUNT ]
+    SHOWTURTLE
+
+    ; Save the picture, ovewriting the file.
+    SETACTIVEAREA [-50 -50 50 50]
+    BITSAVE :filename
+
+    ; Check that the bitmap was saved correctly.
+    CHECKFILEAGAINSTBASELINE :filename (WORD "testimage- :filename)
+
+    ; cleanup
+    SETACTIVEAREA :savedActiveArea
+    SETPENCOLOR   :savedPenColor
+    ERASEFILE     :filename
+END
+
+TO SETBITINDEX.SMOKETEST
+    TRACEINSTRUCTION [ SETBITINDEX 4 ] 
+    SIMPLEREPORTTEST [ BITINDEX  ] 4
+END
+
+TO SETBITINDEX.BADINPUT
+
+    ; initialize bitindex 4
+    TRACEINSTRUCTION [ SETBITINDEX 4  ]
+
+
+    RUNNOTENOUGHINPUTSTEST [ (SETBITINDEX)            ]
+    RUNTOOMANYINPUTSTEST   [ (SETBITINDEX 1 "toomany) ]
+
+    RUNTOOMANYINPUTSTEST   [ (BITINDEX "toomany) ]
+
+    RUNDOESNTLIKEINPUTTEST [ SETBITINDEX -1   ]
+    RUNDOESNTLIKEINPUTTEST [ SETBITINDEX 1.5  ]
+    RUNDOESNTLIKEINPUTTEST [ SETBITINDEX [1]  ]
+    RUNDOESNTLIKEINPUTTEST [ SETBITINDEX {1}  ]
+    RUNDOESNTLIKEINPUTTEST [ SETBITINDEX "one ]
+
+    RUNOUTOFMEMORYTEST [SETBITINDEX 500000000  ] ; allocation failure
+    RUNOUTOFMEMORYTEST [SETBITINDEX 2000000000 ] ; integer overflow
+
+    ; make sure that the selected bitmap didn't change
+    SIMPLEREPORTTEST [ BITINDEX  ] 4
+END
+
+TO BITLOAD.POSITION
+   ; Tests that small images are loaded at the turtle's position
+   ; and ignore the turtle's orientation while large images are
+   ; always drawn in the upper left corner.
+
+   IF (OR NOT EQUAL? ITEM 3 MACHINE 1000
+          NOT EQUAL? ITEM 4 MACHINE 1000) [
+      REPORTTESTBUG "|This test requires a 1000x1000 drawing surface|
+      STOP
+   ]
+
+   ; Put the turtle at 0,0 facing upward
+   TRACEINSTRUCTION [ CLEARSCREEN ]
+   TRACEINSTRUCTION [ WRAP ]
+
+   ; Move the turtle (and change its heading) so that
+   ; the bitmap is partially offscreen
+   TRACEINSTRUCTION [ PENUP             ]
+   TRACEINSTRUCTION [ SETPOS  [100 100] ]
+   TRACEINSTRUCTION [ RIGHT   90        ]
+   
+   ; Load a bitmap that is half the width and height of
+   ; the drawing surface...just small enough for BITLOAD to
+   ; place it at the turtle's position.  Because we moved
+   ; the turtle, the image should be truncated.  And even
+   ; in WRAP mode, the bitmap does not wrap.  Also, even
+   ; with PENUP, the bitmap is drawn.
+   TRACEINSTRUCTION [ BITLOAD "rle4-encoded-500x500.bmp ]
+
+   ; Confirm that the image was loaded correctly.
+   CHECKSCREEN "bitload-500x500
+
+   ; Now load a bitmap whose width is barely larger than half
+   ; of the width of the drawing surface.  This should be drawn
+   ; in the upper-left corner, regardless of the turtle's location.
+   TRACEINSTRUCTION [ BITLOAD "rle4-encoded-501x500.bmp ]
+   CHECKSCREEN "bitload-501x500
+
+   ; Load a bitmap whose height is barely larger than half
+   ; of the height of the drawing surface.  This should be drawn
+   ; in the upper-left corner, regardless of the turtle's location.
+   TRACEINSTRUCTION [ CLEAN ]
+   TRACEINSTRUCTION [ BITLOAD "rle4-encoded-500x501.bmp ]
+   CHECKSCREEN "bitload-500x501
+
+   ; Now enter PERSPECTIVE mode and draw the bitmap while the
+   ; turtle is barely onscreen.  The bitmap is drawn flat.
+   TRACEINSTRUCTION [ PENDOWN     ]
+   TRACEINSTRUCTION [ CLEARSCREEN ]
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETXYZ 350 350 250 ]
+   TRACEINSTRUCTION [ UPPITCH 90         ]
+   TRACEINSTRUCTION [ BITLOAD "rle4-encoded-500x500.bmp ]
+   CHECKSCREEN "bitload-perspective-onscreen
+
+
+   ; Now enter PERSPECTIVE mode and draw the bitmap while the
+   ; turtle is offscreen.
+   TRACEINSTRUCTION [ CLEARSCREEN ]
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETXYZ 400 400 100 ]
+   TRACEINSTRUCTION [ BITLOAD "rle4-encoded-500x500.bmp ]
+   CHECKSCREEN "bitload-perspective-offscreen
+  
+   ; Restore the state
+   TRACEINSTRUCTION [ WRAP        ]
+   TRACEINSTRUCTION [ CLEARSCREEN ]
+END
+
+TO BITLOADTEST.HELPER :type :filename :width :height [:extension ".bmp]
+    ; Determine the location of the test image.
+    LOCAL "filepath
+    MAKE  "filepath (WORD "bmptestsuite-0.9/ :type "/ :filename :extension)
+
+    ; First, test that BITLOADSIZE correctly determines the size of the bitmap
+    SIMPLEREPORTTEST (LIST "BITLOADSIZE QUOTED :filepath)  (LIST :width :height)
+
+    ; Move the turtle so that the image will be roughly centered.
+    CLEARSCREEN
+    PENUP
+    SETXY -:width / 2  -:height / 2
+    PENDOWN
+
+    ; Load the image
+    TRACEINSTRUCTION (LIST "BITLOAD QUOTED :filepath)
+
+    ; Confirm that the image was loaded correctly.
+    CHECKSCREEN (WORD :type "- :filename)
+END
+
+TO BITLOAD.1BPP
+   BITLOADTEST.HELPER "valid "1bpp-1x1                      1   1
+   BITLOADTEST.HELPER "valid "1bpp-320x240                  320 240
+   BITLOADTEST.HELPER "valid "1bpp-320x240-color            320 240
+   BITLOADTEST.HELPER "valid "1bpp-320x240-overlappingcolor 320 240
+   BITLOADTEST.HELPER "valid "1bpp-321x240                  321 240
+   BITLOADTEST.HELPER "valid "1bpp-322x240                  322 240
+   BITLOADTEST.HELPER "valid "1bpp-323x240                  323 240
+   BITLOADTEST.HELPER "valid "1bpp-324x240                  324 240
+   BITLOADTEST.HELPER "valid "1bpp-325x240                  325 240
+   BITLOADTEST.HELPER "valid "1bpp-326x240                  326 240
+   BITLOADTEST.HELPER "valid "1bpp-327x240                  327 240
+   BITLOADTEST.HELPER "valid "1bpp-328x240                  328 240
+   BITLOADTEST.HELPER "valid "1bpp-329x240                  329 240
+   BITLOADTEST.HELPER "valid "1bpp-330x240                  330 240
+   BITLOADTEST.HELPER "valid "1bpp-331x240                  331 240
+   BITLOADTEST.HELPER "valid "1bpp-332x240                  332 240
+   BITLOADTEST.HELPER "valid "1bpp-333x240                  333 240
+   BITLOADTEST.HELPER "valid "1bpp-334x240                  334 240
+   BITLOADTEST.HELPER "valid "1bpp-335x240                  335 240
+   BITLOADTEST.HELPER "valid "1bpp-topdown-320x240          320 240
+END
+
+TO BITLOAD.4BPP
+   BITLOADTEST.HELPER "valid "4bpp-1x1                      1   1
+   BITLOADTEST.HELPER "valid "4bpp-320x240                  320 240
+   BITLOADTEST.HELPER "valid "4bpp-321x240                  321 240
+   BITLOADTEST.HELPER "valid "4bpp-322x240                  322 240
+   BITLOADTEST.HELPER "valid "4bpp-323x240                  323 240
+   BITLOADTEST.HELPER "valid "4bpp-324x240                  324 240
+   BITLOADTEST.HELPER "valid "4bpp-325x240                  325 240
+   BITLOADTEST.HELPER "valid "4bpp-326x240                  326 240
+   BITLOADTEST.HELPER "valid "4bpp-327x240                  327 240
+   BITLOADTEST.HELPER "valid "4bpp-topdown-320x240          320 240
+
+   BITLOADTEST.HELPER "valid "rle4-absolute-320x240         320 240
+   BITLOADTEST.HELPER "valid "rle4-alternate-320x240        320 240
+   BITLOADTEST.HELPER "valid "rle4-delta-320x240            320 240
+   BITLOADTEST.HELPER "valid "rle4-encoded-320x240          320 240
+END
+
+TO BITLOAD.8BPP
+   BITLOADTEST.HELPER "valid "8bpp-1x1                      1     1
+   BITLOADTEST.HELPER "valid "8bpp-1x64000                  1     64000
+   BITLOADTEST.HELPER "valid "8bpp-320x240                  320   240
+   BITLOADTEST.HELPER "valid "8bpp-321x240                  321   240
+   BITLOADTEST.HELPER "valid "8bpp-322x240                  322   240
+   BITLOADTEST.HELPER "valid "8bpp-323x240                  323   240
+   BITLOADTEST.HELPER "valid "8bpp-colorsimportant-two      320   240
+   BITLOADTEST.HELPER "valid "8bpp-colorsused-zero          320   240
+   BITLOADTEST.HELPER "valid "8bpp-topdown-320x240          320   240
+   BITLOADTEST.HELPER "valid "rle8-64000x1                  64000 1
+   BITLOADTEST.HELPER "valid "rle8-absolute-320x240         320   240
+   BITLOADTEST.HELPER "valid "rle8-blank-160x120            160   120
+   BITLOADTEST.HELPER "valid "rle8-delta-320x240            320   240
+   BITLOADTEST.HELPER "valid "rle8-encoded-320x240          320   240
+END
+
+TO BITLOAD.16BPP
+   BITLOADTEST.HELPER "valid "555-1x1                       1   1
+   BITLOADTEST.HELPER "valid "555-320x240                   320 240
+   BITLOADTEST.HELPER "valid "555-321x240                   321 240
+
+   BITLOADTEST.HELPER "valid "565-1x1                       1   1
+   BITLOADTEST.HELPER "valid "565-320x240                   320 240
+   BITLOADTEST.HELPER "valid "565-321x240                   321 240
+   BITLOADTEST.HELPER "valid "565-322x240                   322 240
+
+   BITLOADTEST.HELPER "valid "565-320x240-topdown           320 240
+   BITLOADTEST.HELPER "valid "565-321x240-topdown           321 240
+   BITLOADTEST.HELPER "valid "565-322x240-topdown           322 240
+END
+
+TO BITLOAD.24BPP
+   BITLOADTEST.HELPER "valid "24bpp-1x1                   1   1
+   BITLOADTEST.HELPER "valid "24bpp-320x240               320 240
+   BITLOADTEST.HELPER "valid "24bpp-321x240               321 240
+   BITLOADTEST.HELPER "valid "24bpp-322x240               322 240
+   BITLOADTEST.HELPER "valid "24bpp-323x240               323 240
+   BITLOADTEST.HELPER "valid "24bpp-imagesize-zero        320 240
+   BITLOADTEST.HELPER "valid "24bpp-topdown-320x240       320 240
+END
+
+TO BITLOAD.32BPP
+   BITLOADTEST.HELPER "valid "32bpp-1x1                        1   1
+   BITLOADTEST.HELPER "valid "32bpp-320x240                    320 240
+   BITLOADTEST.HELPER "valid "32bpp-888-optimalpalette-320x240 320 240
+   BITLOADTEST.HELPER "valid "32bpp-101110-320x240             320 240
+   BITLOADTEST.HELPER "valid "32bpp-optimalpalette-320x240     320 240
+   BITLOADTEST.HELPER "valid "32bpp-topdown-320x240            320 240
+END
+
+TO BITLOAD.MISC
+   (BITLOADTEST.HELPER "valid "nofileextension      320 240 "||)
+   (BITLOADTEST.HELPER "valid "misleadingextension  320 240 ".jpg)
+   BITLOADTEST.HELPER "valid "|spaces in  filename| 320 240
+END
+
+TO BITLOAD.JPEG
+   ; Tests that BITLOAD can be used to load a JPEG.
+   CLEARSCREEN
+
+   ; First, test that BITLOADSIZE correctly determines the size of the JPEG.
+   ; This image was saved by GIMP.
+   SIMPLEREPORTTEST [BITLOADSIZE "heron.jpg] [327 472]
+
+   ; Now, use BITLOAD to load the image to the screen.
+   TRACEINSTRUCTION [BITLOAD "heron.jpg]
+
+   ; Confirm that the image was loaded correctly.
+   SCROLLY -500
+   CHECKSCREEN "heron
+
+   ; Try again with a large JPEG.
+   ; This image was created by an old Canon digital camera.
+   SIMPLEREPORTTEST [BITLOADSIZE "rainbow.jpg] [640 480]
+
+   ; Now, use BITLOAD to load the image to the screen.
+   TRACEINSTRUCTION [BITLOAD "rainbow.jpg]
+
+   ; Confirm that the image was loaded correctly.
+   CHECKSCREEN "rainbow
+
+   ; Recenter the scrollbar
+   SCROLLY 0
+END
+
+TO BITLOADTEST.BE_HAPPY_IF_NO_CRASH :instructions
+
+   REPORTTESTINFO (LIST "Running :instructions)
+
+   ; clear the value of ERROR
+   IGNORE ERROR
+
+   ; Run the instructions.
+   ; It doesn't matter if it throws an error or not.
+   ; The important thing is that it doesn't crash.
+   CATCH "ERROR [ 
+     IGNORE RUNRESULT :instructions 
+     REPORTTESTINFO (LIST "Running :instructions "|did not throw an error.|)
+     STOP
+   ]
+
+   REPORTTESTINFO (LIST "Running :instructions "|threw an error: | ITEM 2 ERROR)
+END
+
+TO BITLOADTEST.MALFORMED.HELPER :type :filename
+   ; Determine the location of the test image.
+   LOCAL "filepath
+   MAKE "filepath (WORD "bmptestsuite-0.9/ :type "/ :filename ".bmp)
+
+   ; As a self-check, make sure that the file exists.
+   IF NOT FILEEXISTS :filepath [
+      REPORTTESTBUG (WORD "|File "| :filepath "|" doesn't exist in BITLOADTEST.MALFORMED.HELPER|)
+      STOP
+   ]
+
+   ; Attempt to get the size of the image.
+   BITLOADTEST.BE_HAPPY_IF_NO_CRASH (LIST "IGNORE "BITLOADSIZE QUOTED :filepath)
+
+   ; Clear the screen so that whatever is loaded doesn't get confused with
+   ; what was previously on the screen.
+   CLEARSCREEN
+
+   ; Load the image
+   BITLOADTEST.BE_HAPPY_IF_NO_CRASH (LIST "BITLOAD QUOTED :filepath)
+END
+
+TO BITLOAD.MALFORMED
+   ; It's okay if these files don't load, but it's better to keep backward compatible.
+   BITLOADTEST.HELPER "corrupt "1bpp-pixeldata-cropped        320 240
+   BITLOADTEST.HELPER "corrupt "4bpp-pixeldata-cropped        320 240
+   BITLOADTEST.HELPER "corrupt "8bpp-colorsimportant-large    320 240
+   BITLOADTEST.HELPER "corrupt "8bpp-pixeldata-cropped        320 240
+   BITLOADTEST.HELPER "corrupt "24bpp-pixeldata-cropped       320 240
+   BITLOADTEST.HELPER "corrupt "32bpp-pixeldata-cropped       320 240
+   BITLOADTEST.HELPER "corrupt "555-pixeldata-cropped         320 240
+   BITLOADTEST.HELPER "corrupt "colormasks-cropped            320 240
+   BITLOADTEST.HELPER "corrupt "colormasks-missing            320 240
+   BITLOADTEST.HELPER "corrupt "palette-cropped               320 240
+   BITLOADTEST.HELPER "corrupt "palette-missing               320 240
+   BITLOADTEST.HELPER "corrupt "pixeldata-missing             320 240
+   BITLOADTEST.HELPER "corrupt "rle4-absolute-cropped         320 240
+   BITLOADTEST.HELPER "corrupt "rle4-delta-cropped            320 240   
+   BITLOADTEST.HELPER "corrupt "rle4-no-end-of-line-marker    320 240
+   BITLOADTEST.HELPER "corrupt "rle4-runlength-cropped        320 240
+   BITLOADTEST.HELPER "corrupt "rle8-absolute-cropped         320 240
+   BITLOADTEST.HELPER "corrupt "rle8-delta-cropped            320 240   
+   BITLOADTEST.HELPER "corrupt "rle8-deltaleavesimage         320 240   
+   BITLOADTEST.HELPER "corrupt "rle8-no-end-of-line-marker    320 240
+   BITLOADTEST.HELPER "corrupt "rle8-runlength-cropped        320 240
+
+   BITLOADTEST.HELPER "questionable "filesize-bad                 320 240
+   BITLOADTEST.HELPER "questionable "pels-per-meter-x-large       320 240
+   BITLOADTEST.HELPER "questionable "pels-per-meter-x-negative    320 240
+   BITLOADTEST.HELPER "questionable "pels-per-meter-x-zero        320 240
+   BITLOADTEST.HELPER "questionable "pels-per-meter-y-large       320 240
+   BITLOADTEST.HELPER "questionable "pels-per-meter-y-negative    320 240
+   BITLOADTEST.HELPER "questionable "pels-per-meter-y-zero        320 240
+   BITLOADTEST.HELPER "questionable "pixeldata-rle8-toomuch       320 240
+   BITLOADTEST.HELPER "questionable "pixeldata-toomuch            320 240
+   BITLOADTEST.HELPER "questionable "reserved1-bad                320 240
+   BITLOADTEST.HELPER "questionable "reserved2-bad                320 240
+   BITLOADTEST.HELPER "questionable "rle4-no-end-of-bitmap-marker 320 240
+   BITLOADTEST.HELPER "questionable "rle8-no-end-of-bitmap-marker 320 240
+
+   BITLOADTEST.MALFORMED.HELPER "corrupt "1bpp-no-palette ; the colors selected are random
+   BITLOADTEST.MALFORMED.HELPER "corrupt "4bpp-no-palette ; the colors selected are random
+   BITLOADTEST.MALFORMED.HELPER "corrupt "4bpp-no-palette ; the colors selected are random
+   BITLOADTEST.MALFORMED.HELPER "corrupt "8bpp-colorsimportant-negative
+   BITLOADTEST.MALFORMED.HELPER "corrupt "8bpp-colorsused-large
+   BITLOADTEST.MALFORMED.HELPER "corrupt "8bpp-colorsused-negative
+   BITLOADTEST.MALFORMED.HELPER "corrupt "8bpp-no-palette ; the colors selected are random
+   BITLOADTEST.MALFORMED.HELPER "corrupt "bitdepth-large
+   BITLOADTEST.MALFORMED.HELPER "corrupt "bitdepth-odd
+   BITLOADTEST.MALFORMED.HELPER "corrupt "bitdepth-zero
+   BITLOADTEST.MALFORMED.HELPER "corrupt "compression-bad-rle4-for-8bpp
+   BITLOADTEST.MALFORMED.HELPER "corrupt "compression-bad-rle8-for-4bpp
+   BITLOADTEST.MALFORMED.HELPER "corrupt "compression-unknown
+   BITLOADTEST.MALFORMED.HELPER "corrupt "emptyfile
+   BITLOADTEST.MALFORMED.HELPER "corrupt "fileinfoheader-cropped
+   BITLOADTEST.MALFORMED.HELPER "corrupt "height-zero
+   BITLOADTEST.MALFORMED.HELPER "corrupt "infoheader-cropped
+   BITLOADTEST.MALFORMED.HELPER "corrupt "infoheader-missing
+   BITLOADTEST.MALFORMED.HELPER "corrupt "infoheadersize-large
+   BITLOADTEST.MALFORMED.HELPER "corrupt "infoheadersize-small
+   BITLOADTEST.MALFORMED.HELPER "corrupt "infoheadersize-zero
+   BITLOADTEST.MALFORMED.HELPER "corrupt "magicnumber-bad
+   BITLOADTEST.MALFORMED.HELPER "corrupt "magicnumber-cropped
+   BITLOADTEST.MALFORMED.HELPER "corrupt "offbits-large
+   BITLOADTEST.MALFORMED.HELPER "corrupt "offbits-negative
+   BITLOADTEST.MALFORMED.HELPER "corrupt "offbits-zero
+   BITLOADTEST.MALFORMED.HELPER "corrupt "palette-too-big
+   BITLOADTEST.MALFORMED.HELPER "corrupt "width-negative
+   BITLOADTEST.MALFORMED.HELPER "corrupt "width-times-height-overflow
+   BITLOADTEST.MALFORMED.HELPER "corrupt "width-zero
+
+   BITLOADTEST.MALFORMED.HELPER "questionable "8bpp-pixels-not-in-palette
+   BITLOADTEST.MALFORMED.HELPER "questionable "32bpp-0x0
+   BITLOADTEST.MALFORMED.HELPER "questionable "32bpp-0x240
+   BITLOADTEST.MALFORMED.HELPER "questionable "32bpp-320x0
+   BITLOADTEST.MALFORMED.HELPER "questionable "filesize-zero
+   BITLOADTEST.MALFORMED.HELPER "questionable "planes-large
+   BITLOADTEST.MALFORMED.HELPER "questionable "planes-zero
+   BITLOADTEST.MALFORMED.HELPER "questionable "rle4-height-negative
+   BITLOADTEST.MALFORMED.HELPER "questionable "rle8-height-negative
+END
+
+TO BITLOAD.BADINPUT
+   RUNNOTENOUGHINPUTSTEST [(BITLOAD)]
+   RUNTOOMANYINPUTSTEST   [(BITLOAD "file.bmp "toomany)]
+
+   ; bad input
+   RUNBITMAPOPENERRORTEST [ BITLOAD "doesnotexist.bmp ]
+   RUNDOESNTLIKEINPUTTEST [ BITLOAD {a b c}           ]
+   RUNDOESNTLIKEINPUTTEST [ BITLOAD [a b c]           ]
+
+   ; try to open something that isn't a BMP as a BMP
+   RUNBITMAPINVALIDERRORTEST [ BITLOAD "bitmap.lgo   ]
+
+   ; try to open a directory as a BMP
+   RUNBITMAPOPENERRORTEST [ BITLOAD "bmptestsuite-0.9/corrupt/directory.bmp ]
+END
+
+TO BITSAVE.BADINPUT
+
+   ; bad filename input (must be a word)
+   RUNDOESNTLIKEINPUTTEST [ BITSAVE {1 2 3}       ]
+   RUNDOESNTLIKEINPUTTEST [ BITSAVE [1 2 3]       ]
+   RUNBITMAPOPENERRORTEST [ BITSAVE "||           ]
+   RUNBITMAPOPENERRORTEST [ BITSAVE "bad>file.bmp ]
+
+   ; max color depth (must be a member of {1,2,4,24,32})
+   RUNDOESNTLIKEINPUTTEST [ (BITSAVE "file.bmp 3        ) ]
+   RUNDOESNTLIKEINPUTTEST [ (BITSAVE "file.bmp "nonint  ) ]
+   RUNDOESNTLIKEINPUTTEST [ (BITSAVE "file.bmp [1 2 3]  ) ]
+   RUNDOESNTLIKEINPUTTEST [ (BITSAVE "file.bmp {1 2 3}  ) ]
+   RUNDOESNTLIKEINPUTTEST [ (BITSAVE "file.bmp -1       ) ]
+
+   ; make sure that none of the above created the file
+   SIMPLEREPORTTEST [FILEEXISTS "file.bmp] "false
+
+   ; cleanup, just in case
+   TRACEINSTRUCTION [ ERASEFILE "file.bmp ]
+
+   ; try to save a bmp over a directory
+   TRACEINSTRUCTION       [ MKDIR   "bmptest.bmp POPDIR ]
+   RUNBITMAPOPENERRORTEST [ (BITSAVE "bmptest.bmp 24)   ]
+   RUNBITMAPOPENERRORTEST [ (BITSAVE "bmptest.bmp 1)    ] ; different code path
+   TRACEINSTRUCTION       [ RMDIR   "bmptest.bmp        ]
+
+END
+
+TO BITMAPTEST.COPYTOCLIPBOARD :clipboardFormat :binaryContent
+   ; Validate input
+   REPEAT COUNT :binaryContent [
+      IF GREATER? ASCII ITEM REPCOUNT :binaryContent 255 [
+         REPORTTESTBUG (WORD
+            "|binaryContent has non-binary byte at index |
+            REPCOUNT
+            "|: |
+            ASCII ITEM REPCOUNT :binaryContent
+         )
+         STOP
+      ]
+   ]
+
+   ; FMSLogo internally stores words as UTF16LE.
+   ; To convert the input word, which contains a single byte per UTF16LE
+   ; character, we copy it to a new buffer, taking only the lowest 256 bits
+   ; of each character.
+   LOCAL [buffer bufferSize]
+   MAKE "bufferSize COUNT    :binaryContent
+   MAKE "buffer     AS_PVOID :binaryContent
+
+   ; Use win32 calls to copy :buffer to the clipboard.
+   LOCALMAKE "hMem GLOBALALLOC :buffer :bufferSize
+
+   SETCLIPBOARDDATA :clipboardFormat :hMem
+
+   GLOBALFREE :hMem
+
+END
+
+; FMSLogo internally stores words as UTF16LE.
+; To convert the input word, which contains a single byte per UTF16LE
+; character, we copy it to a new word, taking only the lowest 256 bits
+; of each character, combining pairs of bytes into UTF16LE characters.
+TO AS_PVOID :charArray
+   LOCAL [buffer bufferSize lowByte highByte]
+
+   MAKE "buffer "||
+   REPEAT INT QUOTIENT COUNT :charArray 2 [
+      MAKE "lowByte  ASCII ITEM REPCOUNT * 2 - 1 :charArray
+      MAKE "highByte ASCII ITEM REPCOUNT * 2     :charArray
+      MAKE "buffer WORD :buffer CHAR BITOR LSHIFT :highByte 8 :lowByte
+   ]
+   IF NOTEQUAL? 0 MODULO COUNT :charArray 2 [
+      ; Copy the last byte if :binaryContent has an odd number of characters
+      MAKE "lowByte ASCII ITEM :bufferSize :charArray
+      MAKE "buffer WORD :buffer CHAR :lowByte
+   ]
+   OUTPUT :buffer
+END
+
+TO AS_BYTE :byte
+  OUTPUT CHAR BITAND 255 :byte
+END
+
+; Converts a number to a 32-bit little endian word.
+TO AS_DWORD :dword
+  ; lsb comes first in little endian
+  OUTPUT (WORD
+    AS_BYTE LSHIFT :dword 0
+    AS_BYTE LSHIFT :dword -8
+    AS_BYTE LSHIFT :dword -16
+    AS_BYTE LSHIFT :dword -24)
+END
+
+; Converts a number to a 16-bit little endian word.
+TO AS_WORD :word
+  OUTPUT (WORD
+    AS_BYTE LSHIFT :word 0
+    AS_BYTE LSHIFT :word -8)
+END
+
+TO AS_RGBQUAD :r :g :b
+  OUTPUT (WORD AS_BYTE :r AS_BYTE :g AS_BYTE :b AS_BYTE 0)
+END
+
+
+TO BITSIZE.CLIPBOARDTEST
+    IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+    ; Copy a 1x2 DIB to the clipboard
+    LOCALMAKE "CF_DIB 8
+    BITMAPTEST.COPYTOCLIPBOARD :CF_DIB (WORD
+       AS_DWORD 40 ; biSize
+       AS_DWORD 2  ; biWidth
+       AS_DWORD 1  ; biHeight
+       AS_WORD  1  ; biPlanes
+       AS_WORD  32 ; biBitCount
+       AS_DWORD 0  ; biCompression (BI_RGB)
+       AS_DWORD 0  ; biSizeImage
+       AS_DWORD 0  ; biXPelsPerMeter
+       AS_DWORD 0  ; biYPelsPerMeter
+       AS_DWORD 0  ; biClrUsed
+       AS_DWORD 0  ; biClrImportant
+
+       AS_RGBQUAD 0   0 255
+       AS_RGBQUAD 255 0   0
+    )
+
+    TRACEINSTRUCTION [ SETBITINDEX 0 ]
+    SIMPLEREPORTTEST [ BITSIZE ] [ 2 1 ]
+
+    ; Copy an HBITMAP to the clipboard
+    ; Native code to copy data to the clipboard.
+    DLLLOAD "gdi32.dll
+
+    ; hbitmap = CreateBitmap(width=1, height=4, planes=1, bitcount=32, bits);
+    LOCALMAKE "bits   AS_PVOID (WORD
+        CHAR 255  CHAR   0  CHAR   0  CHAR    0   ; BGRA
+        CHAR 0    CHAR 255  CHAR   0  CHAR    0   ; BGRA
+        CHAR 0    CHAR   0  CHAR 255  CHAR    0   ; BGRA
+        CHAR 0    CHAR   0  CHAR   0  CHAR  255   ; BGRA
+    )
+    LOCALMAKE "hbitmap DLLCALL (LIST "L "CreateBitmap "U :bits "L 32 "L 1 "L 4 "L 1)
+
+    LOCALMAKE "CF_BITMAP 2
+    SETCLIPBOARDDATA :CF_BITMAP :hbitmap
+
+    ; DeleteObject(hbitmap)
+    DLLCALL (LIST "V "DeleteObject "L :hbitmap)
+    (DLLFREE "gdi32.dll)
+
+    SIMPLEREPORTTEST [ BITSIZE ] [ 1 4 ]
+END
+
+TO BITSIZE.SMOKETEST
+    TRACEINSTRUCTION [ SETBITINDEX 1 ]
+
+    TRACEINSTRUCTION [ BITCOPY 3 2   ]
+    SIMPLEREPORTTEST [ BITSIZE       ] [ 3 2 ]
+
+    TRACEINSTRUCTION [ BITCOPY 9  5  ]
+    SIMPLEREPORTTEST [ BITSIZE       ] [ 9 5 ]
+
+    TRACEINSTRUCTION [ BITCOPY 10000 10000 ]
+    SIMPLEREPORTTEST [ BITSIZE       ] [ 10000 10000 ]
+END
+
+
+TO BITSIZE.BADINPUT
+
+    RUNTOOMANYINPUTSTEST   [ (BITSIZE "toomany) ]
+
+    ; Determine the size of a bitmap that doesn't exist.
+    TRACEINSTRUCTION [ SETBITINDEX 41 ]
+    SIMPLEREPORTTEST [ BITSIZE ] [ 0 0 ]
+
+    ; Determine the size of the clipboard bitmap when it has text
+    TRACEINSTRUCTION [ OPENWRITE "clipboard ]
+    TRACEINSTRUCTION [ SETWRITE "clipboard ]
+    TRACEINSTRUCTION [ PRINT "text ]
+    TRACEINSTRUCTION [ SETWRITE [] ]
+    TRACEINSTRUCTION [ CLOSE "clipboard ]
+
+    TRACEINSTRUCTION [ SETBITINDEX 0 ]
+    SIMPLEREPORTTEST [ BITSIZE ] [ 0 0 ]
+
+END
+
+TO BITMAPTEST
+  BITLOADSIZETEST 100 100 1
+  BITLOADSIZETEST 100 101 1
+  BITLOADSIZETEST 101 100 1
+
+  BITLOAD.BADINPUT
+  BITLOAD.POSITION
+  BITLOAD.MALFORMED
+  BITLOAD.1BPP
+  BITLOAD.4BPP
+  BITLOAD.8BPP
+  BITLOAD.24BPP
+  BITLOAD.32BPP
+  BITLOAD.MISC
+  BITLOAD.JPEG
+
+  BITSAVE.BADINPUT
+
+  BITCOPYTEST
+
+  BITCUTTEST.BADINPUT
+  BITCOPYTEST.BADINPUT
+  BITPASTETEST.BADINPUT
+
+  BITPASTETOINDEXTEST.BADINPUT
+  BITPASTETOINDEXTEST.SMOKETEST
+
+  SETBITINDEX.SMOKETEST
+  SETBITINDEX.BADINPUT
+
+  BITSAVE.1BPP
+  BITSAVE.4BPP
+  BITSAVE.8BPP
+  BITSAVE.8BPP.FULLSCREEN
+  BITSAVE.16BPP
+  BITSAVE.24BPP
+  BITSAVE.32BPP
+  BITSAVE.WITHACTIVEAREA
+  BITSAVE.LARGEBITMAP
+  BITSAVE.FILEEXISTS
+
+  BITSIZE.SMOKETEST
+  IF ISWINDOWS [ ; works around a "DLLCALL not defined" bug on GNU/Linux
+    BITSIZE.CLIPBOARDTEST
+  ]
+  BITSIZE.BADINPUT
+END

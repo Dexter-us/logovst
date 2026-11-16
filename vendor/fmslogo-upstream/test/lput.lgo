@@ -1,0 +1,59 @@
+LOAD "testlib.lgo
+
+TO LPUTTEST.SMOKETEST
+
+   SIMPLEREPORTTEST [ LPUT  3  [1 2]    ] [1 2 3]
+   SIMPLEREPORTTEST [ LPUT  1  []       ] [1]
+   SIMPLEREPORTTEST [ LPUT [3] [[1][2]] ] [[1] [2] [3]]
+
+
+   REPORTTESTINFO [Testing that LPUT can put an array into a list]
+   LOCALMAKE "array {1 2 3}
+   SIMPLEREPORTTEST [ LPUT :array [1 2 3] ] (LIST 1 2 3 :array)
+
+
+   REPORTTESTINFO [Testing that LPUT isn't destructive]
+   LOCALMAKE "originallist [1 2]
+   SIMPLEREPORTTEST [ LPUT 3 :originallist ] [1 2 3]
+   SIMPLEREPORTTEST [ :originallist ]        [1 2]
+
+END
+
+TO LPUTTEST.BADINPUT
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(LPUT 3)]
+   RUNTOOMANYINPUTSTEST   [(LPUT 3 [1 2] "toomany)]
+
+   ; bad input
+   RUNDOESNTLIKEINPUTTEST [ LPUT  3 12    ]
+   RUNDOESNTLIKEINPUTTEST [ LPUT "c "ab   ]
+   RUNDOESNTLIKEINPUTTEST [ LPUT "3 {1 2} ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      LPUT [] "word ; can't be a word
+   ][
+      {a b}  ; can't be an array
+      123    ; can't be a word (again)
+      {}     ; can't be an array (again)
+      [1]    ; legal
+   ] ~
+   [ [1 [] ] ] ; NIL put on the end of [1]
+
+
+   ; Test that LPUT accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST "allocated "in "LPUTTEST.BADINPUT) ] ]
+   SIMPLEREPORTTESTNOCATCH [ LPUT 1 {} ] [ allocated in LPUTTEST.BADINPUT 1]
+
+END
+
+
+TO LPUTTEST
+
+   LPUTTEST.SMOKETEST
+   LPUTTEST.BADINPUT
+
+END

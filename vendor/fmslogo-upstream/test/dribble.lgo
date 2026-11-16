@@ -1,0 +1,286 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO DRIBBLETEST.BADINPUT
+   ; try to overflow an internal buffer
+   LOCALMAKE "longfilename REPEATWORD "A 5000
+   RUNFILESYSTEMERRORTEST [DRIBBLE  :longfilename]
+
+   RUNDOESNTLIKEINPUTTEST [DRIBBLE [testfile.txt]]
+   RUNDOESNTLIKEINPUTTEST [DRIBBLE {testfile.txt}]
+
+   ; Incorrect number of inputs.
+   RUNNOTENOUGHINPUTSTEST [(DRIBBLE)]
+   RUNTOOMANYINPUTSTEST   [(DRIBBLE   "testfile.txt "toomany)]
+
+   ; Test the special "can't dribble when dribbling" error
+   TRACEINSTRUCTION [DRIBBLE "testfile.txt]
+   (RUNEXPECTERRORTEST [DRIBBLE "some-other-file.txt] 17 "|Already dribbling|)
+   TRACEINSTRUCTION [NODRIBBLE]
+   ERASEFILE "testfile.txt
+
+END
+
+TO DRIBBLETEST.PO.PROCEDURE :a [:b 1]
+
+  ; comment before blank line
+
+  ; comment after blank line
+  PROC ~
+  PROC
+END
+
+
+TO DRIBBLETEST.PO
+
+   LOCALMAKE "filename "dribbletest.po.txt
+ 
+   ; dribble while running PO
+   DRIBBLE :filename
+   PO [ DRIBBLETEST.PO.PROCEDURE ]
+   NODRIBBLE
+
+   ; validate the dribble file
+   OPENREAD :filename
+   SETREAD  :filename
+   SIMPLEREPORTTEST [READRAWLINE] "|TO DRIBBLETEST.PO.PROCEDURE :a [:b 1]|
+   SIMPLEREPORTTEST [READRAWLINE] "||
+   SIMPLEREPORTTEST [READRAWLINE] "|  ; comment before blank line|
+   SIMPLEREPORTTEST [READRAWLINE] "||
+   SIMPLEREPORTTEST [READRAWLINE] "|  ; comment after blank line|
+   SIMPLEREPORTTEST [READRAWLINE] "|  PROC ~|
+   SIMPLEREPORTTEST [READRAWLINE] "|  PROC|
+   SIMPLEREPORTTEST [READRAWLINE] "|END|
+   SIMPLEREPORTTEST [READRAWLINE] "||
+   SIMPLEREPORTTEST [READRAWLINE] []
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+TO DRIBBLETEST.PO.UNICODE
+   ; Tests that PO can dribble Unicode correctly.
+   LOCAL [aleph procedurename filename]
+   MAKE "aleph         CHAR 1488
+   MAKE "procedurename (WORD "DRIBBLETEST.PO.UNICODE.PROCEDURE :aleph)
+   MAKE "filename      (WORD "dribbletest.po.UNICODE. :aleph ".txt)
+
+   ; Bug #601 impacted the way PO wrote procedures defined with
+   ; DEFINE to the Commander.  As a regression test, it's important
+   ; that DRIBBLE is tested with PO and DEFINE, since we don't
+   ; have another way to test when things are written to the
+   ; Commander.
+   DEFINE :procedurename (LIST
+      (LIST :aleph)               ; inputs
+      (LIST "PRINT QUOTED :aleph) ; body words (as list)
+   )
+
+   ; Run PO while dribbling
+   DRIBBLE :filename
+   PO :procedurename
+   NODRIBBLE
+
+   ; validate the contents of the dribble file
+   OPENREAD :filename
+   SETREAD  :filename
+   SIMPLEREPORTTEST [READWORD] (WORD "|to | :procedurename "| :| :aleph)
+   SIMPLEREPORTTEST [READWORD] WORD "|PRINT "| :aleph
+   SIMPLEREPORTTEST [READWORD] "end
+   SIMPLEREPORTTEST [READWORD] "|| ; blank line
+   SIMPLEREPORTTEST [READWORD] []
+   SETREAD []
+   CLOSE :filename
+
+   ; cleanup
+   ERASE :procedurename
+   ERASEFILE :filename
+END
+
+
+TO DRIBBLETEST.RUNFROMGUI
+   ; Confirms that instructions run from GUI operations
+   ; are written to the dribble file.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   ; The easiest command to run is pressing the Reset button.
+   UIAUTOMATION.INITIALIZE
+   TEXTSCREEN
+
+   LOCALMAKE "filename "dribbletest.txt
+
+   CATCH "ERROR [
+     ; Press Reset while dribbling.
+     ; This is done twice to confirm that the newline is written
+     ; after each instruction.
+     DRIBBLE :filename
+     UIAUTOMATION.PUSHCOMMANDERBUTTON "Reset
+     UIAUTOMATION.PUSHCOMMANDERBUTTON "Reset
+     NODRIBBLE
+   ]
+
+   SPLITSCREEN
+   UIAUTOMATION.UNINITIALIZE
+
+   ; Confirm that the CLEARSCREEN was written to the dribble file (twice).
+   OPENREAD :filename
+   SETREAD  :filename
+   SIMPLEREPORTTEST [READLIST] [CLEARSCREEN]
+   SIMPLEREPORTTEST [READLIST] [CLEARSCREEN]
+   SIMPLEREPORTTEST [READLIST] "||
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+
+TO DRIBBLETEST.READLIST
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   LOCALMAKE "filename "dribbletest.txt
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+       ; Start dribbling
+       DRIBBLE :filename
+
+       ; Setup the UI actions to execute when the READLIST box appears
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "|First Line|
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       IGNORE READLIST
+
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "|Second\ Line ; comment|
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       IGNORE READLIST
+
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "|Third Line ~|
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "Continued\ \|
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "in\ vertical\ bar ~
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "end\ of\ vbar\ \|after
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       IGNORE READLIST
+
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "simple\\backslash
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       IGNORE READLIST
+
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit "with\ \\n\ backslash\ newline
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       IGNORE READLIST
+
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [List Mode (Cancel to Halt)] "Edit WORD "|non-ASCII char: | CHAR 1488
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [List Mode (Cancel to Halt)] "OK
+       IGNORE READLIST
+   ]
+
+   ; make sure that the instructions above didn't throw an error.
+   IGNORE FAILIFERROR "|UI automation for READLIST failed|
+
+   NODRIBBLE
+
+   UIAUTOMATION.UNINITIALIZE
+
+   ; validate the dribble file
+   OPENREAD :filename
+   SETREAD  :filename
+   SIMPLEREPORTTEST [READRAWLINE] "|First Line|
+   SIMPLEREPORTTEST [READRAWLINE] "|Second Line ; comment|
+   SIMPLEREPORTTEST [READRAWLINE] "|Third Line ~|
+   SIMPLEREPORTTEST [READRAWLINE] "|~ Continued \||
+   SIMPLEREPORTTEST [READRAWLINE] "|\| in vertical bar|
+   SIMPLEREPORTTEST [READRAWLINE] "|\| end of vbar \|after|
+   SIMPLEREPORTTEST [READRAWLINE] "|simple\\backslash|
+   SIMPLEREPORTTEST [READRAWLINE] "|with \\n\\  backslash newline| ; the extra backslash might be a bug
+   SIMPLEREPORTTEST [READRAWLINE] WORD "|non-ASCII char: | CHAR 1488
+   SIMPLEREPORTTEST [READRAWLINE] []
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+
+END
+
+TO DRIBBLETEST.UNICODECONTENT
+   ; Confirm that commands that contains Unicode character
+   ; are written into the dribble file as UTF-8.
+   LOCAL [filename sigma]
+
+   MAKE "filename "dribbletest.unicodecontent.txt
+
+   DRIBBLE :filename
+   MAKE "sigma CHAR 963
+   PRINT WORD "Hello :sigma
+
+   NODRIBBLE
+
+   ; Check the contents of the dribble file.
+   ; This is checked in binary mode to confirm that a UTF-8 BOM was added.
+   (OPENREAD :filename "true)
+   SETREAD :filename
+   SIMPLEREPORTTEST [READCHAR] 239  ; UTF-8 BOM byte 1
+   SIMPLEREPORTTEST [READCHAR] 187  ; UTF-8 BOM byte 2
+   SIMPLEREPORTTEST [READCHAR] 191  ; UTF-8 BOM byte 3
+   SIMPLEREPORTTEST [READCHAR] ASCII "H
+   SIMPLEREPORTTEST [READCHAR] ASCII "e
+   SIMPLEREPORTTEST [READCHAR] ASCII "l
+   SIMPLEREPORTTEST [READCHAR] ASCII "l
+   SIMPLEREPORTTEST [READCHAR] ASCII "o
+   SIMPLEREPORTTEST [READCHAR] 207  ; Sigma byte 1
+   SIMPLEREPORTTEST [READCHAR] 131  ; Sigma byte 2
+   SIMPLEREPORTTEST [READCHAR] 13   ; CR
+   SIMPLEREPORTTEST [READCHAR] 10   ; LF
+
+   SIMPLEREPORTTEST [READCHAR] [] ; EOF
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+
+TO DRIBBLETEST.SMOKETEST
+
+   LOCALMAKE "filename "dribbletest.txt
+ 
+   ; Dribble some commands
+   DRIBBLE :filename
+   PRINT "Hello
+   PRINT [Good Bye]
+
+   ; Turn off dribbing.
+   NODRIBBLE
+
+   ; Check the contents of the dribble file.
+   ; This is checked in binary mode to confirm that a UTF-8 BOM was added.
+   (OPENREAD :filename "true)
+   SETREAD :filename
+   SIMPLEREPORTTEST [READCHAR] 239 ; UTF-8 BOM byte 1
+   SIMPLEREPORTTEST [READCHAR] 187 ; UTF-8 BOM byte 2
+   SIMPLEREPORTTEST [READCHAR] 191 ; UTF-8 BOM byte 3
+   SIMPLEREPORTTEST [READWORD] (WORD "Hello      CHAR 13)
+   SIMPLEREPORTTEST [READWORD] (WORD "|Good Bye| CHAR 13)
+   SIMPLEREPORTTEST [READWORD] []
+   SETREAD []
+   CLOSE :filename
+
+   ERASEFILE :filename
+END
+
+
+
+TO DRIBBLETEST
+
+  DRIBBLETEST.SMOKETEST
+  DRIBBLETEST.UNICODECONTENT
+  DRIBBLETEST.PO
+  DRIBBLETEST.PO.UNICODE
+  DRIBBLETEST.RUNFROMGUI
+  DRIBBLETEST.READLIST
+  DRIBBLETEST.BADINPUT
+
+END

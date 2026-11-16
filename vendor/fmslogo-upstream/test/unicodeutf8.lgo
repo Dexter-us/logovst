@@ -1,0 +1,77 @@
+; This file contains simple tests confirm that this file
+; is parsed as Unicode with UTF-8 character encoding.
+;
+; Note that all languages are given in the same file.  That's
+; also part of the test.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+LOAD "testlib.lgo
+
+TO UNICODEUTF8TEST.TEXT
+
+  ; Start with the easy test
+  SIMPLEREPORTTEST [COUNT "ASCII ] 5
+
+  ; Some Latin-1
+  SIMPLEREPORTTEST [COUNT "español ] 7
+
+  ; Translation for Russian
+  SIMPLEREPORTTEST [COUNT "русский\ язык ] 12 
+
+  ; Translation for Greek
+  SIMPLEREPORTTEST [COUNT "ελληνικά ] 8
+
+  ; This is the translation for simplified chinese
+  SIMPLEREPORTTEST [COUNT "汉语 ] 2
+
+  ; This is the translation for traditional chinese
+  SIMPLEREPORTTEST [COUNT "漢語 ] 2
+
+  ; Translation for Arabic (right to left language)
+  SIMPLEREPORTTEST [COUNT "العربية ] 7  
+
+END
+
+TO UNICODEUTF8TEST.LABEL
+  ; Draws different characters from different scripts to the screen.
+  LOCAL [oldfont fontname]
+
+  ; Set the label font for repeatable test results.
+  MAKE "oldfont LABELFONT
+  MAKE "fontname IFELSE ISWINDOWS [[Arial]] [[|DejaVu Sans|]]
+  FAILIFNOTTRUE (LIST "MEMBER? :fontname "FONTFACENAMES )
+  SETLABELFONT (LIST :fontname 32 0 0 400 0 0 0 0 0 0 0 0)
+
+  CLEARSCREEN
+
+  PENUP
+  RIGHT 90
+  SETX -200
+  SETY 30
+  PENDOWN
+  LABEL "|汉语| ; vbar
+
+  PENUP
+  SETY 0
+  PENDOWN
+  LABEL "汉语
+
+  PENUP
+  SETY -30
+  PENDOWN
+  LABEL "|漢語|
+
+  PENUP
+  SETY -60
+  PENDOWN
+  LABEL "العربية 
+
+  CHECKSCREEN "unicode-utf8
+
+  ; Restore the previous label font.
+  SETLABELFONT :oldfont
+END
+
+TO UNICODEUTF8TEST
+  UNICODEUTF8TEST.TEXT
+  UNICODEUTF8TEST.LABEL
+END

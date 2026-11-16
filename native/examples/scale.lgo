@@ -1,0 +1,12 @@
+; Initial command-line prototype syntax: one musical command per line.
+; Durations are measured in quarter-note beats.
+TEMPO 110
+CHANNEL 1
+VELOCITY 96
+GATE 0.8
+
+NOTE 60 0.5
+NOTE 67 0.5
+REST 0.5
+NOTE 72 0.5
+CHORD [48 55 60] 4

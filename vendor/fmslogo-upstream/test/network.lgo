@@ -1,0 +1,956 @@
+LOAD "testlib.lgo
+
+TO NETWORKTEST.RUNNETWORKALREADYSTARTEDTEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1701 "|netstartup has already been run|)
+END
+
+TO NETWORKTEST.RUNNETWORKNOTSTARTEDTEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1702 "|The network subsystem has not been started|)
+END
+
+TO NETWORKTEST.RUNNETCONNECTALREADYONTEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1703 "|netconnecton has already been run|)
+END
+
+TO NETWORKTEST.RUNNETACCEPTALREADYONTEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1704 "|netaccepton has already been run|)
+END
+
+TO NETWORKTEST.SERVERCOMMAND :test :port
+   OUTPUT (LIST "perl.exe "networkserver.pl :test :port)
+END
+
+TO CLIENT.ONREADYTOSEND
+  LOCALMAKE "payload [This is my payload]
+
+  make "NetConnectOnCall :NetConnectOnCall + 1
+  (print "Client.OnReadySend "call "# :NetConnectOnCall)
+
+  if :NetConnectOnCall > 2 [
+     (print "Sending: :payload)
+     LOCALMAKE "isok NETCONNECTSENDVALUE :payload
+     (print "Send "Status: :isok)
+  ]
+
+  WAIT 100
+END
+
+TO NETWORKTEST.SMOKETEST
+
+  LOCAL [serverport]
+
+  NETSTARTUP
+
+  MAKE "serverport 5960
+  IGNORE NETACCEPTON :serverport [print [ready to send]] [print (list "|Received:| NETCONNECTRECEIVEVALUE)]
+
+  ; connect to the port 5960
+  LOCALMAKE "NetConnectOnCall 0
+
+  (print "Connecting)
+  localmake "isok NETCONNECTON "localhost :serverport "CLIENT.ONREADYTOSEND []
+  (print "Connect "Status: :isok)
+
+  WAIT 60 * 10 ; 10 seconds
+
+  ; close the client socket
+  NETCONNECTOFF
+
+  ; close the server socket
+  NETACCEPTOFF
+
+  NETSHUTDOWN
+END
+
+TO NETWORKTEST.NETSHUTDOWNCRASH
+  TRACEINSTRUCTION [(NETSTARTUP 1)] ; must be synchronous
+  TRACEINSTRUCTION [ IGNORE NETCONNECTON "localhost 9999 [] [] ]
+  TRACEINSTRUCTION [ NETSHUTDOWN ]
+  TRACEINSTRUCTION [ NETSHUTDOWN ] ; crashes (bug #48)
+END
+
+
+TO NETWORKTEST.SERVER.RECEIVEUNFRAMEDPACKET
+
+   LOCAL [localport server.data onsendreadycounter shellcommand]
+
+   MAKE "localport   1234
+   MAKE "server.data []
+   MAKE "onsendreadycounter 0
+
+   ; start the server
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [
+      NETACCEPTON
+         :localport
+         [ MAKE  "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "server.data        NETACCEPTRECEIVEVALUE   ]
+   ]
+
+   TRACEINSTRUCTION [ WAIT 60 * 2 ]
+
+   ; Spawn a client to send a packet that does not end in NUL.
+   ; This is a regression test for Bug #49, which sent FMSLogo into a tight loop.
+   MAKE "shellcommand (SENTENCE [perl.exe networkclient.pl nonul localhost] :localport)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+ 
+   ; wait two seconds for the network connection
+   TRACEINSTRUCTION [ WAIT 60 * 2 ]
+
+   ; shutdown the server
+   TRACEINSTRUCTION [ NETACCEPTOFF ]
+   TRACEINSTRUCTION [ NETSHUTDOWN  ]
+
+
+   ; Verify that the "send ready" callback was called three times.
+   ; 1) When the listen() is successful and the server
+   ;    is ready to receive connections.
+   ; 2) When the client connects to the server.
+   ; 3) When the server is ready to send data.
+   SIMPLEREPORTTEST [:onsendreadycounter] 3
+
+   ; verify that we received the expected data
+   SIMPLEREPORTTEST [:server.data]    [[hello]]
+
+END
+
+
+TO NETWORKTEST.SERVER.TWOCONNECTIONS.SERIAL
+   ; Tests that a single server (NETACCEPTON) can receive data from multiple
+   ; connections made in serial without restarting.
+   ; This is a regression test for Bug #182.
+
+   LOCAL [localport server.data shellcommand onsendreadycounter]
+
+   MAKE "localport 2222
+   MAKE "server.data []
+   MAKE "onsendreadycounter 0
+
+   ; start the server
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [
+      NETACCEPTON
+         :localport
+         [ MAKE  "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "server.data        NETACCEPTRECEIVEVALUE   ]
+   ]
+
+   ; spawn a client to open a connection to the server
+   MAKE "shellcommand (SENTENCE [perl.exe networkclient.pl simple localhost] :localport)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait two seconds for the network connection
+   WAIT 60*2
+
+   ; spawn a client to open a second connection to the server
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait two seconds for the network connection
+   WAIT 60*2
+
+   ; shutdown the server
+   NETACCEPTOFF
+
+   NETSHUTDOWN
+
+   ; Verify that the "send ready" callback was called five times.
+   ; 1) When the listen() is successful and the server
+   ;    is ready to receive connections.
+   ; 2) When the first client connects to the server.
+   ; 3) When the server is ready to send data to the first client.
+   ; 4) When the second client connects to the server.
+   ; 5) When the server is ready to send data to the second client.
+   SIMPLEREPORTTEST [:onsendreadycounter] 5
+
+   ; verify that both connections succeeded
+   SIMPLEREPORTTEST [:server.data] [[hello] [hello]]
+
+END
+
+TO NETWORKTEST.SERVER.TWOCONNECTIONS.CLIENTRESET
+   ; Tests a client which resets a socket doesn't prevent a server
+   ; from receive data on a subsequent connection.
+
+   LOCAL [localport server.data onsendreadycounter shellcommand]
+
+   MAKE "localport   2229
+   MAKE "server.data []
+   MAKE "onsendreadycounter 0
+
+   ; start the server
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [
+      NETACCEPTON
+         :localport
+         [ MAKE  "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "server.data        NETACCEPTRECEIVEVALUE   ]
+   ]
+
+   ; wait two seconds for the server to start listening
+   TRACEINSTRUCTION [ WAIT 2*60 ]
+
+   ; Spawn a client connect then reset the socket.
+   MAKE "shellcommand (SENTENCE [perl.exe networkclient.pl fastreset localhost] :localport)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+ 
+   ; wait a second for the network connection
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; spawn a second client to send data to the server
+   MAKE "shellcommand (SENTENCE [perl.exe networkclient.pl simple localhost] :localport)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the network connection
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; shutdown the server
+   TRACEINSTRUCTION [ NETACCEPTOFF ]
+   TRACEINSTRUCTION [ NETSHUTDOWN  ]
+
+   ; Verify that the "send ready" callback was called five times.
+   ; 1) When the listen() is successful and the server
+   ;    is ready to receive connections.
+   ; 2) When the first client connects to the server.
+   ; 3) When the server is ready to send to the first client.
+   ; 4) When the second client connects to the server.
+   ; 5) When the server is ready to send data to the second server.
+   SIMPLEREPORTTEST [:onsendreadycounter] 5
+
+   ; verify that we received the data from the second client.
+   SIMPLEREPORTTEST [:server.data]    [[hello]]
+
+END
+
+TO NETWORKTEST.SERVER.TWOCONNECTIONS.CONCURRENT
+
+   LOCAL [localport server.data onsendreadycounter shellcommand]
+
+   MAKE "localport   2223
+   MAKE "server.data []
+   MAKE "onsendreadycounter 0
+
+   ; start the server
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [
+      NETACCEPTON
+         :localport
+         [ MAKE  "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "server.data        NETACCEPTRECEIVEVALUE   ]
+   ]
+
+   ; Spawn two clients that each open a connection to the server,
+   ; sleep, then sends some data.
+   MAKE "shellcommand (SENTENCE [perl.exe networkclient.pl delay localhost] :localport)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; Wait three seconds for the network connection.
+   TRACEINSTRUCTION [ WAIT 60*3 ]
+
+   ; shutdown the server
+   TRACEINSTRUCTION [ NETACCEPTOFF ]
+   TRACEINSTRUCTION [ NETSHUTDOWN  ]
+
+   ; Verify that the "send ready" callback was called five times.
+   ; 1) When the listen() is successful and the server
+   ;    is ready to receive connections.
+   ; 2) When the first client connects to the server.
+   ; 3) When the server is ready to send to the first client.
+   ; 4) When the second client connects to the server.
+   ; 5) When the server is ready to send data to the second server.
+   SIMPLEREPORTTEST [:onsendreadycounter] 5
+
+   ; verify that both connections succeeded
+   SIMPLEREPORTTEST [:server.data] [[hello] [hello]]
+
+END
+
+TO NETWORKTEST.SERVER.LISTENAGAIN
+   ; Tests that NETACCEPTON can be called after NETACCEPTOFF is called.
+   ; This tests that NETACCEPTOFF cancels the listen socket.
+   LOCAL [localport server.data shellcommand]
+
+   MAKE "localport 2224
+   MAKE "server.data []
+
+   NETSTARTUP
+
+   ; start the server
+   FAILIFNOTTRUE [ NETACCEPTON :localport [] [QUEUE "server.data NETACCEPTRECEIVEVALUE ]]
+
+   ; Spawn a client that sends data to the server.
+   MAKE "shellcommand (SENTENCE [perl.exe networkclient.pl simple localhost] :localport)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the network connection.
+   WAIT 60
+
+   ; Verify that the data was received.
+   SIMPLEREPORTTEST [:server.data] [[hello]]
+
+   ; shutdown the server, but not the entire network stack.
+   TRACEINSTRUCTION [ NETACCEPTOFF ]
+
+   ; Start up the server a second time.
+   FAILIFNOTTRUE [ NETACCEPTON :localport [] [QUEUE "server.data NETACCEPTRECEIVEVALUE ]]
+
+   ; Connect to this server.
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the network connection.
+   WAIT 60
+
+   ; verify that the second connection succeeded
+   SIMPLEREPORTTEST [:server.data] [[hello] [hello]]
+
+   ; Cleanup
+   TRACEINSTRUCTION [ NETACCEPTOFF ]
+   TRACEINSTRUCTION [ NETSHUTDOWN  ]
+
+END
+
+TO NETWORKTEST.SERVER.RECEIVESPECIAL
+   ; Tests that data that is received from the network is parsed
+   ; before the programmer receives it.
+
+   LOCAL [localport server.data shellcommand]
+
+   MAKE "localport 2225
+   MAKE "server.data []
+
+   NETSTARTUP
+
+   ; Start the server.
+   FAILIFNOTTRUE [ NETACCEPTON :localport [] [QUEUE "server.data NETACCEPTRECEIVEVALUE ]]
+
+   ; Spawn a client to open a connection to the server.
+   ; This sends "one  two; three\n[a  b]  {1 2}\n\0"
+   MAKE "shellcommand (SENTENCE [perl.exe networkclient.pl special localhost] :localport)
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; Wait a second for data.
+   WAIT 60
+
+   ; Shutdown the server.
+   NETACCEPTOFF
+
+   NETSHUTDOWN
+
+   ; Confirm that the content was parsed into a list.
+   SIMPLEREPORTTEST [COUNT :server.data] 1
+   FAILIFNOTTRUE    [LIST? FIRST :server.data] 
+   SIMPLEREPORTTEST [COUNT FIRST :server.data] 5
+   SIMPLEREPORTTEST [ITEM 1 FIRST :server.data] "one
+   SIMPLEREPORTTEST [ITEM 2 FIRST :server.data] "|two;|
+   SIMPLEREPORTTEST [ITEM 3 FIRST :server.data] "three
+   SIMPLEREPORTTEST [ITEM 4 FIRST :server.data] [a b]
+   FAILIFNOTTRUE    [ARRAY? ITEM 5 FIRST :server.data]
+   SIMPLEREPORTTEST [COUNT  ITEM 5 FIRST :server.data] 2
+   SIMPLEREPORTTEST [ITEM 1 ITEM 5 FIRST :server.data] 1
+   SIMPLEREPORTTEST [ITEM 2 ITEM 5 FIRST :server.data] 2
+
+END
+
+TO NETWORKTEST.CLIENT.SMOKETEST
+
+   LOCAL [remoteport client.data shellcommand]
+
+   MAKE "remoteport  5556
+   MAKE "client.data []
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "simple :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; connect the client to the server
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE    [ NETCONNECTON "localhost :remoteport [] [QUEUE "client.data NETCONNECTRECEIVEVALUE] ]
+
+   ; wait two seconds for the network connection
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   SIMPLEREPORTTEST [:client.data] [[hello]]
+END
+
+TO NETWORKTEST.CLIENT.ECHO
+
+   LOCAL [remoteport client.data onsendreadycounter shellcommand]
+
+   MAKE "remoteport  5557
+   MAKE "client.data []
+   MAKE "onsendreadycounter 0
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "echo :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+   ; connect the client to the server
+   TRACEINSTRUCTION  [ NETSTARTUP ]
+
+   FAILIFNOTTRUE [ 
+      NETCONNECTON 
+         "localhost
+         :remoteport
+         [ MAKE   "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "client.data         NETCONNECTRECEIVEVALUE  ]
+   ]
+
+   ; wait two seconds for the network connection
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   ; send the data that we expect to see echo'd back to us
+   FAILIFNOTTRUE  [ NETCONNECTSENDVALUE "yodle ]
+
+   ; we shouldn't be able to send right away (the client should be busy)
+   FAILIFNOTFALSE [ NETCONNECTSENDVALUE "XXXXX ]
+
+   ; wait two seconds for the server to echo the data
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   SIMPLEREPORTTEST [:onsendreadycounter ] 3
+   SIMPLEREPORTTEST [:client.data]         [[yodle]]
+END
+
+TO NETWORKTEST.CLIENT.ECHO.ANSI
+
+   LOCAL [remoteport client.data onsendreadycounter shellcommand windows1252]
+
+   MAKE "remoteport  5558
+   MAKE "client.data []
+   MAKE "onsendreadycounter 0
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "echo :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+   ; connect the client to the server
+   TRACEINSTRUCTION  [ NETSTARTUP ]
+
+   FAILIFNOTTRUE [ 
+      NETCONNECTON 
+         "localhost
+         :remoteport
+         [ MAKE   "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "client.data         NETCONNECTRECEIVEVALUE  ]
+   ]
+
+   ; wait two seconds for the network connection
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   ; Send the data that we expect to see echo'd back to us.
+   ; How the data is modified upon sending and upon receiving depends
+   ; on the system code page.
+   ; Note that because the data is "node printed" before transmission,
+   ; some logo metacharacters in the ASCII range cannot be transmitted.
+   MAKE "windows1252 APPLY "WORD MAP "CHAR [
+              1    2    3    4    5    6   7    8            11  12  13  14  15
+       16    17   18   19   20   21   22   23  24   25  26   27  28  20  30  31
+             33   34   35   36   37   38   39           42   43  44  45  46  47
+       48    49   50   51   52   53   54   55  56   57  58   59  60  61  62  63
+       64    65   66   67   68   69   70   71  72   73  74   75  76  77  78  79
+       80    81   82   83   84   85   86   87  88   89  90               94  95
+       96    97   98   99  100  101  102  103 104  105 106  107 108 109 110 111
+      112   113  114  115  116  117  118  119 120  121 122              126 127
+
+      8364  129 8218  402 8222 8230 8224 8225 710 8240 352 8249 338 141 381 143
+      144  8216 8217 8220 8221 8226 8211 8212 732 8482 353 8250 339 157 382 376
+      160   161  162  163  164  165  166  167 168  169 170  171 172 173 174 175
+      176   177  178  179  180  181  182  183 184  185 186  187 188 189 190 191
+      192   193  194  195  196  197  198  199 200  201 202  203 204 205 206 207
+      208   209  210  211  212  213  214  215 216  217 218  219 220 221 222 223
+      224   225  226  227  228  229  230  231 232  233 234  235 236 237 238 239
+      240   241  242  243  244  245  246  247 248  249 250  251 252 253 254 255
+   ]
+   FAILIFNOTTRUE  [ NETCONNECTSENDVALUE :windows1252 ]
+
+   ; wait two seconds for the server to echo the data
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   SIMPLEREPORTTEST [:onsendreadycounter ] 3
+   SIMPLEREPORTTEST [:client.data]         (LIST (LIST :windows1252))
+END
+
+TO NETWORKTEST.CLIENT.ORDTESTHELPER :remoteport :datatosend :expectedresponse
+   ; Starts server that returns the ordinal of each byte received and
+   ; sends it the requested data.  This can be used to test the
+   ; wire format of data that is sent from FMSLogo via NETCONNECTSENDVALUE.
+
+   LOCAL [client.data onsendreadycounter shellcommand]
+
+   MAKE "client.data []
+   MAKE "onsendreadycounter 0
+
+   ; Spawn a server that will return the ordinal of each byte received.
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "ord :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; Wait a second for the server to come online
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+   ; Connect the client to the server.
+   TRACEINSTRUCTION  [ NETSTARTUP ]
+
+   FAILIFNOTTRUE [
+      NETCONNECTON
+         "localhost
+         :remoteport
+         [ MAKE   "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "client.data         NETCONNECTRECEIVEVALUE  ]
+   ]
+
+   ; Wait a second for the network connection.
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+   ; Send the data.
+   FAILIFNOTTRUE [NETCONNECTSENDVALUE :datatosend]
+
+   ; Wait a second for the server to encode the data which it received.
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   SIMPLEREPORTTEST [:onsendreadycounter ] 3
+   SIMPLEREPORTTEST [:client.data]         (LIST :expectedresponse)
+END
+
+TO NETWORKTEST.CLIENT.SENDSPECIAL
+
+   NETWORKTEST.CLIENT.ORDTESTHELPER ~
+      5558 ~
+      (WORD "|[ a  b ]| CHAR 10 "|{ c } \\\\X|) ~
+      (LIST
+         ASCII "|[|
+         ASCII "| |
+         ASCII "|a|
+         ASCII "| |
+         ASCII "| |
+         ASCII "|b|
+         ASCII "| |
+         ASCII "|]|
+         10 ; newline
+         ASCII "|{|
+         ASCII "| |
+         ASCII "|c|
+         ASCII "| |
+         ASCII "|}|
+         ASCII "| |
+         ASCII "|\\|
+         ASCII "|\\|
+         ASCII "|X|
+         0 ; NUL framing character
+      )
+END
+
+TO NETWORKTEST.CLIENT.SENDARRAY
+   NETWORKTEST.CLIENT.ORDTESTHELPER ~
+      5559 ~
+      {a b} ~
+      (LIST ASCII "\{ ASCII "a ASCII "| | ASCII "b ASCII "\} 0)
+END
+
+TO NETWORKTEST.CLIENT.SENDLIST
+   NETWORKTEST.CLIENT.ORDTESTHELPER ~
+      5560 ~
+      [a b] ~
+      (LIST ASCII "a ASCII "| | ASCII "b 0)
+END
+
+TO NETWORKTEST.CLIENT.RECEIVELARGEPACKET
+
+   LOCAL [remoteport client.data onsendreadycounter shellcommand expecteddata]
+
+   MAKE "remoteport  5556
+   MAKE "client.data []
+   MAKE "onsendreadycounter 0
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "largepacket :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+   ; connect the client to the server
+   TRACEINSTRUCTION  [ NETSTARTUP ]
+
+   FAILIFNOTTRUE [
+      NETCONNECTON
+         "localhost
+         :remoteport
+         [ MAKE "onsendreadycounter :onsendreadycounter + 1 ]
+         [ QUEUE "client.data ITEM 1 NETCONNECTRECEIVEVALUE ]
+   ]
+
+   ; wait two seconds for the network connection
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   MAKE "expecteddata REPEATWORD "abcdefghijklmnopqrstuvwxyz 1000
+
+   SIMPLEREPORTTEST [:onsendreadycounter ] 3
+   SIMPLEREPORTTEST [:client.data] (LIST :expecteddata)
+END
+
+
+TO NETWORKTEST.CLIENT.RECEIVEUNFRAMEDPACKET
+
+   LOCAL [remoteport client.data shellcommand]
+
+   MAKE "remoteport  5555
+   MAKE "client.data []
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "nonul :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; connect the client to the server
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [ 
+      NETCONNECTON 
+         "localhost
+         :remoteport 
+         [] 
+         [QUEUE "client.data NETCONNECTRECEIVEVALUE]
+   ]
+
+   ; wait two seconds for the network connection
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   SIMPLEREPORTTEST [:client.data] [[Hello]]
+END
+
+
+TO NETWORKTEST.CLIENT.RECEIVEANSI
+
+   LOCAL [remoteport client.data shellcommand windows1252]
+
+   MAKE "remoteport  5555
+   MAKE "client.data []
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "ansi :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; connect the client to the server
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [ 
+      NETCONNECTON
+         "localhost
+         :remoteport
+         []
+         [QUEUE "client.data NETCONNECTRECEIVEVALUE]
+   ]
+
+   ; wait two seconds for the network connection
+   TRACEINSTRUCTION  [ WAIT 60*2 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   ; A sequence of bytes from 0x80 - 0xFF.
+   ; How FMSLogo interpretes these depends on the system code page.
+   MAKE "windows1252 APPLY "WORD MAP "CHAR [
+      8364  129 8218  402 8222 8230 8224 8225 710 8240 352 8249 338 141 381 143
+      144  8216 8217 8220 8221 8226 8211 8212 732 8482 353 8250 339 157 382 376
+      160   161  162  163  164  165  166  167 168  169 170  171 172 173 174 175
+      176   177  178  179  180  181  182  183 184  185 186  187 188 189 190 191
+      192   193  194  195  196  197  198  199 200  201 202  203 204 205 206 207
+      208   209  210  211  212  213  214  215 216  217 218  219 220 221 222 223
+      224   225  226  227  228  229  230  231 232  233 234  235 236 237 238 239
+      240   241  242  243  244  245  246  247 248  249 250  251 252 253 254 255
+   ]
+   SIMPLEREPORTTEST [:client.data] (LIST (LIST :windows1252))
+END
+
+TO NETWORKTEST.CLIENT.REMOTERESETAFTERCONNECT
+   ; Test when a remote server closes the connection with the RST flag.
+
+   LOCAL [remoteport client.data shellcommand onsendreadycounter]
+
+   MAKE "remoteport         5556
+   MAKE "client.data        []
+   MAKE "onsendreadycounter 0
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "fastreset :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; Connect the client to the server.
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [ 
+      NETCONNECTON
+         "localhost
+         :remoteport
+         [ MAKE "onsendreadycounter :onsendreadycounter + 1 ]
+         [QUEUE "client.data NETCONNECTRECEIVEVALUE]
+   ]
+
+   ; Wait a second for the network connection to be established
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   ; Confirm that no data was returned.
+   SIMPLEREPORTTEST [:client.data] []
+
+   ; Confirm that the sendready callback was called three times.
+   SIMPLEREPORTTEST [:onsendreadycounter] 3
+END
+
+TO NETWORKTEST.CLIENT.REMOTERESETAFTERSEND
+   ; Test when a remote server closes the connection with the RST flag
+   ; after it receives some data.
+
+   LOCAL [remoteport client.data shellcommand onsendreadycounter]
+
+   MAKE "remoteport         5557
+   MAKE "client.data        []
+   MAKE "onsendreadycounter 0
+
+   ; spawn a server
+   MAKE "shellcommand NETWORKTEST.SERVERCOMMAND "slowreset :remoteport
+   FAILIFNOTTRUE (LIST "SHELL :shellcommand)
+
+   ; wait a second for the server to come online
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; Connect the client to the server.
+   TRACEINSTRUCTION [ NETSTARTUP ]
+   FAILIFNOTTRUE [
+      NETCONNECTON
+         "localhost
+         :remoteport
+         [ MAKE "onsendreadycounter :onsendreadycounter + 1
+           IF :onsendreadycounter = 3 [ IGNORE NETCONNECTSENDVALUE "data ]
+         ]
+         [QUEUE "client.data NETCONNECTRECEIVEVALUE]
+   ]
+
+   ; Wait a second for the network connection to be established
+   TRACEINSTRUCTION  [ WAIT 60 ]
+
+
+   TRACEINSTRUCTION  [ NETCONNECTOFF ]
+   TRACEINSTRUCTION  [ NETSHUTDOWN   ]
+
+   ; Confirm that no data was returned.
+   SIMPLEREPORTTEST [:client.data] []
+
+   ; Confirm that the sendready callback was called three times.
+   SIMPLEREPORTTEST [:onsendreadycounter] 3
+END
+
+
+TO NETWORKTEST.SERVER.SHUTDOWNRACE
+
+   ; start the network system
+   TRACEINSTRUCTION [ NETSTARTUP ]
+
+   ; Start a server.  This schedules an asynchronous callback.
+   FAILIFNOTTRUE [ NETACCEPTON 12345 [] [] ]
+
+   ; Immediately shutdown (before the server's sendready gets called)
+   ; This forces a race condition where the WSAAsyncGetHostByName message
+   ; comes in after the network subsystem has been shut down.
+   ; This is a regression test for Bug #181, which is a crash.
+   TRACEINSTRUCTION [ NETSHUTDOWN ]
+
+END
+
+TO NETWORKTEST.CLIENT.SHUTDOWNRACE
+
+   ; start the network system
+   TRACEINSTRUCTION  [ NETSTARTUP ]
+
+   ; make an outbound connection.  Because this is asynchronous, 
+   ; we don't even need a server, we are going to shutdown before
+   ; the call to connect() is made.
+   FAILIFNOTTRUE [ NETCONNECTON "localhost 4444 [] [] ]
+
+   ; Immediately shutdown (before the client's sendready gets called).
+   ; This forces a race condition where the WSAAsyncGetHostByName message
+   ; comes in after the network subsystem has been shut down.
+   ; This is a regression test for bug #181, which is a crash.
+   TRACEINSTRUCTION [ NETSHUTDOWN ]
+END
+
+TO NETWORKTEST.BADINPUT
+
+   ; Start with the network off.
+   ; If the network isn't started, this is a no-op.
+   TRACEINSTRUCTION [ NETSHUTDOWN ]
+
+   ; Try to connect/accept/send/receive when the network isn't started.
+   NETWORKTEST.RUNNETWORKNOTSTARTEDTEST [ NETCONNECTON "localhost 54321 [] [] ]
+   TRACEINSTRUCTION [ NETCONNECTOFF ]             ; no-op if not running
+   FAILIFNOTFALSE   [ NETCONNECTSENDVALUE "data ] ; outputs false for error
+   TRACEINSTRUCTION [ NETCONNECTRECEIVEVALUE ]    ; outputs nothing for error
+   NETWORKTEST.RUNNETWORKNOTSTARTEDTEST [ NETACCEPTON 54321 [] [] ]
+   TRACEINSTRUCTION [ NETACCEPTOFF ]             ; no-op if not running
+   FAILIFNOTFALSE   [ NETACCEPTSENDVALUE "data ] ; outputs false for error
+   TRACEINSTRUCTION [ NETACCEPTRECEIVEVALUE ]    ; outputs nothing for error
+
+   ; Start the network with synchronous DNS.
+   ; This makes some errors synchronous.
+   TRACEINSTRUCTION [ (NETSTARTUP 1) ]
+
+   ; Start the network when it's already started.
+   NETWORKTEST.RUNNETWORKALREADYSTARTEDTEST [ NETSTARTUP ]
+
+   ; The send/receive procedures still do nothing.
+   FAILIFNOTFALSE   [ NETCONNECTSENDVALUE "data ] ; outputs false for error
+   TRACEINSTRUCTION [ NETCONNECTRECEIVEVALUE ]    ; output nothing for error
+   FAILIFNOTFALSE   [ NETACCEPTSENDVALUE "data ]  ; outputs false for error
+   TRACEINSTRUCTION [ NETACCEPTRECEIVEVALUE ]     ; output nothing for error
+
+
+   ; Test connecting when the port is not a number.
+   RUNDOESNTLIKEINPUTTEST [ NETCONNECTON "example.org "notanumber [] [] ]
+
+   ; Test when the host name is unknown.
+   ; This is a catch-all for the code path which translates names.
+   (RUNEXPECTERRORTEST
+      [ NETCONNECTON "does.not.exist.example.org 80 [] [] ]
+      1700
+      "|Network Error: No data record available|)
+   (RUNEXPECTERRORTEST
+      [ NETCONNECTON "doesnotexist 80 [] [] ]
+      1700
+      "|Network Error: Authoritative Answer: Host not found|)
+
+   ; Try to connect to a host/port that isn't listening.
+   ; The connection instruction reports a success, but a "connection refused"
+   ; error is reported elsewhere.
+   FAILIFNOTTRUE [ NETCONNECTON "localhost 54321 [] [] ]
+
+   ; Try to create another connection while the first connection is running.
+   NETWORKTEST.RUNNETCONNECTALREADYONTEST [ NETCONNECTON "localhost 54321 [] [] ]
+
+   ; Turn off the connection.
+   TRACEINSTRUCTION [ NETCONNECTOFF ]
+
+   ; Other errors
+   FAILIFNOTTRUE [ NETCONNECTON "0.0.0.0 54321 [] [] ] ; printed to console
+   TRACEINSTRUCTION [ NETCONNECTOFF ]
+
+   ; Listen on a port number that is given as a list.
+   RUNDOESNTLIKEINPUTTEST [ NETACCEPTON [8080] [] [] ]
+
+   ; Listen on an impossible port number.
+   ; This succeeds (the overflow error is ignored)
+   FAILIFNOTTRUE    [ NETACCEPTON 100000 [] [] ]
+
+   ; Try to create another server while the first server is running.
+   NETWORKTEST.RUNNETACCEPTALREADYONTEST [ NETACCEPTON "localhost 54322 [] [] ]
+
+   ; Turn off the server.
+   TRACEINSTRUCTION [ NETACCEPTOFF ]
+
+
+   ; Spawn a server to listen on a port
+   FAILIFNOTTRUE (LIST "SHELL NETWORKTEST.SERVERCOMMAND "simple 54321)
+   TRACEINSTRUCTION [ WAIT 60 ] ; wait a second for the server to come online
+
+   ; Try to listen on the same port in FMSLogo.
+   ; This will result in an bind() error.
+   (RUNEXPECTERRORTEST
+      [ NETACCEPTON 54321 [] [] ]
+      1700
+      "|Network Error: Address already in use|)
+
+   ; Turn off the external server (by connecting to it)
+   FAILIFNOTTRUE [ NETCONNECTON "localhost 54321 [] [] ]
+
+
+
+   ; Restart the network with asynchronous DNS.
+   ; The main difference is that the instructions report success and
+   ; errors are reported asynchronously, where the programmer cannot
+   ; get them programmatically.
+   TRACEINSTRUCTION [ NETSHUTDOWN   ]
+   TRACEINSTRUCTION [ (NETSTARTUP 0) ]
+
+   ; Test connecting when the port is not a number.
+   RUNDOESNTLIKEINPUTTEST [ NETCONNECTON "example.org "notanumber [] [] ]
+
+   ; Test when the host name is unknown.
+   ; Because DNS is asynchronous, the instruction returns a success code
+   ; and the error is reported elsewhere.
+   FAILIFNOTTRUE [ NETCONNECTON "does.not.exist.example.org 80 [] [] ]
+
+   ; Try to create another connection while the first connection is running.
+   NETWORKTEST.RUNNETCONNECTALREADYONTEST [ NETCONNECTON "localhost 54321 [] [] ]
+
+   ; Turn off the connection.
+   TRACEINSTRUCTION [ NETCONNECTOFF ]
+
+
+   ; Cleanup
+   TRACEINSTRUCTION [ NETSHUTDOWN ]
+
+END
+
+TO NETWORKTEST
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  NETWORKTEST.SMOKETEST
+  NETWORKTEST.NETSHUTDOWNCRASH
+
+  NETWORKTEST.SERVER.RECEIVEUNFRAMEDPACKET
+  NETWORKTEST.SERVER.LISTENAGAIN
+  NETWORKTEST.SERVER.TWOCONNECTIONS.SERIAL
+  NETWORKTEST.SERVER.TWOCONNECTIONS.CLIENTRESET
+  NETWORKTEST.SERVER.TWOCONNECTIONS.CONCURRENT
+  NETWORKTEST.SERVER.RECEIVESPECIAL
+  NETWORKTEST.SERVER.SHUTDOWNRACE
+
+  NETWORKTEST.CLIENT.SMOKETEST
+  NETWORKTEST.CLIENT.ECHO
+  NETWORKTEST.CLIENT.ECHO.ANSI
+  NETWORKTEST.CLIENT.SENDSPECIAL
+  NETWORKTEST.CLIENT.SENDARRAY
+  NETWORKTEST.CLIENT.SENDLIST
+  NETWORKTEST.CLIENT.RECEIVEUNFRAMEDPACKET
+  NETWORKTEST.CLIENT.RECEIVELARGEPACKET
+  NETWORKTEST.CLIENT.RECEIVEANSI
+  NETWORKTEST.CLIENT.REMOTERESETAFTERCONNECT
+  NETWORKTEST.CLIENT.REMOTERESETAFTERSEND
+  NETWORKTEST.CLIENT.SHUTDOWNRACE
+
+  NETWORKTEST.BADINPUT
+
+END

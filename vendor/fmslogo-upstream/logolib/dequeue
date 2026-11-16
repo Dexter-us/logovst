@@ -1,0 +1,21 @@
+.macro dequeue :the.queue.name
+
+  if member? :the.queue.name [the.queue.name the.item.value] [
+    ; If :the.queue.name = "the.queue.name, this outputs something like:
+    ;  [invoke [make "the.queue.name butfirst thing "the.queue.name ?] first thing "the.queue.name ]
+    ; The "invoke ... ?" part stores value of the dequeued element in ?
+    ; while it gets dequeued, then it is output as ?.
+    output (list
+      "invoke (list "make quoted :the.queue.name "butfirst "thing quoted :the.queue.name "?)
+      "first "thing quoted :the.queue.name
+    )
+  ]
+
+  ; common case: a faster way
+  local "the.item.value
+  make "the.item.value first thing :the.queue.name
+  make :the.queue.name butfirst thing :the.queue.name
+  output (list "first (list :the.item.value))
+end
+
+bury "dequeue

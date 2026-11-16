@@ -1,0 +1,244 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO GETSCROLLX
+  OUTPUT ITEM 16 MACHINE
+END
+
+TO GETSCROLLY
+  OUTPUT ITEM 17 MACHINE
+END
+
+TO SETSCREENWINDOWSIZE :width :height
+
+  UIAUTOMATION.INITIALIZE
+
+  CATCH "ERROR [
+    ; Get Handle to Main Window
+    LOCALMAKE "hwnd UIAUTOMATION.FINDWINDOW "FMSLogo 0
+
+    ; Resize Main Window
+    IGNORE UIAUTOMATION.MOVEWINDOW :hwnd 100 100 :width :height "true
+  ]
+
+  IGNORE FAILIFERROR "SCROLLTEST.SMOKETEST
+
+  ; cleanup
+  UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO SCROLLTEST.HELPER
+  LOCAL [center_x center_y]
+
+  ; Center the scroll position
+  SCROLLX 0
+  SCROLLY 0
+  MAKE "center_x GETSCROLLX
+  MAKE "center_y GETSCROLLY
+
+  ; Scroll as far to the left and up as possible
+  TRACEINSTRUCTION [ SCROLLX -100000 ]
+  TRACEINSTRUCTION [ SCROLLY -100000 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 0
+  SIMPLEREPORTTEST [ GETSCROLLY ] 0
+
+  ; Scroll 1 pixel to the right
+  TRACEINSTRUCTION [ SCROLLX 1 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 1
+  SIMPLEREPORTTEST [ GETSCROLLY ] 0 ; not modified
+
+  ; Scroll 100 pixels to the right
+  TRACEINSTRUCTION [ SCROLLX 100 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 101
+  SIMPLEREPORTTEST [ GETSCROLLY ] 0 ; not modified
+
+  ; Scroll 100 pixels to the left
+  TRACEINSTRUCTION [ SCROLLX -100 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 1
+  SIMPLEREPORTTEST [ GETSCROLLY ] 0 ; not modified
+
+  ; Scroll 1.1 pixels to the left 10 times.
+  ; This should round down to 1 (not be kept as 1.1)
+  TRACEINSTRUCTION [ REPEAT 10 [ SCROLLX 1.1 ] ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 11
+  SIMPLEREPORTTEST [ GETSCROLLY ] 0 ; not modified
+
+  ; Scroll 1.5 pixels to the left.
+  ; This should round up to 2.
+  TRACEINSTRUCTION [ SCROLLX 1.5 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 13
+  SIMPLEREPORTTEST [ GETSCROLLY ] 0 ; not modified
+
+  ; Scroll 0.5 pixels to the right.
+  ; This should round up to -1.
+  TRACEINSTRUCTION [ SCROLLX -0.5 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 12
+  SIMPLEREPORTTEST [ GETSCROLLY ] 0 ; not modified
+
+
+  ; Scroll 101 pixels down
+  TRACEINSTRUCTION [ SCROLLY 101 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 12   ; not modified
+  SIMPLEREPORTTEST [ GETSCROLLY ] 101
+
+  ; Scroll 1 pixel up
+  TRACEINSTRUCTION [ SCROLLY -1 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 12   ; not modified
+  SIMPLEREPORTTEST [ GETSCROLLY ] 100
+
+  ; Scroll 0.5 pixels up.  This should round up to 1.
+  TRACEINSTRUCTION [ SCROLLY -0.5 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 12   ; not modified
+  SIMPLEREPORTTEST [ GETSCROLLY ] 99
+
+  ; Scroll 1.5 pixels down.  This should round up to 2.
+  TRACEINSTRUCTION [ SCROLLY 1.5 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] 12   ; not modified
+  SIMPLEREPORTTEST [ GETSCROLLY ] 101
+
+  ; Reset the scroll position
+  TRACEINSTRUCTION [ SCROLLX 0 ]
+  TRACEINSTRUCTION [ SCROLLY 0 ]
+  SIMPLEREPORTTEST [ GETSCROLLX ] :center_x
+  SIMPLEREPORTTEST [ GETSCROLLY ] :center_y
+
+END
+
+
+TO SCROLLTEST.SMOKETEST
+  IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+  LOCAL [original_screen_window_width original_screen_window_height max_scroll_x max_scroll_y]
+
+  ; Test as the normal zoom level
+  TRACEINSTRUCTION [ ZOOM 1 ]
+
+  ; Make sure scrollbars are visible
+  FULLSCREEN
+  MAKE "original_screen_window_width  ITEM 12 MACHINE
+  MAKE "original_screen_window_height ITEM 13 MACHINE
+  SETSCREENWINDOWSIZE 400 400
+
+  ; Run some simple tests
+  SCROLLTEST.HELPER
+
+  ; Restore the window size
+  SETSCREENWINDOWSIZE :original_screen_window_width :original_screen_window_height
+  SPLITSCREEN
+
+  ; Determine the maximum scroll position at this size
+  TRACEINSTRUCTION [ SCROLLX 100000 ]
+  TRACEINSTRUCTION [ SCROLLY 100000 ]
+  MAKE "max_scroll_x GETSCROLLX
+  MAKE "max_scroll_y GETSCROLLY
+ 
+  ; Zoom in far enough that the scrollbars appear.
+  TRACEINSTRUCTION [ ZOOM 8 ]
+
+  ; The maximum size scrollbar positions should have increased.
+  FAILIFNOTTRUE [GREATERP GETSCROLLX :max_scroll_x]
+  FAILIFNOTTRUE [GREATERP GETSCROLLX :max_scroll_y]
+
+  ; Run the same tests at this zoom level (without resizing the window)
+  SCROLLTEST.HELPER
+
+  ; Restore the default zoom level
+  TRACEINSTRUCTION [ ZOOM 1 ]
+END
+
+
+TO SCROLLTEST.SCROLLX.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [(SCROLLX)]
+   RUNTOOMANYINPUTSTEST   [(SCROLLX 0 "toomany)]
+
+   ; Determine the current scroll position so we can test if it changes.
+   LOCAL "scrollx
+   MAKE "scrollx GETSCROLLX
+
+   ; bad input
+   RUNDOESNTLIKEINPUTTEST [ SCROLLX "five  ]
+   RUNDOESNTLIKEINPUTTEST [ SCROLLX []     ]
+   RUNDOESNTLIKEINPUTTEST [ SCROLLX [1]    ]
+   RUNDOESNTLIKEINPUTTEST [ SCROLLX {0}    ]
+
+; The bad input tests shouldn't change the scroll position.
+   SIMPLEREPORTTEST [ GETSCROLLX ] :scrollx
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      SCROLLX []  ; empty list is not legal
+   ] (LIST
+      [ 1 ]    ; can't be a list
+      {10}     ; must be a number (not an array)
+      "10x     ; must be a number (not a string)
+      []       ; can't be the empty list (again)
+      [ 2 ]    ; can't be a list (again)
+      {10}     ; can't be an array (again)
+      "10x     ; must be a number (again)
+      5        ; legal
+   ) []
+
+   SIMPLEREPORTTEST [ GETSCROLLX ] :scrollx + 5
+
+   ; Test that SCROLLX accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD 1 ". 0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SCROLLX [] ]
+   SIMPLEREPORTTEST [ GETSCROLLX ] :scrollx + 6
+
+END
+
+TO SCROLLTEST.SCROLLY.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [(SCROLLY)]
+   RUNTOOMANYINPUTSTEST   [(SCROLLY 0 "toomany)]
+
+   ; Determine the current scroll position so we can test if it changes.
+   LOCAL "scrolly
+   MAKE "scrolly GETSCROLLY
+
+   ; bad input
+   RUNDOESNTLIKEINPUTTEST [ SCROLLY "five  ]
+   RUNDOESNTLIKEINPUTTEST [ SCROLLY [ ]    ]
+   RUNDOESNTLIKEINPUTTEST [ SCROLLY [1]    ]
+   RUNDOESNTLIKEINPUTTEST [ SCROLLY {0}    ]
+
+   ; The bad input tests shouldn't change the scroll position.
+   SIMPLEREPORTTEST [ GETSCROLLY ] :scrolly
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      SCROLLY []  ; empty list is not legal
+   ] (LIST
+      [ 1 ]    ; can't be a list
+      {10}     ; must be a number (not an array)
+      "10x     ; must be a number (not a string)
+      []       ; can't be the empty list (again)
+      [ 2 ]    ; can't be a list (again)
+      {10}     ; can't be an array (again)
+      "10x     ; must be a number (again)
+      3        ; legal
+   ) []
+
+   SIMPLEREPORTTEST [ GETSCROLLY ] :scrolly + 3
+
+   ; Test that SCROLLY accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD 10 ". 0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SCROLLY [] ]
+   SIMPLEREPORTTEST [ GETSCROLLY ] :scrolly + 13
+
+END
+
+
+TO SCROLLTEST
+
+  SCROLLTEST.SMOKETEST
+  SCROLLTEST.SCROLLX.BADINPUT
+  SCROLLTEST.SCROLLY.BADINPUT
+
+END

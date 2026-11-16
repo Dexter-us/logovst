@@ -1,0 +1,50 @@
+LOAD "testlib.lgo
+
+TO MACHINETEST.SMOKETEST
+   TRACEINSTRUCTION [ ZOOM 1 ] ; needed for upper bounds on scrollbar positions.
+
+   FAILIFNOTTRUE    [LISTP MACHINE]
+   SIMPLEREPORTTEST [COUNT MACHINE] 18
+
+   ; Sanity test each of the members of the list returned by MACHINE.
+   SIMPLEREPORTTEST [ITEM 1 MACHINE] 1             ; is windows
+   SIMPLEREPORTTEST [ITEM 2 MACHINE] 32            ; word size
+   FAILIFNOTTRUE    [LESSP ITEM 3 MACHINE 20000]   ; drawing surface width
+   FAILIFNOTTRUE    [LESSP ITEM 4 MACHINE 20000]   ; drawing surface height
+   SIMPLEREPORTTEST [ITEM 5 MACHINE] 0             ; is paletted
+   FAILIFNOTTRUE    [LESSP ITEM 6 MACHINE 20]      ; windows major version
+   FAILIFNOTTRUE    [LESSP ITEM 7 MACHINE 10]      ; windows minor version
+   FAILIFNOTTRUE    [LESSP ITEM 8 MACHINE 20000]   ; working area width
+   FAILIFNOTTRUE    [LESSP ITEM 9 MACHINE 20000]   ; working area height
+   FAILIFNOTTRUE    [GREATEREQUALP ITEM 10 MACHINE ITEM 8 MACHINE] ; desktop width (larger than working area)
+   FAILIFNOTTRUE    [GREATEREQUALP ITEM 11 MACHINE ITEM 9 MACHINE] ; desktop height (larger than working area)
+   FAILIFNOTTRUE    [LESSP ITEM 12 MACHINE 20000]                  ; main frame width (fits in working area)
+   FAILIFNOTTRUE    [LESSP ITEM 13 MACHINE 20000]                  ; main frame height (fits in working area)
+   FAILIFNOTTRUE    [LESSEQUALP ITEM 14 MACHINE ITEM 12 MACHINE ]  ; screen window width (fits in main frame)
+   FAILIFNOTTRUE    [LESSEQUALP ITEM 15 MACHINE ITEM 13 MACHINE ]  ; screen window height (fits in main frame)
+   FAILIFNOTTRUE    [LESSEQUALP ITEM 16 MACHINE ITEM 3 MACHINE ]   ; x scrollbar position (less than drawing surface)
+   FAILIFNOTTRUE    [LESSEQUALP ITEM 17 MACHINE ITEM 4 MACHINE ]   ; y scrollbar position (less than drawing surface)
+   SIMPLEREPORTTEST [ITEM 18 MACHINE ] 1                           ; zoom
+
+   ; Change the ZOOM scale.
+   TRACEINSTRUCTION [ ZOOM 2 ]
+   SIMPLEREPORTTEST [ITEM 18 MACHINE ] 2
+
+   TRACEINSTRUCTION [ ZOOM 0.5 ]
+   SIMPLEREPORTTEST [ITEM 18 MACHINE ] 0.5
+
+   ; Restore the ZOOM
+   TRACEINSTRUCTION [ ZOOM 1 ]
+
+END
+
+TO MACHINETEST.BADINPUT
+   RUNTOOMANYINPUTSTEST   [(MACHINE 0)]
+END
+
+TO MACHINETEST
+
+   MACHINETEST.SMOKETEST
+   MACHINETEST.BADINPUT
+
+END

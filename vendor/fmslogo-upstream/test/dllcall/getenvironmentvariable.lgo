@@ -1,0 +1,33 @@
+; Calls the win32 function GetEnvironmentVariableW.
+; Outputs the value of the environment variable named :name.
+; Outputs [] if the environment variable does not exist.
+TO GETENVIRONMENTVARIABLE :name
+  LOCAL [rval value size buffer codepoint]
+
+  DLLLOAD "kernel32.dll
+
+  MAKE "rval (DLLCALL
+    (SENTENCE [L GetEnvironmentVariableW L 32768 B 32768 U] :name)
+    "kernel32.dll)
+  IFELSE EQUAL? 0 ITEM 1 :rval [
+    MAKE "value [] ; variable probably doesn't exist
+  ][
+    ; Convert from WCHAR* to a Logo word.
+    MAKE "size   ITEM 1 :rval
+    MAKE "buffer ITEM 2 :rval
+
+    MAKE "value "||
+    REPEAT :size [
+      ; Determine the code point of the REPCOUNTth character.
+      MAKE "codepoint (SUM
+        ASCII ITEM (2*REPCOUNT-1) :buffer         ; low byte comes first
+        LSHIFT ASCII ITEM (2*REPCOUNT) :buffer 8) ; high byte comes second
+
+      ; Append the REPCOUNTth character to the value.
+      MAKE "value WORD :value CHAR :codepoint
+    ]
+  ]
+
+  (DLLFREE "kernel32.dll)
+  OUTPUT :value
+END

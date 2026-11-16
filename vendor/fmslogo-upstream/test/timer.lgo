@@ -1,0 +1,182 @@
+LOAD "testlib.lgo
+
+TO TIMERTEST.RUNNOTFOUNDTEST :instructions
+  (RUNEXPECTERRORTEST :instructions 1401 "|Timer not found|)
+END
+
+TO TIMERTEST.LARGECALLBACK
+   ; make sure that the timer facility doesn't crash when
+   ; given a very long callback as input.
+   LOCALMAKE "longcallback (LIST "Print QUOTED REPEATWORD "A 10000)
+
+   SETTIMER   31 500 :longcallback
+   WAIT 60
+   CLEARTIMER 31
+END
+
+TO TIMERTEST.SMOKETEST
+   SETSCREENCOLOR 1
+
+   SETTIMER 31 100 [SETSCREENCOLOR (SCREENCOLOR + 1)]
+   WAIT 60
+   CLEARTIMER 31
+
+   SETSCREENCOLOR 7
+END
+
+TO TIMERTEST.YIELDFLAG.HELPER :timerid :expectYield
+
+   REPORTTESTINFO (WORD "|Running TIMERTEST.YIELDFLAG.HELPER with timerid=| :timerid)
+
+   ; Initialize the variables to known values.
+   LOCAL [variable copiedVariable endTime]
+   MAKE "variable       "noyieldvalue
+   MAKE "copiedVariable "timer-event-has-not-run
+   MAKE "endTime        SUM TIMEMILLI 100
+
+   ; Schedule a timer event that will schedule another timer event
+   ; that has a measurable side-effect.  If the outer timer event
+   ; yields, then the inner timer event will run and change the
+   ; value of :variable.  Therefore, we will know if the outer timer
+   ; event yields by whether or not :variable has been changed.
+   SETTIMER :timerid 0 [
+      ; Stop the outer timer event from running again.
+      CLEARTIMER :timerId 
+
+      ; Schedule another a timer event to more-or-less immediately
+      ; using the same timer id.  This one modifies the value.
+      SETTIMER :timerid 0 [
+        CLEARTIMER :timerid        ; stop the inner timer event from running again
+        MAKE "variable "yieldvalue ; Change the value.
+      ]
+
+      ; Wait for other the inner timer event to run.
+      WHILE [LESS? TIMEMILLI :endTime] []
+
+      ; Save the current value of the variable.
+      MAKE "copiedVariable :variable
+   ]
+
+   ; Wait for the operating system to schedule the timer event.
+   WAIT 6
+
+   ; Confirm that the copied variable has the original value.
+   SIMPLEREPORTTEST [:copiedVariable] IFELSE :expectYield [ "yieldvalue ] [ "noyieldvalue ]
+
+   ; Clean up (just in case)
+   CATCH "ERROR [ CLEARTIMER :timerid ]
+   IGNORE ERROR
+END
+
+TO TIMERTEST.YIELDFLAG
+   ; Tests that the timer event IDs obey their documented yield flag
+
+   ; Timer events 1-16 should not yield by default.
+   TIMERTEST.YIELDFLAG.HELPER  1 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  2 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  3 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  4 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  5 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  6 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  7 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  8 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER  9 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER 10 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER 11 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER 12 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER 13 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER 14 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER 15 LOCALEFALSE
+   TIMERTEST.YIELDFLAG.HELPER 16 LOCALEFALSE
+
+   ; Timer events 17-31 should yield by default.
+   TIMERTEST.YIELDFLAG.HELPER 17 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 18 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 19 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 20 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 21 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 22 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 23 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 24 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 25 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 26 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 27 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 28 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 29 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 30 LOCALETRUE
+   TIMERTEST.YIELDFLAG.HELPER 31 LOCALETRUE
+END
+
+TO TIMERTEST.BADINPUT
+
+   ;
+   ; bad input for SETTIMER
+   ;
+   RUNDOESNTLIKEINPUTTEST [SETTIMER  0        100       [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 32        100       [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 1.5       100       [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER "badvalue 100       [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER [1]       100       [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER []        100       [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER {1}       100       [FD 1]]
+
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 1         -100      [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 1         100.5     [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 1         [100]     [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 1         []        [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 1         "badvalue [FD 1]]
+   RUNDOESNTLIKEINPUTTEST [SETTIMER 1         {100}     [FD 1]]
+
+   RUNNOTENOUGHINPUTSTEST [(SETTIMER 1 100)]
+   RUNTOOMANYINPUTSTEST   [(SETTIMER 1 100 [FD 1] "toomany)]
+
+   ;
+   ; bad input for CLEARTIMER
+   ; 
+   RUNDOESNTLIKEINPUTTEST    [CLEARTIMER 32] ; illegal value
+   TIMERTEST.RUNNOTFOUNDTEST [CLEARTIMER 31] ; non-existent
+
+   RUNNOTENOUGHINPUTSTEST [(CLEARTIMER)]
+   RUNTOOMANYINPUTSTEST   [(CLEARTIMER 1 "toomany)]
+
+END
+
+TO TIMERTEST.OVERWRITE
+   LOCAL [counter1 counter2]
+   TRACEINSTRUCTION [ MAKE "counter1 0 ]
+   TRACEINSTRUCTION [ MAKE "counter2 0 ]
+
+   ; Set a timer.
+   TRACEINSTRUCTION [ SETTIMER 31 100 [MAKE "counter1 :counter1 + 1] ]
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   ; Set a different callback for the same timer
+   ; without calling CLEARTIMER.
+   TRACEINSTRUCTION [ SETTIMER 31 10 [MAKE "counter2 :counter2 + 1] ]
+   TRACEINSTRUCTION [ WAIT 60 ]
+
+   TRACEINSTRUCTION [ CLEARTIMER 31 ]
+
+   ; Deduce what happened.
+   ; The first timer should have run about 10 times.
+   UNLIMITEDPRINT WORD "counter1= :counter1 
+   FAILIFNOTTRUE [LESSP 5         :counter1 ]
+   FAILIFNOTTRUE [LESSP :counter1 15        ]
+
+   ; The second timer should have run about 100 times.
+   ; That is, the second delay should have taken effect.
+   UNLIMITEDPRINT WORD "counter2= :counter2
+   FAILIFNOTTRUE [LESSP 20        :counter2 ]
+   FAILIFNOTTRUE [LESSP :counter1 150       ]
+
+END
+
+TO TIMERTEST
+
+   TIMERTEST.SMOKETEST
+   TIMERTEST.YIELDFLAG
+   TIMERTEST.BADINPUT
+   TIMERTEST.LARGECALLBACK
+   TIMERTEST.OVERWRITE
+
+END

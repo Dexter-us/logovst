@@ -1,0 +1,58 @@
+; LOAD the ASCII auto-complete test, too.
+LOAD "autocomplete.lgo
+
+TO AUTOCOMPLETE.TEST.UNICODE
+   ; This procedure contains some manual tests for auto-completion.
+   ; It cannot be run, but if you position the cursor in the locations
+   ; indicated by the "X" cross-hair and press Ctrl+Space, you should
+   ; see the expected popups.
+
+   ;               \/                    +-----------------------------------+
+   AUTOCOMPLETE.TEST   ; should complete |AUTOCOMPLETE.TEST.UNICODE          |
+   ;               /\                    |AUTOCOMPLETE.TEST.UNICODE.Ελληνικά |
+   ;                                     |AUTOCOMPLETE.TEST.UNICODE.Россия   |
+   ;                                     +-----------------------------------+
+
+   ;                          \/                    +-----------------------------------+
+   AUTOCOMPLETE.TEST.UNICODE.Ελ   ; should complete |AUTOCOMPLETE.TEST.UNICODE.Ελληνικά |
+   ;                          /\                    +-----------------------------------+
+
+   ; \/                    +---------+
+   :Ελ   ; should complete |Ελληνικά |
+   ; /\                    +---------+
+
+   ; \/                    +-------+
+   中国   ; should complete |中国    |
+   ; /\                    |中国笛子 |
+   ;                       +-------+
+
+END
+
+;
+; Define some procedures to assist with testing auto-completion
+; in AUTOCOMPLETE.TEST.UNICODE
+;
+TO AUTOCOMPLETE.TEST.UNICODE.Россия
+   ; Россия means "Russian"
+END
+
+TO AUTOCOMPLETE.TEST.UNICODE.Ελληνικά
+   ; Ελληνικά means "Greek"
+END
+
+TO 中国
+   ; 中国 means "Chinese"
+END
+
+TO 中国笛子
+   ; 中国笛子 means "Chinese flute"
+END
+
+;
+; Define some variables to assist with testing auto-completion
+; in AUTOCOMPLETE.TEST.UNICODE
+;
+MAKE "autocompletetest.Россия   "Russian
+MAKE "autocompletetest.Ελληνικά "Greek
+MAKE "Россия                    "Russian
+MAKE "Ελληνικά                  "Greek

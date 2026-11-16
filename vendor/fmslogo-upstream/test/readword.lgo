@@ -1,0 +1,145 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+; helper function for reading words from READWORD when the
+; word comes from the UI.
+TO READWORDTEST.READWORDFROMUI :wordtoread
+
+   UIAUTOMATION.INITIALIZE
+ 
+   local "theword
+
+   CATCH "ERROR [
+
+       ; enter the line and press press OK
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [Input Mode (Cancel to Halt)] "Edit :wordtoread
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Input Mode (Cancel to Halt)] "OK
+
+       make "theword READWORD
+   ]
+
+   IGNORE FAILIFERROR (list "UI "Automation "to "read :wordtoread)
+
+   UIAUTOMATION.UNINITIALIZE
+
+   OUTPUT :theword
+
+END
+
+TO READWORDTEST.UI
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   SIMPLEREPORTTEST [READWORDTEST.READWORDFROMUI "easytest]    "easytest
+   SIMPLEREPORTTEST [READWORDTEST.READWORDFROMUI "|Two Words|] "|Two Words|
+
+END
+
+TO READWORDTEST.UICANCEL
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+       ; enter the line and press press Cancel
+       UIAUTOMATION.POSTSTRINGTOWINDOW     [Input Mode (Cancel to Halt)] "Edit   "|UI will press Cancel|
+       UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Input Mode (Cancel to Halt)] "Cancel
+   ]
+
+   IGNORE FAILIFERROR "READWORDTEST.UICANCEL
+
+   RUNSTOPPINGTEST [IGNORE READWORD]
+
+   UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO READWORDTEST.HELPER :data :expecteddata
+
+   LOCALMAKE "filename "readwordtest.txt
+
+   WRITEBINARYDATA :filename :data
+
+   OPENREAD :filename
+   SETREAD  :filename
+   SIMPLEREPORTTEST [ READWORD ] :expecteddata
+   SIMPLEREPORTTEST [ READWORD ] []
+   CLOSE    :filename
+
+   ERASEFILE :filename
+END
+
+TO READWORDTEST.SMOKETEST
+
+  ; read a single word
+  READWORDTEST.HELPER "Hello\n             "Hello
+
+  ; read two words
+  READWORDTEST.HELPER "|Hello Hello\n|     "|Hello Hello|
+
+  ; a file with a blank line
+  READWORDTEST.HELPER "|\n|                "||
+
+  ; empty files reads as the empty list
+  READWORDTEST.HELPER "||                  []
+
+  ; tilde is a line concatenator, but is not removed
+  READWORDTEST.HELPER "|Hello~\nHello\n|   "|Hello~\nHello|
+
+  ; linear whitespace after a tilde is ignored
+  READWORDTEST.HELPER "|Hello~  \nHello\n| "|Hello~\nHello|
+
+  ; vertical bars are kept in the input stream
+  READWORDTEST.HELPER "\|ABC\|\n           "\|ABC\|
+
+  ; vertical bars allow the text to span newlines
+  READWORDTEST.HELPER "A\|B\nC\|\n         "A\|B\nC\|
+
+  ; comments are ignored
+  READWORDTEST.HELPER "AB\;CD\n            "AB\;CD
+
+  ; vertical bars in comments are treated normally
+  READWORDTEST.HELPER "A\;B\|C\nD\|\n      "A\;B\|C\nD\|
+
+  ; an end-of-file reached within a vertical bar preserves the bar.
+  READWORDTEST.HELPER "A\|B\nC\n           "A\|B\nC\n
+
+  ; backslashes are not preserved
+  READWORDTEST.HELPER "A\\B\\C\n           "ABC
+
+END
+
+TO READWORDTEST.BACKSLASH
+  ; Tests that backslashes are removed when before all ASCII characters.
+  REPEAT 128 [
+    IFELSE EQUALP REPCOUNT - 1 ASCII "n [
+       READWORDTEST.HELPER WORD "\\ CHAR (REPCOUNT - 1) CHAR 10 ; \n mean LF
+    ][
+       READWORDTEST.HELPER WORD "\\ CHAR (REPCOUNT - 1) CHAR (REPCOUNT - 1)
+    ]
+  ]
+END
+
+TO READWORDTEST.FILEWITHNOEOL
+   ; Test READWORD on files that has no newline at the end.
+   ; This is a regression test for bug #439.
+   READWORDTEST.HELPER "|This file has no newline character|           "|This file has no newline character|
+   READWORDTEST.HELPER "|This file ends in a continuation character~|  "|This file ends in a continuation character~|
+END
+
+TO READWORDTEST.BADINPUT
+
+   RUNTOOMANYINPUTSTEST [(READWORD "toomany)]
+   RUNTOOMANYINPUTSTEST [(RW       "toomany)]
+
+END
+
+TO READWORDTEST
+
+   READWORDTEST.SMOKETEST
+   READWORDTEST.BACKSLASH
+   READWORDTEST.FILEWITHNOEOL
+   READWORDTEST.UI
+   READWORDTEST.UICANCEL
+   READWORDTEST.BADINPUT
+
+END

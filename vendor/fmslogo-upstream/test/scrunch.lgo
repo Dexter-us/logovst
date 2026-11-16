@@ -1,0 +1,110 @@
+LOAD "testlib.lgo
+
+TO SCRUNCHTEST.SMOKETEST
+
+   LOCALMAKE "oldscrunch SCRUNCH
+
+   SETSCRUNCH 1 1
+   SIMPLEREPORTTEST [SCRUNCH] [1 1]
+
+   SETSCRUNCH 2 0.1
+   CIRCLE 100
+   SIMPLEREPORTTEST [SCRUNCH] [2 0.1]
+
+   ; try to flush out some divide by zero bugs
+   SETSCRUNCH 0 0
+   SIMPLEREPORTTEST [SCRUNCH] [0 0]
+   FORWARD 100
+   RIGHT   45
+   FORWARD 100
+   CIRCLE  100
+
+   ; try to flush out some divide by zero bugs
+   SETSCRUNCH 1e50 -1e50
+   SIMPLEREPORTTEST [SCRUNCH] [1e50 -1e50]
+   FORWARD 100
+   RIGHT   45
+   FORWARD 100
+   CIRCLE  100
+
+   ; undo side-effects
+   CLEARSCREEN
+   SETSCRUNCH (ITEM 1 :oldscrunch) (ITEM 2 :oldscrunch)
+
+END
+
+
+TO SCRUNCHTEST.BADINPUT
+   RUNTOOMANYINPUTSTEST [(SCRUNCH "toomany)]
+END
+
+TO SETSCRUNCHTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   TRACEINSTRUCTION [ SETSCRUNCH 2 3 ]
+
+   RUNNOTENOUGHINPUTSTEST [(SETSCRUNCH)       ]
+   RUNNOTENOUGHINPUTSTEST [(SETSCRUNCH [1 1]) ]
+   RUNNOTENOUGHINPUTSTEST [(SETSCRUNCH 1)     ]
+   RUNTOOMANYINPUTSTEST   [(SETSCRUNCH 1 1 1) ]
+
+   RUNDOESNTLIKEINPUTTEST [ SETSCRUNCH "a  1  ]
+   RUNDOESNTLIKEINPUTTEST [ SETSCRUNCH [1] 1  ]
+   RUNDOESNTLIKEINPUTTEST [ SETSCRUNCH {1} 1  ]
+   RUNDOESNTLIKEINPUTTEST [ SETSCRUNCH 1  "a  ]
+   RUNDOESNTLIKEINPUTTEST [ SETSCRUNCH 1  [1] ]
+   RUNDOESNTLIKEINPUTTEST [ SETSCRUNCH 1  {1} ]
+
+   ; None of the tests above should have changed the scrunch setting.
+   SIMPLEREPORTTEST [ SCRUNCH ] [ 2 3 ]
+
+   ; Restore the default scrunch setting.
+   TRACEINSTRUCTION [ SETSCRUNCH 1 1 ]
+
+END
+
+TO SETSCRUNCHTEST.BADINPUT.RECOVERABLE
+
+   ; Set the scrunch configuration to known value.
+   TRACEINSTRUCTION [ SETSCRUNCH 2 3 ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   RUNRECOVERABLEERRORTEST [
+      SETSCRUNCH [] []  ; empty list is not legal
+   ] (LIST
+      [ 1 ]    ; first input can't be a list
+      {10}     ; first input must be a number (not an array)
+      "10x     ; first input must be a number (not a string)
+      []       ; first input can't be the empty list (again)
+      [ 2 ]    ; first input can't be a list (again)
+      {10}     ; first input can't be an array (again)
+      "10x     ; first input must be a number (again)
+      4        ; legal first input
+      [ 1 ]    ; second input can't be a list
+      {10}     ; second input must be a number (not an array)
+      "10x     ; second input must be a number (not a string)
+      []       ; second input can't be the empty list (again)
+      [ 2 ]    ; second input can't be a list (again)
+      {10}     ; second input can't be an array (again)
+      "10x     ; second input must be a number (again)
+      2        ; legal second input
+   ) []
+
+   ; Confirm that the legal scrunch inputs were accepted.
+   SIMPLEREPORTTEST [ SCRUNCH ] [ 4 2 ]
+
+
+   ; Test that SETSCRUNCH accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "1 ". "0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETSCRUNCH [2] [2] ]
+   SIMPLEREPORTTEST [ SCRUNCH ] [ 1 1 ]
+
+END
+
+TO SCRUNCHTEST
+    SCRUNCHTEST.SMOKETEST
+    SCRUNCHTEST.BADINPUT
+    SETSCRUNCHTEST.BADINPUT
+    SETSCRUNCHTEST.BADINPUT.RECOVERABLE
+END

@@ -1,0 +1,87 @@
+; EDITFILE is a simple procedure for editing (and re-editing)
+; an external file using FMSLogo's editor.  While external files
+; can be edited in an external editor, it's preferable to use FMSLogo.
+;
+; This is not to say that editing external files is pleasant in
+; FMSLogo, only that it should be.  By using this procedure, it's
+; more likely that I will understand the pain of trying to edit
+; files in FMSLogo and improve the overall experience.
+;
+TO EDITFILE
+   ; See if the file to edit already been designated.
+   IF NOT NAME? "editfile.filetoedit [
+      ; The file to edit has not been designated.
+      ; As the user to select one.
+      ;
+      ; Note that we use a "save" variant of the file picker
+      ; to be able to select a file that doesn't exist.
+      MAKE "editfile.filetoedit DIALOGFILESAVE "*.lgo
+      IF EQUAL? [] :editfile.filetoedit [
+         ; The user cancelled the selection.
+         ERASE NAMELIST "editfile.filetoedit
+         STOP
+      ]
+
+      ; Bury the filename so that it doesn't pollute the workspace.
+      BURY NAMELIST "editfile.filetoedit
+   ]
+
+   ; If an editor is already open to this file, then
+   ; activate it and give it focus.
+   WINDOWSET :editfile.filetoedit 9
+   SETFOCUS  :editfile.filetoedit
+
+   IF NOTEQUAL? GETFOCUS :editfile.filetoedit [
+       ; No editor session for this file was found.
+       ; Open the file in the FMSLogo editor.
+
+       ; When the file is saved, LOAD it into the workspace.
+       ;
+       ; If we used [ LOAD :editfile.filetoedit ], the file might
+       ; fail to load if :editfile.filetoedit were erased
+       ; or modified while the editor was open.  Therefore, we
+       ; create an instruction list that has the value of
+       ; :editfile.filetoedit as a word literal, instead of the
+       ; relying on the variable's name.
+       ;
+       ; Unfortunately, file names may contain special characters
+       ; which must be backslashed to be preserved.  The MAP adds a
+       ; backslash to any character which needs it, as described in
+       ; the documentation of BACKSLAHEDP.  QUOTED creates the word
+       ; literal.
+       ;
+       WINDOWFILEEDIT :editfile.filetoedit (LIST
+          "LOAD
+          QUOTED MAP [
+             IFELSE MEMBER? ? "|	 \n()[]{}\|+-*/=<>":;\\~?| [
+                WORD "\\ ?
+             ][
+                ?
+             ]
+          ] :editfile.filetoedit)
+   ]
+
+END
+
+
+; EDITNEWFILE is like EDITFILE, except that it always prompts
+; for the file to edit.  EDITFILE will subsequently open the
+; newly selected file each time it's run without prompting.
+;
+; EDITDIFFERENTFILE would be a better name, since the file isn't
+; created, but that's harder to type.
+;
+TO EDITNEWFILE
+    ERASE NAMELIST "editfile.filetoedit
+    EDITFILE
+END
+
+
+; When using EDITFILE to open a file, EDALL has confusing behavior
+; because it doesn't save the changes back to the file and includes things
+; in the workspace which don't come from the file.  To avoid accidentally
+; editing the workspace, we redefine the Edall button to use EDITFILE.
+;
+TO EDALLBTN
+    EDITFILE
+END

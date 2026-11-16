@@ -1,0 +1,115 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO TIMEWAIT :TimeToWait
+    LOCAL [instruction executionTime minAcceptableTime maxAcceptableTime]
+
+    MAKE "instruction   (LIST "WAIT :TimeToWait)
+    MAKE "executionTime TIMECOMMAND :instruction
+
+    MAKE "minAcceptableTime :TimeToWait * 1000 / 60 ; should not take less time
+    MAKE "maxAcceptableTime :minAcceptableTime + 20 ; can take a little more time
+
+    CHECKEXECUTIONTIME :instruction :executionTime :minAcceptableTime :maxAcceptableTime
+END
+
+TO WAITTEST.SMOKETEST
+
+   TIMEWAIT 0
+   TIMEWAIT 1
+   TIMEWAIT 6
+   TIMEWAIT 10.0  ; float converted to an integer
+   TIMEWAIT "60.0 ; string converted to an integer
+   TIMEWAIT 100
+
+   TIMEWAIT 60.5
+
+END
+
+TO WAITTEST.ISHALTABLE
+   ; Tests that WAIT with a large duration can be halted.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   LOCAL [executionTime]
+
+   TEXTSCREEN
+   UIAUTOMATION.INITIALIZE
+
+   ; Schedule a timer that simulates pressing the Halt button after a second.
+   ; This should halt the WAIT instruction, not the test pass.
+   SETTIMER 1 1000 [
+     CLEARTIMER 1
+     (UIAUTOMATION.PUSHCOMMANDERBUTTON "Halt "False)
+   ]
+
+   ; Start a 60 second wait
+   MAKE "executionTime TIMECOMMAND [ RUNSTOPPINGTEST [ WAIT 3600 ] ]
+ 
+   ; cleanup
+   UIAUTOMATION.UNINITIALIZE
+   SPLITSCREEN
+
+   ; The test passes if WAIT 3600 takes less than 5 seconds.
+   IFELSE LESSP :executionTime 5000 [
+     REPORTTESTPASSED "|'WAIT 3600' halted.|
+   ][
+     REPORTTESTFAILED "|'WAIT 3600' was not halted.|
+   ]
+
+END
+
+
+TO WAITTEST.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [(WAIT)]
+   RUNTOOMANYINPUTSTEST   [(WAIT 10 10)]
+
+   RUNDOESNTLIKEINPUTTEST [WAIT -0.1]
+   RUNDOESNTLIKEINPUTTEST [WAIT -1]
+   RUNDOESNTLIKEINPUTTEST [WAIT "ABC]
+   RUNDOESNTLIKEINPUTTEST [WAIT [1]]
+   RUNDOESNTLIKEINPUTTEST [WAIT {1}]
+
+END
+
+TO WAITTEST.BADINPUT.RECOVERABLE
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      WAIT []   ; can't be the empty list
+   ][
+      10a        ; can't be a word
+      {10}       ; can't be an array
+      [10]       ; can't be a list
+      []         ; can't be the empty list (again)
+      -1         ; can't be negative
+      10a        ; can't be a word (again)
+      {10}       ; can't be an array (again)
+      [10]       ; can't be a list (again)
+      -1         ; can't be negative (again)
+      10         ;legal
+   ] ~
+   [] ; WAIT doesn't output anything
+
+
+   ; Test that WAIT accepts ownership of any node :erract provides.
+   ; Note that this can't call TRACEINSTRUCTIONOCATCH because that
+   ; uses RUNRESULT, which will want WAIT to output a value and get
+   ; it from :erract when WAIT doesn't provide one.  This is not part
+   ; of the test.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "1 ". "0) ] ]
+   UNLIMITEDPRINT "|CALL: WAIT []|
+   WAIT []
+
+END
+
+TO WAITTEST
+
+   WAITTEST.SMOKETEST
+   WAITTEST.BADINPUT
+   WAITTEST.BADINPUT.RECOVERABLE
+   WAITTEST.ISHALTABLE
+
+END

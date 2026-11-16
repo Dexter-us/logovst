@@ -1,0 +1,170 @@
+LOAD "testlib.lgo
+
+TO SETITEMTEST.SMOKETEST
+   LOCAL "array
+   TRACEINSTRUCTION [ MAKE "array {a b c} ]
+
+   ; Set the first item to a number. 
+   TRACEINSTRUCTION [ SETITEM 1 :array 1 ]
+   SIMPLEREPORTTEST [ ITEM 1 :array ] 1
+   SIMPLEREPORTTEST [ ITEM 2 :array ] "b
+   SIMPLEREPORTTEST [ ITEM 3 :array ] "c
+   SIMPLEREPORTTEST [ COUNT :array ] 3
+
+   ; Set the second item to a list (using a decimal)
+   TRACEINSTRUCTION [ SETITEM 2.0 :array [1 2 3] ]
+   SIMPLEREPORTTEST [ ITEM 1 :array ] 1
+   SIMPLEREPORTTEST [ ITEM 2 :array ] [1 2 3]
+   SIMPLEREPORTTEST [ ITEM 3 :array ] "c
+   SIMPLEREPORTTEST [ COUNT :array ] 3
+
+   ; Set the third item to an identical array.
+   ; This doesn't create a circular structure.
+   TRACEINSTRUCTION [ SETITEM 3 :array {a b c} ]
+   SIMPLEREPORTTEST [ ITEM 1 :array ] 1
+   SIMPLEREPORTTEST [ ITEM 2 :array ] [1 2 3]
+   FAILIFNOTTRUE    [ ARRAY? ITEM 3 :array ]
+   SIMPLEREPORTTEST [ ITEM 1 ITEM 3 :array ] "a
+   SIMPLEREPORTTEST [ ITEM 2 ITEM 3 :array ] "b
+   SIMPLEREPORTTEST [ ITEM 3 ITEM 3 :array ] "c
+   SIMPLEREPORTTEST [ COUNT  ITEM 3 :array ] 3
+   SIMPLEREPORTTEST [ COUNT :array ] 3
+
+   ; Reinitialize the array with a differnt offset
+   TRACEINSTRUCTION [ MAKE "array {x y}@-100 ]
+   
+   ; Set the first item to a word
+   TRACEINSTRUCTION [ SETITEM -100 :array "abc ]
+   SIMPLEREPORTTEST [ ITEM -100 :array ] "abc
+   SIMPLEREPORTTEST [ ITEM  -99 :array ] "y
+   SIMPLEREPORTTEST [ COUNT :array     ] 2
+
+   ; Set an item to its own value.
+   ; This test that the new value is referenced before the old one
+   ; is dereferenced.  However, even if it didn't, the reference
+   ; held by the argument list would keep the item from being freed.
+   TRACEINSTRUCTION [ SETITEM -99 :array LIST "new "allocation ]
+   TRACEINSTRUCTION [ SETITEM -99 :array ITEM -99 :array       ]
+   SIMPLEREPORTTEST [ ITEM  -99 :array ] [new allocation]
+END
+
+TO SETITEMTEST.BADINPUT
+   LOCAL [array word list list_of_array array_of_array]
+
+   RUNNOTENOUGHINPUTSTEST [ (SETITEM 1 {a}) ]
+   RUNTOOMANYINPUTSTEST   [ (SETITEM 1 {a} 1 "toomany) ]
+
+   ; bad index input
+   TRACEINSTRUCTION [ MAKE "array {a b c} ]
+   RUNNONRECOVERABLEDOESNTLIKEINPUTTEST ( LIST "SETITEM 0 :array 1 ) ; too low
+   RUNNONRECOVERABLEDOESNTLIKEINPUTTEST ( LIST "SETITEM 4 :array 2 ) ; too high
+   RUNDOESNTLIKEINPUTTEST ( LIST "SETITEM 1.5  :array 3 )            ; not an integer
+   RUNDOESNTLIKEINPUTTEST ( LIST "SETITEM []   :array 4 )
+   RUNDOESNTLIKEINPUTTEST ( LIST "SETITEM [1]  :array 5 )
+   RUNDOESNTLIKEINPUTTEST ( LIST "SETITEM {1}  :array 6 )
+   RUNDOESNTLIKEINPUTTEST ( LIST "SETITEM QUOTED "one :array 7 )
+
+   ; Confirm that none of the test above modified :array
+   SIMPLEREPORTTEST [ COUNT :array  ] 3
+   SIMPLEREPORTTEST [ ITEM 1 :array ] "a
+   SIMPLEREPORTTEST [ ITEM 2 :array ] "b
+   SIMPLEREPORTTEST [ ITEM 3 :array ] "c
+
+   ; bad object input
+   TRACEINSTRUCTION [ MAKE "word "abc ]
+   RUNDOESNTLIKEINPUTTEST [ SETITEM 1 :word "x ]
+   SIMPLEREPORTTEST [ :word ] "abc
+
+   TRACEINSTRUCTION [ MAKE "list [a b c] ]
+   RUNDOESNTLIKEINPUTTEST [ SETITEM 1 :list "x ]
+   SIMPLEREPORTTEST [ :list ] [a b c]
+
+   ; bad value input (circular array structure)
+   RUNDOESNTLIKEINPUTTEST [ SETITEM 1 :array :array ]
+
+   ; Note: the circular array tests fail due to Bug #319.
+   RUNDOESNTLIKEINPUTTEST (LIST "SETITEM 1 :array (LIST 1 2 :array) )
+   RUNDOESNTLIKEINPUTTEST (LIST "SETITEM 1 :array (LIST :array    ) )
+
+   TRACEINSTRUCTION [ MAKE "array_of_array {1 2 3}@10   ]
+   TRACEINSTRUCTION [ SETITEM 11 :array_of_array :array ]
+   RUNDOESNTLIKEINPUTTEST (LIST "SETITEM 1 :array :array_of_array)
+
+   ; Confirm that the array wasn't modified
+   SIMPLEREPORTTEST [ COUNT :array  ] 3
+   SIMPLEREPORTTEST [ ITEM 1 :array ] "a
+   SIMPLEREPORTTEST [ ITEM 2 :array ] "b
+   SIMPLEREPORTTEST [ ITEM 3 :array ] "c
+END
+
+TO SETITEMTEST.BADINPUT.RECOVERABLE.RUNINDEXTEST :badindex
+   LOCAL [erract array]
+
+   UNLIMITEDPRINT SENTENCE [Running SETITEMTEST.BADINPUT.RECOVERABLE.RUNINDEXTEST with ] (LIST :badindex)
+   TRACEINSTRUCTION [ MAKE "erract [ 2 ] ]
+   TRACEINSTRUCTION [ MAKE "array {a b c} ]
+
+   ; Run SETITEM with the bad index
+   ; Note: TRACEINSTRUCTIONNOCATCH doesn't work because of Bug #619
+   ; TRACEINSTRUCTIONNOCATCH (LIST "SETITEM :badindex :array 100 )
+   SETITEM :badindex :array 100
+
+   ; Confirm that the bad index was replaced with the good index
+   ; that was provided by :erract.
+   SIMPLEREPORTTEST [ ITEM 1 :array ] "a
+   SIMPLEREPORTTEST [ ITEM 2 :array ] 100
+   SIMPLEREPORTTEST [ ITEM 3 :array ] "c
+   SIMPLEREPORTTEST [ COUNT :array ] 3
+END
+
+TO SETITEMTEST.BADINPUT.RECOVERABLE
+   ; tests that bad input errors are recoverable
+
+   ; not-integer index
+   SETITEMTEST.BADINPUT.RECOVERABLE.RUNINDEXTEST [1]
+   SETITEMTEST.BADINPUT.RECOVERABLE.RUNINDEXTEST {1}
+   SETITEMTEST.BADINPUT.RECOVERABLE.RUNINDEXTEST 0.5
+   SETITEMTEST.BADINPUT.RECOVERABLE.RUNINDEXTEST "word
+
+   ; Test recovering from multiple mistakes.
+   LOCAL [array arrayWithArray]
+   TRACEINSTRUCTION [ MAKE "array {a b c} ]
+   TRACEINSTRUCTION [ MAKE "arrayWithArray {a b c}@-10 ]
+   TRACEINSTRUCTION [ SETITEM -9 :arrayWithArray :array ]
+
+   RUNRECOVERABLEERRORTEST [
+      SETITEM [] [] :array  ; the first two inputs are bad and the last one will be
+   ](LIST
+      "abc            ; first input not a number
+      1.2             ; first input not an integer
+      [1]             ; first input not a number
+      {1}             ; first input not a number
+      2               ; legal
+      "abc            ; second input can't be a word
+      [1 2 3]         ; second input can't be a list
+      "abc            ; second input can't be a word (again)
+      (LIST 1 2)      ; second input can't be a list (again)
+      :array          ; legal, but third input causes circular reference
+      (LIST :array)   ; circular reference
+      :arrayWithArray ; circular reference (again)
+      "x
+   ) ~
+   [] ; SETITEM is a command (returns nothing)
+
+   ; Confirm that SETITEM accepted the legal replacement inputs
+   ;  SETITEM 2 :array "x
+   SIMPLEREPORTTEST [ ITEM 1 :array ] "a
+   SIMPLEREPORTTEST [ ITEM 2 :array ] "x
+   SIMPLEREPORTTEST [ ITEM 3 :array ] "c
+   SIMPLEREPORTTEST [ COUNT :array ] 3
+
+END
+
+TO SETITEMTEST
+
+   SETITEMTEST.SMOKETEST
+   SETITEMTEST.BADINPUT
+   SETITEMTEST.BADINPUT.RECOVERABLE
+
+END
+

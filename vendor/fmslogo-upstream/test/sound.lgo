@@ -1,0 +1,315 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO SOUNDTEST.FREQUENCY.C4
+   OUTPUT 261
+END
+
+TO SOUNDTEST.FREQUENCY.D4
+   OUTPUT 293
+END
+
+TO SOUNDTEST.FREQUENCY.E4
+   OUTPUT 329
+END
+
+TO SOUNDTEST.FREQUENCY.F4
+   OUTPUT 349
+END
+
+TO SOUNDTEST.FREQUENCY.G4
+   OUTPUT 392
+END
+
+TO SOUNDTEST.FREQUENCY.A4
+   OUTPUT (WORD "440) ; word, convertable to int
+END
+
+TO SOUNDTEST.FREQUENCY.B4
+   OUTPUT 493.0 ; float, convertable to int
+END
+
+TO SOUNDTEST.FREQUENCY.C5
+   OUTPUT 523
+END
+
+TO SOUNDTEST.FREQUENCY.D5
+   OUTPUT 587
+END
+
+
+TO SOUNDTEST.TONE
+   ; Plays a verse of "Mary Had A Little Lamb" using TONE
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.A4 250
+   TONE SOUNDTEST.FREQUENCY.G4 250
+   TONE SOUNDTEST.FREQUENCY.A4 250
+
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.B4 500
+
+   TONE SOUNDTEST.FREQUENCY.A4 250
+   TONE SOUNDTEST.FREQUENCY.A4 250
+   TONE SOUNDTEST.FREQUENCY.A4 500
+
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.D5 250
+   TONE SOUNDTEST.FREQUENCY.D5 500
+
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.A4 250
+   TONE SOUNDTEST.FREQUENCY.G4 250
+   TONE SOUNDTEST.FREQUENCY.A4 250
+
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.B4 250
+
+   TONE SOUNDTEST.FREQUENCY.A4 250
+   TONE SOUNDTEST.FREQUENCY.A4 250
+   TONE SOUNDTEST.FREQUENCY.B4 250
+   TONE SOUNDTEST.FREQUENCY.A4 250
+
+   TONE SOUNDTEST.FREQUENCY.G4 1e3 ; integer as float is legal
+END
+
+TO TONETEST.RUNDURATIONTEST :frequency :duration
+
+    LOCAL [instruction executionTime minAcceptableTime maxAcceptableTime]
+
+    MAKE "instruction   (LIST "TONE :frequency :duration)
+    MAKE "executionTime TIMECOMMAND :instruction
+
+    MAKE "minAcceptableTime :duration      ; should not take less time
+    MAKE "maxAcceptableTime :duration + 30 ; can take a little more time
+
+    CHECKEXECUTIONTIME :instruction :executionTime :minAcceptableTime :maxAcceptableTime
+END
+
+TO TONETEST.DURATION
+   ; Tests that TONE takes about as much time as its duration input.
+   TONETEST.RUNDURATIONTEST 1   10
+   TONETEST.RUNDURATIONTEST 100 100
+   TONETEST.RUNDURATIONTEST 200 1000
+
+   ; integers as floats are legal
+   TONETEST.RUNDURATIONTEST 2e2 1e3
+
+   ; TONE has a special case for frequency=0
+   TONETEST.RUNDURATIONTEST 0   1000
+   TONETEST.RUNDURATIONTEST 0   10
+END
+
+TO TONETEST.ISHALTABLE
+   ; Tests that TONE with a large duration can be halted.
+   ; This is a regression test for Bug #218.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   LOCAL [executionTime]
+
+   TEXTSCREEN
+   UIAUTOMATION.INITIALIZE
+
+   ; Schedule a timer that simulates pressing the Halt button after a second.
+   ; This should halt the TONE instruction, not the test pass.
+   SETTIMER 1 1000 [
+     CLEARTIMER 1
+     (UIAUTOMATION.PUSHCOMMANDERBUTTON "Halt "False)
+   ]
+
+   ; Start a low frequency tone for 15 seconds
+   MAKE "executionTime TIMECOMMAND [ RUNSTOPPINGTEST [ TONE 50 15000 ] ]
+ 
+   ; cleanup
+   UIAUTOMATION.UNINITIALIZE
+   SPLITSCREEN
+
+   ; The test passes if TONE 50 15000 takes less than 14 seconds.
+   IFELSE LESSP :executionTime 14000 [
+     REPORTTESTPASSED "|Bug #218 is fixed; 'TONE 50 15000' halted.|
+   ][
+     REPORTTESTFAILED "|Bug #218 is not fixed; 'TONE 50 15000' was not halted.|
+   ]
+END
+
+TO TONETEST.INTEGEROVERFLOW
+   ; Attempt to overflow an internal buffer (low freq and high duration).
+   ; The test fails if FMSLogo crashes.
+   LOCAL [executionTime]
+
+   IFELSE ISWINDOWS [
+      ; On Windows, if there is no overflow, then the tone plays for a very
+      ; long time, so this must also be halted.
+      TEXTSCREEN
+      UIAUTOMATION.INITIALIZE
+
+      ; Schedule a timer that simulates pressing the Halt button after a second.
+      ; This should halt the TONE instruction, not the test pass.
+      SETTIMER 1 1000 [
+        CLEARTIMER 1
+        (UIAUTOMATION.PUSHCOMMANDERBUTTON "Halt "False)
+      ]
+
+      ; Start a tone with low frequency and high duration.
+      MAKE "executionTime TIMECOMMAND [ RUNSTOPPINGTEST [ TONE 1 2147483647 ] ]
+ 
+      ; cleanup
+      UIAUTOMATION.UNINITIALIZE
+      SPLITSCREEN
+  ][
+      ; On GNU/Linux the overflow is detected.
+      RUNOUTOFMEMORYTEST [TONE 1 2147483647]
+  ]
+
+END
+
+TO SOUNDTEST.SOUND
+   ; Plays a verse of "Mary Had A Little Lamb" using SOUND
+   SOUND (LIST
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.A4 250
+     SOUNDTEST.FREQUENCY.G4 250
+     SOUNDTEST.FREQUENCY.A4 250
+
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.B4 500
+
+     SOUNDTEST.FREQUENCY.A4 250
+     SOUNDTEST.FREQUENCY.A4 250
+     SOUNDTEST.FREQUENCY.A4 500
+
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.D5 250
+     SOUNDTEST.FREQUENCY.D5 500
+
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.A4 250
+     SOUNDTEST.FREQUENCY.G4 250
+     SOUNDTEST.FREQUENCY.A4 250
+
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.B4 250
+
+     SOUNDTEST.FREQUENCY.A4 250
+     SOUNDTEST.FREQUENCY.A4 250
+     SOUNDTEST.FREQUENCY.B4 250
+     SOUNDTEST.FREQUENCY.A4 250
+
+     SOUNDTEST.FREQUENCY.G4 1e3 ; integer as float is legal
+   )
+
+END
+
+TO SOUNDTEST.BADINPUT
+   RUNNOTENOUGHINPUTSTEST [(SOUND)]
+   RUNTOOMANYINPUTSTEST   [(SOUND [100 100] "toomany)]
+
+   RUNDOESNTLIKEINPUTTEST [SOUND "string        ]
+   RUNDOESNTLIKEINPUTTEST [SOUND {100 100}      ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [100]          ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [100 100 100]  ]
+   RUNDOESNTLIKEINPUTTEST [SOUND []             ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ [100] 100  ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ {100} 100  ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ "ten  100  ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100.5 100  ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 1e20  100  ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ -1    100  ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100  [100] ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100  {100} ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100  "ten  ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100  100.5 ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100   1e20 ] ]
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100    -1  ] ]
+
+   ; Confirm that, when there's an error in any part of the input
+   ; that no part of the input is used to produce sound.
+   ; We do this by playing a 10 second tone, followed by bad input.
+   LOCALMAKE "beforetime TIMEMILLI
+   RUNDOESNTLIKEINPUTTEST [SOUND [ 100 10000 200 bad ] ]
+   LOCALMAKE "aftertime TIMEMILLI
+   SIMPLEREPORTTEST [:aftertime - :beforetime < 100] LOCALETRUE
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; In this case, the initial input are bad, as the most
+   ; of the replacement values which ERRACT outputs.
+   RUNRECOVERABLEERRORTEST ~
+     [SOUND "string] ~
+     [
+        {100 100}     ; must be list (not array)
+        [100]         ; inputs must be paired
+        [100 100 100] ; inputs must be paired
+        []            ; can't be empty list
+        [[100]  100 ] ; first member must be an integer (not list)
+        [{100}  100 ] ; first member must be an integer (not array)
+        ["ten   100 ] ; first member must be an integer (not word)
+        [ 100.5 100 ] ; first member must be an integer (not float)
+        [ 1e20  100 ] ; first member must be an integer (not too large)
+        [ -1    100 ] ; first member must be non-negative
+        [ 100  [100]] ; second member must be an integer (not list)
+        [ 100  {100}] ; second member must be an integer (not array)
+        [ 100  "ten ] ; second member must be an integer (not word)
+        [ 100  100.5] ; second member must be an integer (not float)
+        [ 100   1e20] ; second member must be an integer (not too large)
+        [ 100   -1  ] ; second member must be non-negative
+        [ 100   0   ] ; legal (plays nothing)
+     ] ~
+     [] ; no expected output
+END
+
+TO TONETEST.BADINPUT
+
+   RUNNOTENOUGHINPUTSTEST [(TONE 100)]
+   RUNTOOMANYINPUTSTEST   [(TONE 100 100 "toomany)]
+   RUNDOESNTLIKEINPUTTEST [TONE [100]  100  ]
+   RUNDOESNTLIKEINPUTTEST [TONE {100}  100  ]
+   RUNDOESNTLIKEINPUTTEST [TONE "ten   100  ]
+   RUNDOESNTLIKEINPUTTEST [TONE 100.5  100  ]
+   RUNDOESNTLIKEINPUTTEST [TONE  1e20  100  ]
+   RUNDOESNTLIKEINPUTTEST [TONE  -1    100  ]
+   RUNDOESNTLIKEINPUTTEST [TONE  100  [100] ]
+   RUNDOESNTLIKEINPUTTEST [TONE  100  {100} ]
+   RUNDOESNTLIKEINPUTTEST [TONE  100  "ten  ]
+   RUNDOESNTLIKEINPUTTEST [TONE  100  100.5 ]
+   RUNDOESNTLIKEINPUTTEST [TONE  100   1e20 ]
+   RUNDOESNTLIKEINPUTTEST [TONE  100    -1  ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; In this case, the initial input are bad, as the most
+   ; of the replacement vlaues which ERRACT outputs.
+   RUNRECOVERABLEERRORTEST ~
+     [TONE "string "string] ~
+     [
+        [100]    ; first member must be an integer (not list)
+        {100}    ; first member must be an integer (not array)
+        "ten     ; first member must be an integer (not word)
+        100.5    ; first member must be an integer (not float)
+        1e20     ; first member must be an integer (not too large)
+        -1       ; first member must be non-negative
+        0        ; legal first member
+        [100]    ; second member must be an integer (not list)
+        {100}    ; second member must be an integer (not array)
+        "ten     ; second member must be an integer (not word)
+        100.5    ; second member must be an integer (not float)
+        1e20     ; second member must be an integer (not too large)
+        -1       ; second member must be non-negative
+        0        ; legal (plays nothing)
+     ] ~
+     [] ; no expected output
+END
+
+TO SOUNDTEST
+   SOUNDTEST.TONE
+   SOUNDTEST.SOUND
+   TONETEST.DURATION
+   TONETEST.ISHALTABLE
+   TONETEST.INTEGEROVERFLOW
+
+   SOUNDTEST.BADINPUT
+   TONETEST.BADINPUT
+END

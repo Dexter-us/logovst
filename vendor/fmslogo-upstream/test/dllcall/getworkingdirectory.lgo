@@ -1,0 +1,25 @@
+; Calls the win32 function GetCurrentDirectoryW.
+; Outputs the current working directory as a word.
+; Outputs [] on error.
+TO GETWORKINGDIRECTORY
+    LOCAL [rval total_characters working_directory working_directory_length]
+
+    DLLLOAD "kernel32.dll
+
+    ; Call it with a NULL buffer to determine the required buffer size (in characters)
+    MAKE "total_characters ITEM 1 (DLLCALL [L GetCurrentDirectoryW L 0 L 0] "kernel32.dll)
+    IF :total_characters <> 0 [
+        ; Read the directory name into a correctly-sized buffer.
+        MAKE "rval (DLLCALL (LIST "L "GetCurrentDirectoryW "B :total_characters*2 "L :total_characters) "kernel32.dll)
+        MAKE "working_directory_length ITEM 1 :rval
+        MAKE "working_directory        ITEM 2 :rval
+    ]
+
+    (DLLFREE "kernel32.dll)
+
+    ; Output [] on error.
+    IF :total_characters = 0 [ OUTPUT [] ]
+
+    ; Remove the NUL characters from the buffer
+    OUTPUT FILTER [NOTEQUAL? CHAR 0 ? ] :working_directory
+END

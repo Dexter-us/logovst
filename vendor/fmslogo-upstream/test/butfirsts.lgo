@@ -1,0 +1,63 @@
+LOAD "testlib.lgo
+
+TO BUTFIRSTSTEST.SMOKETEST
+
+   SIMPLEREPORTTEST [BFS       [[1 2 3]]] [[2 3]]
+   SIMPLEREPORTTEST [BUTFIRSTS [[1 2 3]]] [[2 3]]
+
+   SIMPLEREPORTTEST [BUTFIRSTS [[1 2 3] [a b c]    ]] (LIST [2 3] [b c]        )
+   SIMPLEREPORTTEST [BUTFIRSTS [[1 2 3] hello [1] h]] (LIST [2 3] "ello [] "|| )
+   SIMPLEREPORTTEST [BUTFIRSTS [ 123 -1 .23        ]] [ 23 1 23 ]
+
+   ; empty list is valid
+   SIMPLEREPORTTEST [BUTFIRSTS []]  []
+
+END
+
+TO BUTFIRSTSTEST.BADINPUT
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(BUTFIRSTS)]
+   RUNTOOMANYINPUTSTEST   [(BUTFIRSTS [[1 2 3]] "toomany)]
+
+   ; bad inputs (a list containing bad input to BUTFIRST)
+   RUNDOESNTLIKEINPUTTEST [BUTFIRSTS "abc                         ]
+   RUNDOESNTLIKEINPUTTEST [BUTFIRSTS 123                          ]
+   RUNDOESNTLIKEINPUTTEST [BUTFIRSTS {a b c}                      ]
+   RUNDOESNTLIKEINPUTTEST [BUTFIRSTS [     [1 2 3]  []  [1 2 3] ] ]
+   RUNDOESNTLIKEINPUTTEST [BUTFIRSTS (LIST [1 2 3] "||  [1 2 3] ) ]
+   RUNDOESNTLIKEINPUTTEST [BUTFIRSTS [     [1 2 3] {1}  [1 2 3] ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      BUTFIRSTS "abc   ; must be a list
+   ](LIST
+      123                         ; must be a list
+      {1 2 3}                     ; must be a list
+      [ [1 2 3] [] [a b c]  ]     ; item can't be the empty list
+      [ [1 2 3] {a b c} abc ]     ; item can't be an array
+      (LIST "|| [a b c] )         ; item can't be empty word
+      "abc                        ; must be a list (again)
+      123                         ; must be a list (again)
+      {1 2 3}                     ; must be a list (again)
+      [ [1 2 3] [] ]              ; item can't be the empty list (again)
+      (LIST [1 2 3] "abc "|| )    ; item can't be the empty word (again)
+      [ [1 2 3] {a} abc ]         ; item can't be an array (again)
+      [ [1 2 3] abc 321 -1.5    ] ; legal
+   ) ~
+   [[ [2 3] bc 21 1.5 ]] ; everything but the first member of each element
+
+   ; Test that BUTFIRSTS accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST (LIST "allocated "in "BUTFIRSTS.BADINPUT) ) ] ]
+   SIMPLEREPORTTESTNOCATCH [ BUTFIRSTS {} ] [[in BUTFIRSTS.BADINPUT]]
+
+END
+
+TO BUTFIRSTSTEST
+
+   BUTFIRSTSTEST.SMOKETEST
+   BUTFIRSTSTEST.BADINPUT
+
+END

@@ -1,0 +1,88 @@
+LOAD "testlib.lgo
+
+
+.MACRO MACROTEST.MYRUN :instructions
+   ; simple macro that just runs its input in the context of the caller
+   OUTPUT :instructions
+END
+
+TO MACROTEST.STOPTEST
+   REPORTTESTINFO  [Running a macro that should stop the caller]
+   MACROTEST.MYRUN [STOP]
+
+   REPORTTESTFAILED [MACROTEST.MYRUN [STOP] failed to stop the caller.]
+END
+
+TO MACROTEST.OUTPUTTEST
+    REPORTTESTINFO  [Running a macro that should output the caller]
+    MACROTEST.MYRUN [OUTPUT 123]
+
+    REPORTTESTFAILED [MACROTEST.MYRUN [OUTPUT 124] failed to stop the caller.]
+    OUTPUT [test failed to output]
+END
+
+TO MACROTEST.SMOKETEST
+    ; run a macro that stops in the caller's context
+    MACROTEST.STOPTEST
+
+    ; run a macro that outputs in the caller's context
+    SIMPLEREPORTTEST [ MACROTEST.OUTPUTTEST ] 123
+END
+
+
+
+.MACRO MACROTEST.OUTPUTNOTHING
+  ; a macro that outputs nothing (instead of a list)
+  ; This is part of a regression test for bug #133.
+  SHOW "|This is a macro that outputs nothing (instead of a list)|
+END
+
+TO MACROTEST.MACROOUTPUTSNOTHING
+  RUNEXPECTERRORTEST [ MACROTEST.OUTPUTNOTHING ] 29
+END
+
+TO MACROTEST.BUG133
+  ; Bug 133 is a crash when running a macro that outputs nothing.
+  ; Calling this within a CATCH block interferes with the repro,
+  ; so this would halt the tests if it were integrated into the
+  ; the automated tests.
+  MACROTEST.OUTPUTNOTHING
+END
+
+
+.MACRO MACROTEST.MY.LOCALMAKE :name :value
+  ; The example macro from the documentation.
+  OUTPUT `[LOCAL ",:name APPLY "MAKE [,:name ,:value]]
+END
+
+TO MACROTEST.EXAMPLEFROMMANUAL.MYLOCALMAKE.INNER
+
+  ; As a self-check, confirm that the variables don't yet exists.
+  SIMPLEREPORTTEST [NAMEP "var1] LOCALEFALSE
+  SIMPLEREPORTTEST [NAMEP "var2] LOCALEFALSE
+
+  ; Use the MY.LOCALMAKE macro from the manual to create
+  ; a local variable and assign it.
+  MACROTEST.MY.LOCALMAKE "var1 "abc
+  MACROTEST.MY.LOCALMAKE "var2 [1 2 3]
+
+  ; Confirm that the variables are now defined.
+  SIMPLEREPORTTEST [:var1] "abc
+  SIMPLEREPORTTEST [:var2] [1 2 3]
+END
+
+TO MACROTEST.EXAMPLEFROMMANUAL.MYLOCALMAKE
+  ; Run a procedure that uses MY.LOCALMAKE
+  MACROTEST.EXAMPLEFROMMANUAL.MYLOCALMAKE.INNER
+
+  ; Confirm that the variables were local to that procedure.
+  SIMPLEREPORTTEST [NAMEP "var1] LOCALEFALSE
+  SIMPLEREPORTTEST [NAMEP "var2] LOCALEFALSE
+END
+
+
+TO MACROTEST
+   MACROTEST.SMOKETEST
+   MACROTEST.MACROOUTPUTSNOTHING
+   MACROTEST.EXAMPLEFROMMANUAL.MYLOCALMAKE
+END

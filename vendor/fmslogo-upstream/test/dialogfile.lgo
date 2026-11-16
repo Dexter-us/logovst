@@ -1,0 +1,102 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO DIALOGFILEOPEN.SMOKETEST
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+
+     ; press OK
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Open] "&Open
+     FAILIFNOTTRUE [ SUBSTRINGP "src\\test\\dialogfile.lgo DIALOGFILEOPEN "dialogfile.lgo ]
+
+     ; lists are accepted as text
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Open] "&Open
+     FAILIFNOTTRUE [ SUBSTRINGP "src\\test\\dialogfile.lgo DIALOGFILEOPEN [dialogfile.lgo] ]
+
+     ; press Cancel
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Open] "Cancel
+     SIMPLEREPORTTEST [ DIALOGFILEOPEN "*.lgo ] []
+   ]
+
+   IGNORE FAILIFERROR "DIALOGFILEOPEN.SMOKETEST
+
+   UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO DIALOGFILEOPEN.ENDINSLASH
+   ; This is a regression test for Bug #63.
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+     ; Press Cancel
+     ; It would be better to select a file and press OK, but the UIAUTOMATION
+     ; library is powerful enough to navigate the native windows file picker.
+     ; Instead, we rely on indirect means to test that the dialog box appeared
+     ; by confirming that the UIAUTOMATION library posted all messages,
+     ; which likely means that a model dialog box delayed the execution
+     ; of this test until it was dismissed.
+     UIAUTOMATION.POSTSTRINGTOWINDOW     "Open "ComboBox "dialogfile.lgo
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW "Open "Cancel
+
+     ; Open the dialog box to a directory that ends in a backslash
+     SIMPLEREPORTTEST [DIALOGFILEOPEN ".\\] []
+
+     ; Confirm that the UI automation library posted the Cancel.
+     SIMPLEREPORTTEST [COUNT :uiautomation.eventqueue] 0
+   ]
+
+   IGNORE FAILIFERROR "DIALOGFILEOPEN.ENDINSLASH
+
+   UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO DIALOGFILEOPEN.BADINPUT
+   RUNNOTENOUGHINPUTSTEST [ IGNORE (DIALOGFILEOPEN) ]
+   RUNTOOMANYINPUTSTEST   [ IGNORE (DIALOGFILEOPEN "dialogfile.lgo "toomany) ]
+END
+
+TO DIALOGFILESAVE.SMOKETEST
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+
+     ; Press Save
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Save As] "&Save
+     FAILIFNOTTRUE [ SUBSTRINGP "src\\test\\someunknownfile.txt DIALOGFILESAVE "someunknownfile.txt ]
+
+     ; lists are converted to file names.
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Save As] "&Save
+     FAILIFNOTTRUE [ SUBSTRINGP "|src\\test\\1 2 3| DIALOGFILESAVE [1 2 3] ]
+
+     ; press Cancel
+     UIAUTOMATION.POSTBUTTONPUSHTOWINDOW [Save As] "Cancel
+     SIMPLEREPORTTEST [ DIALOGFILESAVE "*.lgo ] []
+   ]
+
+   IGNORE FAILIFERROR "DIALOGFILESAVE.SMOKETEST
+
+   UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO DIALOGFILESAVE.BADINPUT
+   RUNNOTENOUGHINPUTSTEST [ IGNORE (DIALOGFILESAVE) ]
+   RUNTOOMANYINPUTSTEST   [ IGNORE (DIALOGFILESAVE "dialogfile.lgo "toomany) ]
+END
+
+TO DIALOGFILETEST
+  DIALOGFILEOPEN.SMOKETEST
+  DIALOGFILEOPEN.ENDINSLASH
+  DIALOGFILEOPEN.BADINPUT
+
+  DIALOGFILESAVE.SMOKETEST
+  DIALOGFILEOPEN.BADINPUT
+END

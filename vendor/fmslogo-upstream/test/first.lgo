@@ -1,0 +1,57 @@
+LOAD "testlib.lgo
+
+TO FIRSTTEST.SMOKETEST
+
+   SIMPLEREPORTTEST [FIRST [1 2 3] ] 1
+   SIMPLEREPORTTEST [FIRST     [1] ] 1
+
+   ; FIRST for an array shows the origin.
+   SIMPLEREPORTTEST [FIRST {a b c}   ] 1
+   SIMPLEREPORTTEST [FIRST {a b c}@2 ] 2
+   SIMPLEREPORTTEST [FIRST {}        ] 1
+   SIMPLEREPORTTEST [FIRST {}@100    ] 100
+   SIMPLEREPORTTEST [FIRST {}@-4     ] -4
+
+   SIMPLEREPORTTEST [FIRST "hello  ] "h
+   SIMPLEREPORTTEST [FIRST "h      ] "h
+   SIMPLEREPORTTEST [FIRST 123     ] 1
+   SIMPLEREPORTTEST [FIRST 0       ] 0
+   SIMPLEREPORTTEST [FIRST 1       ] 1
+   SIMPLEREPORTTEST [FIRST -1      ] "-
+   SIMPLEREPORTTEST [FIRST .1      ] 0   ; .1 becomes 0.1
+   SIMPLEREPORTTEST [FIRST 2.3     ] 2
+END
+
+TO FIRSTTEST.BADINPUT
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(FIRST)]
+   RUNTOOMANYINPUTSTEST   [(FIRST "word "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [FIRST []  ] 
+   RUNDOESNTLIKEINPUTTEST [FIRST "|| ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      FIRST []   ; can't be the empty list
+   ](LIST
+      "||        ; can't be empty word
+      []         ; can't be the empty list (again)
+      "||        ; can't be the empty word (again)
+      123        ; legal but must be converted to a string
+   ) ~
+   [1] ; first digit of 123
+
+
+   ; Test that FIRST accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (LIST "allocated "in "FIRSTTEST.BADINPUT) ] ]
+   SIMPLEREPORTTESTNOCATCH [ FIRST [] ] "allocated
+
+END
+
+TO FIRSTTEST
+   FIRSTTEST.SMOKETEST
+   FIRSTTEST.BADINPUT
+END

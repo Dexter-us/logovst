@@ -1,0 +1,599 @@
+LOAD "testlib.lgo
+LOAD "uiautomationlib.lgo
+
+TO SAVETEST.HASBOM :filename
+    ; Outputs TRUE if the file begins with a BOM, FALSE otherwise.
+    LOCAL [byte1 byte2 byte3]
+
+    (OPENREAD :filename "TRUE)
+    SETREAD :filename
+    MAKE "byte1 READCHAR
+    MAKE "byte2 READCHAR
+    MAKE "byte3 READCHAR
+    SETREAD []
+    CLOSE   :filename
+
+    OUTPUT (OR
+      (AND (:byte1 = 239) (:byte2 = 187) (:byte3 = 191)) ; UTF-8 BOM
+      (AND (:byte1 = 255) (:byte2 = 254)))               ; UTF-16 BOM
+END
+
+
+TO SAVETEST.HELPER :filename :contents :expectedcontents :expectbom
+   ; A helper procedure for that saves a workspace
+   ; and verify the contents.
+   LOCAL [savedWorkspace]
+
+   ; Change the workspace so that only :contents are unburied.
+   MAKE "savedWorkspace CONTENTS
+   BURYALL
+   UNBURY :contents
+
+   ; Save the workspace and confirm that it was saved correctly.
+   (RUNPRINTTEST (LIST "SAVE QUOTED :filename) :expectedcontents :filename)
+
+   ; Confirm that the file has a BOM.
+   SIMPLEREPORTTEST [ SAVETEST.HASBOM :filename ] :expectbom
+
+   ; Cleanup
+   ERASEFILE :filename
+   UNBURY :savedWorkspace
+
+END
+
+TO SAVETEST.SMOKETEST.HELPER :filename
+   LOCAL "contents
+
+   ; Create one of each type of object
+   TRACEINSTRUCTION [ DEFINE "MyProcedure    [[x y] [OUTPUT :x + :y]] ]
+   TRACEINSTRUCTION [ MAKE   "MyVariable     "abc                     ]
+   TRACEINSTRUCTION [ PPROP  "MyPropertyList "Property 1              ]
+
+   ; Save the workspace and verify the contents
+   (SAVETEST.HELPER
+      :filename
+      [[MyProcedure] [MyVariable] [MyPropertyList]] 
+      (list
+         "|to myprocedure :x :y|
+         "|OUTPUT :x + :y|
+         "|end|
+         "||
+         "|Make "myvariable "abc|
+         "|Pprop "mypropertylist "Property 1|
+      )
+      LOCALEFALSE ; no BOM (pure ASCII)
+   )
+
+   ; Restore the workspace.
+   ERASE [[MyProcedure] [MyVariable] [MyPropertyList]]
+
+END
+
+TO SAVETEST.SMOKETEST
+  SAVETEST.SMOKETEST.HELPER "savetest.smoketest.txt
+END
+
+TO SAVETEST.NUMBERFILENAME
+  SAVETEST.SMOKETEST.HELPER 123.4
+END
+
+TO SAVETEST.UNICODEFILENAME
+  LOCALMAKE "greekSigma CHAR 963
+  SAVETEST.SMOKETEST.HELPER (WORD "savetest.unicode :greekSigma ".txt)
+END
+
+TO SAVETEST.BACKSLASHABLE? :character
+   ; Ouptuts whether or not :character would be backslashed if entered
+   ; between vertical bars
+   OUTPUT MEMBER? :character (WORD CHAR 32 CHAR 9 CHAR 10 "|\|{}()[]+-*/=<>":;\\~?|)
+END
+
+TO SAVETEST.BACKSLASHWORD :word
+   OUTPUT MAP [IFELSE SAVETEST.BACKSLASHABLE? ? [WORD "\\ ?] [?]] :word
+END
+
+TO SAVETEST.EMPTYWORKSPACE
+   ; Tests that SAVE will write an empty file with the workspace is empty.
+   SAVETEST.HELPER "savetest.emptyworkspace.lgo [] [] LOCALEFALSE
+END
+
+TO SAVETEST.ASCIICONTENT
+   ; Tests that SAVE will save content without a BOM if
+   ; all unburied elements are pure ASCII (full range)
+   LOCAL [savedWorkspace filename ascii backslashedAscii lowercaseAscii crlf]
+
+   MAKE "filename "savetest.asciicontent.lgo
+
+   ; Get a word that has the full range of ASCII characters.
+   ; None of these should cause a workspace to be saved with a BOM.
+   ; LF and NUL characters cause problems for the tests so they are not tested.
+   MAKE "ascii            APPLY "WORD MAP "CHAR FILTER [? <> 10] ISEQ 1 127
+   MAKE "backslashedAscii SAVETEST.BACKSLASHWORD :ascii
+   MAKE "lowercaseAscii   LOWERCASE :ascii
+
+   ; Unfortunately, DEFINE makes it impossible to include all ASCII
+   ; in a procedure definition, so we have to resort to writing the
+   ; definition to a file (without SAVE), then loading it (with LOAD).
+   MAKE "crlf WORD CHAR 13 CHAR 10
+   WRITEBINARYDATA :filename (WORD
+     "|MAKE  "| :backslashedAscii "| "| :backslashedAscii :crlf
+
+     "|PPROP "| :backslashedAscii "| "| :backslashedAscii "| "| :backslashedAscii :crlf
+
+     "|TO | :backslashedAscii "| :| :backslashedAscii :crlf
+     "|  SHOW "| :backslashedAscii                    :crlf
+     "|END|                                           :crlf
+   )
+
+   TRACEINSTRUCTION [ LOAD :filename ]
+   ERASEFILE :filename
+
+   ; Save the workspace and verify the contents
+   (SAVETEST.HELPER
+     :filename
+     (LIST (LIST :ascii) (LIST :ascii) (LIST :ascii))
+     (LIST
+         (WORD "|TO | :backslashedAscii "| :| :backslashedAscii)
+         (WORD "|  SHOW "| :backslashedAscii)
+         (WORD "|END|)
+         (WORD "||)
+         (WORD "|Make "|  :lowercaseAscii "| "| :backslashedAscii)
+         (WORD "|Pprop "| :lowercaseAscii "| "| :backslashedAscii "| "| :backslashedAscii)
+     )
+     LOCALEFALSE ; expect no BOM (pure ASCII)
+   )
+
+   ; Restore the workspace.
+   ERASE (LIST (LIST :ascii) (LIST :ascii) (LIST :ascii))
+END
+
+TO SAVETEST.UNICODECONTENT
+
+   LOCAL [contents GREEK_BETA]
+
+   MAKE "GREEK_BETA CHAR 946
+
+   ; Create one of each type of object with only ASCII characters.
+   TRACEINSTRUCTION [ DEFINE "MyAsciiProcedure    [[x y] [OUTPUT :x + :y]] ]
+   TRACEINSTRUCTION [ MAKE   "MyAsciiVariable     "abc                     ]
+   TRACEINSTRUCTION [ PPROP  "MyAsciiPropertyList "Property 1              ]
+
+   ; Create one type of each object that has a non-ACSII Unicode character
+   ; in its value.
+   TRACEINSTRUCTION (LIST
+      "DEFINE QUOTED "MyUnicodeProcedure (LIST []
+        (LIST "OUTPUT QUOTED :GREEK_BETA)
+      )
+   )
+   TRACEINSTRUCTION (LIST
+      "MAKE   QUOTED "MyUnicodeVariable
+      QUOTED (WORD "a :GREEK_BETA "c)
+   )
+   TRACEINSTRUCTION (LIST
+      "PPROP  QUOTED "MyUnicodePropertyList QUOTED "Prop QUOTED WORD "a :GREEK_BETA
+   )
+
+   MAKE "contents [[MyAsciiProcedure    MyUnicodeProcedure   ]
+                   [MyAsciiVariable     MyUnicodeVariable    ]
+                   [MyAsciiPropertyList MyUnicodePropertyList] ]
+
+   ; Save the workspace and verify the contents
+   (SAVETEST.HELPER
+       "savetest.unicode.txt
+       :contents
+       (LIST
+         "|to myasciiprocedure :x :y|
+         "|OUTPUT :x + :y|
+         "|end|
+         "||
+         "|to myunicodeprocedure|
+         (WORD "|OUTPUT "| :GREEK_BETA)
+         "|end|
+         "||
+         "|Make "myasciivariable "abc|
+         (WORD "|Make "myunicodevariable "a| :GREEK_BETA "c)
+         "|Pprop "myasciipropertylist "Property 1|
+         (WORD "|Pprop "myunicodepropertylist "Prop "a| :GREEK_BETA)
+       )
+       LOCALETRUE ; expect UTF-8 BOM
+   )
+
+   ; Restore the workspace.
+   ERASE :contents
+END
+
+TO SAVETEST.NONASCII.VARIATIONS
+   ; Variations which attempts to get good code coverage of the
+   ; code paths in po_is_ascii() which return false.  To confirm
+   ; each one of these paths, SAVE must be called a distinct time.
+   ;
+   ; Variations:
+   ; * a character that is just beyond the ASCII range.
+   ; * at the {beginning, end} of a string.
+   ; * at the {beginning, end} of a list.
+   ; * at the {beginning, end} of an array.
+   ; * at the beginning of an array with a negative offset (before index 0)
+   ; * a procedure {name, input, first body line, second body line}
+   ; * a variable {name, value}
+   ; * a property list {list name, property name, property value}
+   ; * pure ASCII and a non-ASCII {procedure, variable, plist} in same workspace
+
+   LOCAL [NONASCII]
+
+   MAKE "NONASCII CHAR 128
+
+   ; Create two of each type of object that is pure ASCII.
+   ; The non-ASCII versions will be created alphabetically between these.
+   TRACEINSTRUCTION [ DEFINE "MyAsciiProc    [[x y]  [OUTPUT :x + :y]] ]
+   TRACEINSTRUCTION [ DEFINE "YourAsciiProc  [[dist] [FORWARD :dist]]  ]
+   TRACEINSTRUCTION [ MAKE   "MyAsciiVar     "abc                      ]
+   TRACEINSTRUCTION [ MAKE   "YourAsciiVar   "xyz                      ]
+   TRACEINSTRUCTION [ PPROP  "MyAsciiPlist   "Property 1               ]
+   TRACEINSTRUCTION [ PPROP  "YourAsciiPlist "Property 2               ]
+
+   ; How the above objects look when printed to a workspace.
+   LOCAL [MyAsciiProcDefinition  YourAsciiProcDefinition
+          MyAsciiVarDefinition   YourAsciiVarDefinition
+          MyAsciiPlistDefinition YourAsciiPlistDefinition]
+   MAKE "MyAsciiProcDefinition  (LIST
+      "|to myasciiproc :x :y|
+      "|OUTPUT :x + :y|
+      "|end|
+      "||)
+   MAKE "YourAsciiProcDefinition  (LIST
+      "|to yourasciiproc :dist|
+      "|FORWARD :dist|
+      "|end|
+      "||)
+   MAKE "MyAsciiVarDefinition     "|Make "myasciivar "abc|
+   MAKE "YourAsciiVarDefinition   "|Make "yourasciivar "xyz|
+   MAKE "MyAsciiPlistDefinition   "|Pprop "myasciiplist "Property 1|
+   MAKE "YourAsciiPlistDefinition "|Pprop "yourasciiplist "Property 2|
+
+   ; Create one type of each object that has a non-ACSII character
+   TRACEINSTRUCTION [DEFINE (WORD "MyNonAsciiProcName :NONASCII) [[]] ]
+   TRACEINSTRUCTION (LIST "DEFINE "\"MyNonAsciiProcVar   (LIST (LIST :NONASCII)))
+   TRACEINSTRUCTION (LIST "DEFINE "\"MyNonAsciiProcBody1 (LIST [] (LIST "OP :NONASCII)))
+   TRACEINSTRUCTION (LIST "DEFINE "\"MyNonAsciiProcBody2 (LIST [] [FD 1] (LIST "OP :NONASCII)))
+
+   TRACEINSTRUCTION [MAKE (WORD "MyNonAsciiVarName :NONASCII) 1]
+   TRACEINSTRUCTION [MAKE "MyNonAsciiVarWordValueAtBeginning WORD :NONASCII "XYZ ]
+   TRACEINSTRUCTION [MAKE "MyNonAsciiVarWordValueAtEnd       WORD "ABC :NONASCII ]
+   TRACEINSTRUCTION [MAKE "MyNonAsciiVarListValueAtBeginning (LIST :NONASCII "x "y "z)]
+   TRACEINSTRUCTION [MAKE "MyNonAsciiVarListValueAtEnd       (LIST "a "b "c :NONASCII)]
+
+   TRACEINSTRUCTION [MAKE "MyNonAsciiVarArrayValueAtBeginning {a b c d}]
+   TRACEINSTRUCTION [SETITEM 1 :MyNonAsciiVarArrayValueAtBeginning :NONASCII]
+
+   TRACEINSTRUCTION [MAKE "MyNonAsciiVarArrayValueAtEnd       {a b c d} ]
+   TRACEINSTRUCTION [SETITEM 4 :MyNonAsciiVarArrayValueAtEnd :NONASCII]
+
+   TRACEINSTRUCTION [MAKE "MyNonAsciiVarArrayValueBefore0     {a b c d}@-10 ]
+   TRACEINSTRUCTION [SETITEM -10 :MyNonAsciiVarArrayValueBefore0 :NONASCII]
+
+   TRACEINSTRUCTION [PPROP WORD "MyNonAsciiPlistName :NONASCII "prop 1]
+   TRACEINSTRUCTION [PPROP "MyNonAsciiPlistPropName :NONASCII 1]
+   TRACEINSTRUCTION [PPROP "MyNonAsciiPlistPropVal  "prop :NONASCII]
+
+   ;
+   ; self-test for ASCII-only contents
+   ;
+   (SAVETEST.HELPER
+      "savetest.nonascii.asciionly.txt
+      [ [MyAsciiProc  YourAsciiProc  ]
+        [MyAsciiVar   YourAsciiVar   ]
+        [MyAsciiPlist YourAsciiPlist ] ]
+      (SENTENCE
+         :MyAsciiProcDefinition
+         :YourAsciiProcDefinition
+         :MyAsciiVarDefinition
+         :YourAsciiVarDefinition
+         :MyAsciiPlistDefinition
+         :YourAsciiPlistDefinition)
+      LOCALEFALSE) ; BOM expected
+
+   ;
+   ; Save each variation in isolation
+   ;
+   (SAVETEST.HELPER
+      "savetest.nonascii.procname.txt
+      WORD "MyNonAsciiProcName :NONASCII
+      (LIST
+         (WORD "|to | WORD "mynonasciiprocname :NONASCII)
+         (WORD "|end|)
+         (WORD "||))
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciiprocvar.txt
+      "MyNonAsciiProcVar
+      (LIST
+         (WORD "|to mynonasciiprocvar :| :NONASCII)
+         (WORD "|end|)
+         (WORD "||))
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciiprocbody1.txt
+      "MyNonAsciiProcBody1
+      (LIST
+         (WORD "|to mynonasciiprocbody1|)
+         (WORD "|OP | :NONASCII)
+         (WORD "|end|)
+         (WORD "||))
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciiprocbody2.txt
+      "MyNonAsciiProcBody2
+      (LIST
+         (WORD "|to mynonasciiprocbody2|)
+         (WORD "|FD 1|)
+         (WORD "|OP | :NONASCII)
+         (WORD "|end|)
+         (WORD "||))
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivarname.txt
+      (LIST [] (WORD "MyNonAsciiVarName :NONASCII))
+      (WORD "|Make "mynonasciivarname| :NONASCII "| 1|)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivarwordvaluebeginning.txt
+      [[] [MyNonAsciiVarWordValueAtBeginning]]
+      (WORD "|Make "mynonasciivarwordvalueatbeginning "| :NONASCII "XYZ)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivarwordvalueend.txt
+      [[] [MyNonAsciiVarWordValueAtEnd]]
+      (WORD "|Make "mynonasciivarwordvalueatend "ABC| :NONASCII)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivarlistvaluebeginning.txt
+      [[] [MyNonAsciiVarListValueAtBeginning]]
+      (WORD "|Make "mynonasciivarlistvalueatbeginning [| :NONASCII "| x y z]|)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivarlistvalueend.txt
+      [[] [MyNonAsciiVarListValueAtEnd]]
+      (WORD "|Make "mynonasciivarlistvalueatend [a b c | :NONASCII "\])
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivararrayvalueatbeginning.txt
+      [[] [MyNonAsciiVarArrayValueAtBeginning]]
+      (WORD "|Make "mynonasciivararrayvalueatbeginning {| :NONASCII "| b c d}|)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivararrayvalueatend.txt
+      [[] [MyNonAsciiVarArrayValueAtEnd]]
+      (WORD "|Make "mynonasciivararrayvalueatend {a b c | :NONASCII "\})
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciivararrayvaluebefore0.txt
+      [[] [MyNonAsciiVarArrayValueBefore0]]
+      (WORD "|Make "mynonasciivararrayvaluebefore0 {| :NONASCII "| b c d}@-10|)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciiplistname.txt
+      (LIST [] [] (WORD "MyNonAsciiPlistName :NONASCII))
+      (WORD "|Pprop "mynonasciiplistname| :NONASCII "| "prop 1|)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciiplistpropname.txt
+      [[] [] [MyNonAsciiPlistPropName]]
+      (WORD "|Pprop "mynonasciiplistpropname "| :NONASCII "| 1|)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.nonasciiplistpropval.txt
+      [[] [] [MyNonAsciiPlistPropVal]]
+      (WORD "|Pprop "mynonasciiplistpropval "prop "| :NONASCII)
+      LOCALETRUE) ; BOM expected
+
+   ;
+   ; Test each class of workspace object (variable, procedure, property list)
+   ; with a ASCII and non-ASCII example, to test that SAVE can find the
+   ; non-ASCII part even if it's not listed first and that processing a
+   ; subsequent pure-ASCII doesn't clear the non-ASCII part.
+   ; The order in which the objects are processed is the same as the order
+   ; in which they appear in the saved workspace.
+   ;
+   (SAVETEST.HELPER
+      "savetest.nonascii.mixedproc.txt
+      [ [MyAsciiProc YourAsciiProc MyNonAsciiProcVar ] ; mixed procedures
+        [MyAsciiVar]
+        [MyAsciiPlist] ]
+      (SENTENCE
+         :MyAsciiProcDefinition
+         (WORD "|to mynonasciiprocvar :| :NONASCII)
+         (WORD "|end|)
+         (WORD "||)
+         :YourAsciiProcDefinition
+         :MyAsciiVarDefinition
+         :MyAsciiPlistDefinition)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.mixedvar.txt
+      [ [MyAsciiProc ]
+        [MyAsciiVar  YourAsciiVar MyNonAsciiVarWordValueAtEnd ] ; mixed variables
+        [MyAsciiPlist] ]
+      (SENTENCE
+         :MyAsciiProcDefinition
+         :MyAsciiVarDefinition
+         (WORD "|Make "mynonasciivarwordvalueatend "ABC| :NONASCII)
+         :YourAsciiVarDefinition
+         :MyAsciiPlistDefinition)
+      LOCALETRUE) ; BOM expected
+
+   (SAVETEST.HELPER
+      "savetest.nonascii.mixedplist.txt
+      [ [MyAsciiProc]
+        [MyAsciiVar] 
+        [MyAsciiPlist YourAsciiPlist MyNonAsciiPlistPropName ] ] ; mixed plists
+      (SENTENCE
+         :MyAsciiProcDefinition
+         :MyAsciiVarDefinition
+         :MyAsciiPlistDefinition
+         (WORD "|Pprop "mynonasciiplistpropname "| :NONASCII "| 1|)
+         :YourAsciiPlistDefinition)
+      LOCALETRUE) ; BOM expected
+
+
+   ; Restore the workspace.
+   ERASE (LIST
+     (LIST "MyAsciiProc
+           "YourAsciiProc
+           WORD "MyNonAsciiProcName :NONASCII
+           "MyNonAsciiProcVar
+           "MyNonAsciiProcBody1
+           "MyNonAsciiProcBody2)
+
+     (LIST "MyAsciiVar
+           "YourAsciiVar
+           WORD "MyNonAsciiVarName :NONASCII
+           "MyNonAsciiVarWordValueAtBeginning
+           "MyNonAsciiVarWordValueAtEnd
+           "MyNonAsciiVarListValueAtBeginning
+           "MyNonAsciiVarListValueAtEnd
+           "MyNonAsciiVarArrayValueAtBeginning
+           "MyNonAsciiVarArrayValueAtEnd
+           "MyNonAsciiVarArrayValueBefore0)
+
+     (LIST "MyAsciiPlist
+           "YourAsciiPlist
+           WORD "MyNonAsciiPlistName :NONASCII
+           "MyNonAsciiPlistPropName
+           "MyNonAsciiPlistPropVal))
+
+END
+
+TO |SAVETEST.BACKSLASH.IN\\PROC\nNAME|   :|in\nvarname|
+    IGNORE "in\ body\ntoo!
+END
+
+TO SAVETEST.BACKSLASH
+   ; Tests that SAVE backslashes the correct characters.
+   LOCAL [variable]
+
+   ; NUL is not backslashed
+   MAKE "variable CHAR 0
+   (SAVETEST.HELPER
+      "savetest.backslash.nul.txt
+      [[] [variable]]
+      (WORD "|Make "variable "| CHAR 0)
+      LOCALEFALSE) ; BOM not expected
+
+   ; tab is backslashed
+   MAKE "variable CHAR 9
+   (SAVETEST.HELPER
+      "savetest.backslash.tab.txt
+      [[] [variable]]
+      (WORD "|Make "variable "\\| CHAR 9)
+      LOCALEFALSE) ; BOM not expected
+
+   ; "\n" is preserved
+   MAKE "variable "\n
+   (SAVETEST.HELPER
+      "savetest.backslash.newline.txt
+      [[] [variable]]
+      "|Make "variable "\\n|
+      LOCALEFALSE) ; BOM not expected
+
+   ; "\n" is preserved within vbars
+   MAKE "variable "|\n|
+   (SAVETEST.HELPER
+      "savetest.backslash.newline.txt
+      [[] [variable]]
+      "|Make "variable "\|\\n\|| ; looks like "|\n|
+      LOCALEFALSE) ; BOM not expected
+
+   ; Colon doesn't need to be backslashed in a word...
+   MAKE "variable ":::
+   (SAVETEST.HELPER
+      "savetest.backslash.colon.txt
+      [[] [variable]]
+      "|Make "variable ":::| ; no backslashes
+      LOCALEFALSE)           ; BOM not expected
+
+   ; ...but if any character is backslashed, they all get backslashed.
+   MAKE "variable "\::: ; a backslash before one colon
+   (SAVETEST.HELPER
+      "savetest.backslash.colon.txt
+      [[] [variable]]
+      "|Make "variable "\\:\\:\\:| ; a backslash before all colons
+      LOCALEFALSE) ; BOM not expected
+
+   ; backslashes and newlines in a procedure title/body
+   (SAVETEST.HELPER
+      "savetest.backslash.procedure.txt
+      "|SAVETEST.BACKSLASH.IN\\PROC\nNAME|
+      (LIST
+          "|TO \|SAVETEST.BACKSLASH.IN\\\\PROC\\nNAME\|   :\|in\\nvarname\||
+          "|    IGNORE "in\\ body\\ntoo!|
+          "|END|
+          "||)
+      LOCALEFALSE) ; BOM not expected
+END
+
+TO SAVETEST.EDITOROPEN
+   ; Tests that a warning is shown when running SAVE while the editor is open.
+
+   IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+   UIAUTOMATION.INITIALIZE
+
+   CATCH "ERROR [
+      ; Open the editor.
+      LOCALMAKE "Instructions [Close the editor after the message from SAVE is dismissed]
+      TRACEINSTRUCTION [ EDIT [ [] [Instructions] ] ]
+
+      ; Set up the UI automation to close the warning dialog by pressing OK.
+      ; This also tests that the warning does appear.
+      UIAUTOMATION.POSTBUTTONPUSHTOWINDOW "Information "Ok
+
+      ; Call SAVE.  This should display a warning about an editor being open.
+      SAVETEST.SMOKETEST.HELPER "savetest.editoropen.txt
+
+      ; Close the editor
+      LOCALMAKE "WM_CLOSE    16  ; 0x0010
+      LOCALMAKE "hwnd UIAUTOMATION.FINDWINDOW "Editor 0
+      IGNORE UIAUTOMATION.SENDMESSAGE :hwnd :WM_CLOSE 0 0
+   ]
+
+   UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO SAVETEST.BADINPUT
+   RUNNOTENOUGHINPUTSTEST [(SAVE)]
+   RUNTOOMANYINPUTSTEST   [(SAVE "testfile.txt "toomany)]
+
+   RUNFILESYSTEMERRORTEST [SAVE  [] ]
+   RUNFILESYSTEMERRORTEST [SAVE  [1]]
+   RUNFILESYSTEMERRORTEST [SAVE  {1}]
+END
+
+TO SAVETEST
+  SAVETEST.SMOKETEST
+  SAVETEST.NUMBERFILENAME
+  SAVETEST.UNICODEFILENAME
+
+  SAVETEST.EMPTYWORKSPACE
+  SAVETEST.ASCIICONTENT
+  SAVETEST.UNICODECONTENT
+  SAVETEST.NONASCII.VARIATIONS
+  SAVETEST.BACKSLASH
+  SAVETEST.EDITOROPEN
+  SAVETEST.BADINPUT
+END

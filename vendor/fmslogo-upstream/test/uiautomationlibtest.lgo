@@ -1,0 +1,68 @@
+; Includes tests for some helpers in uiautomationlib.lgo
+; There is no testing for when an instruction is expected to log an error,
+; so it can be included in the full test pass.
+LOAD "uiautomationlib.lgo
+
+TO UIAUTOMATIONLIBTEST.FINDCOMMANDER
+    IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+    LOCAL "hwnd
+
+    UIAUTOMATION.INITIALIZE
+
+    ; We should be able to find the commander when it's undocked.
+    TRACEINSTRUCTION [TEXTSCREEN]
+    TRACEINSTRUCTION [MAKE "hwnd UIAUTOMATION.FINDWINDOW.COMMANDER]
+    FAILIFNOTFALSE   [EQUAL? :hwnd 0]
+    TRACEINSTRUCTION [SPLITSCREEN]
+
+    UIAUTOMATION.UNINITIALIZE
+END
+
+TO UIAUTOMATIONLIBTEST.SENDBUTTONPUSHTOWINDOW.SMOKETEST
+    IF NOT ISWINDOWS [ STOP ] ; This test only runs on Windows
+
+    UIAUTOMATION.INITIALIZE
+
+    ; Push Status/NoStatus on the commander
+    TRACEINSTRUCTION [TEXTSCREEN]
+    TRACEINSTRUCTION [UIAUTOMATION.SENDBUTTONPUSHTOWINDOW "Commander "Status   ]
+    TRACEINSTRUCTION [UIAUTOMATION.SENDBUTTONPUSHTOWINDOW "Commander "NoStatus ]
+
+    ; Again, with list for window title.
+    TRACEINSTRUCTION [UIAUTOMATION.SENDBUTTONPUSHTOWINDOW [Commander] "Status   ]
+    TRACEINSTRUCTION [UIAUTOMATION.SENDBUTTONPUSHTOWINDOW [Commander] "NoStatus ]
+
+    ; Cleanup (redock the commander)
+    TRACEINSTRUCTION [SPLITSCREEN]
+
+    UIAUTOMATION.UNINITIALIZE
+END
+
+
+TO UIAUTOMATIONLIBTEST.SENDBUTTONPUSHTOWINDOW.BUTTONOTFOUND
+    ; Tests when the button cannot be found
+    ; Note: This is not integrated into the full test pass because it tests failures.
+    UIAUTOMATION.INITIALIZE
+
+    ; Window cannot be found.
+    TRACEINSTRUCTION [UIAUTOMATION.SENDBUTTONPUSHTOWINDOW "DoesNotExist "Button ]
+
+    ; Button cannot be found on window.
+    TRACEINSTRUCTION [TEXTSCREEN]
+    TRACEINSTRUCTION [UIAUTOMATION.SENDBUTTONPUSHTOWINDOW "Commander "DoesNotExist ]
+    TRACEINSTRUCTION [SPLITSCREEN]
+
+    ; Window cannot be found with list window title.
+    TRACEINSTRUCTION [TEXTSCREEN]
+    TRACEINSTRUCTION [UIAUTOMATION.SENDBUTTONPUSHTOWINDOW [Commander] "DoesNotExist ]
+    TRACEINSTRUCTION [SPLITSCREEN]
+
+    UIAUTOMATION.UNINITIALIZE
+
+END
+
+TO UIAUTOMATIONLIBTEST
+    UIAUTOMATIONLIBTEST.FINDCOMMANDER
+    UIAUTOMATIONLIBTEST.SENDBUTTONPUSHTOWINDOW.SMOKETEST
+END

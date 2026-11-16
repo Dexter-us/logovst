@@ -1,0 +1,654 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Tests for SETXY, SETXYZ, SETX, SETY, SETZ, XCOR, YCOR, and ZCOR
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+LOAD "testlib.lgo
+
+
+TO SETXYTEST.WRAP
+
+   TRACEINSTRUCTION [ WRAP ]
+
+   TRACEINSTRUCTION [ SETXY 0 0 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+   TRACEINSTRUCTION [ SETXY -1.1 -1.2 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -1.1 -1.2 0 ]
+
+   TRACEINSTRUCTION [ SETXY 0.1 0.2 ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 0.1 0.2 0 ]
+
+   ; Strings that are converted to numbers.
+   TRACEINSTRUCTION [ SETXY "10 "2e1 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 10 20 0 ]
+
+   ; Wrapping works.
+   TRACEINSTRUCTION [ SETXY 1500 2500 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [499.999999 499.999999 0]
+
+   TRACEINSTRUCTION [ SETXY -2500 -1500 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [-500 -500 0]
+
+END
+
+TO SETXYTEST.PERSPECTIVE
+   ; Set the mode to PERSPECTIVE so that we can set the position
+   ; outside the drawing surface.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [100 200 300] ]
+
+   TRACEINSTRUCTION [ SETXY 1000 2000 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 1000 2000 300 ]
+
+   TRACEINSTRUCTION [ SETXY -1e3 2e2 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -1000 200 300 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETXYTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(SETXY 0)]
+   RUNTOOMANYINPUTSTEST   [(SETXY 0 0 "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [ SETXY {10}  0   ]
+   RUNDOESNTLIKEINPUTTEST [ SETXY []    0   ]
+   RUNDOESNTLIKEINPUTTEST [ SETXY [10]  0   ]
+   RUNDOESNTLIKEINPUTTEST [ SETXY "1a   0   ]
+   RUNDOESNTLIKEINPUTTEST [ SETXY 0    {10} ]
+   RUNDOESNTLIKEINPUTTEST [ SETXY 0    []   ]
+   RUNDOESNTLIKEINPUTTEST [ SETXY 0    [10] ]
+   RUNDOESNTLIKEINPUTTEST [ SETXY 0    "1a  ]
+
+   ; None of the bad input should have changed the position.
+   SIMPLEREPORTTEST [ POSXYZ ] [ 51 52 53 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETXYTEST.BADINPUT.RECOVERABLE
+
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 1 2 3 ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   RUNRECOVERABLEERRORTEST [
+      SETXY [] []  ; empty list is not legal
+   ] (LIST
+      [ 1 ]    ; first input can't be a list
+      {10}     ; first input must be a number (not an array)
+      "10x     ; first input must be a number (not a string)
+      []       ; first input can't be the empty list (again)
+      [ 2 ]    ; first input can't be a list (again)
+      {10}     ; first input can't be an array (again)
+      "10x     ; first input must be a number (again)
+      10       ; legal first input
+      [ 1 ]    ; second input can't be a list
+      {10}     ; second input must be a number (not an array)
+      "10x     ; second input must be a number (not a string)
+      []       ; second input can't be the empty list (again)
+      [ 2 ]    ; second input can't be a list (again)
+      {10}     ; second input can't be an array (again)
+      "10x     ; second input must be a number (again)
+      20       ; legal second input
+   ) []
+
+   SIMPLEREPORTTEST [ POSXYZ ] [ 10 20 3 ]
+
+   ; Test that SETXY accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD 5 ". 0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETXY [] {} ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 5 5 3 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETXYZTEST.WRAP
+
+   TRACEINSTRUCTION [ WRAP ]
+
+   TRACEINSTRUCTION [ SETXYZ 0 0 0 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+   ; Z coordinate is ignored outside of PERSPECTIVE.
+   TRACEINSTRUCTION [ SETXYZ 100 -100 50 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 -100 0 ]
+
+   TRACEINSTRUCTION [ SETXYZ -5.5 5.5 -10.5 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -5.5 5.5 0 ]
+
+   TRACEINSTRUCTION [ SETXYZ 0.1 -0.2 0.3 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0.1 -0.2 0   ]
+
+   ; Strings that are converted to numbers.
+   TRACEINSTRUCTION [ SETXYZ "10 "1e2 "-10 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 10 100 0 ]
+
+   ; Wrapping works.
+   TRACEINSTRUCTION [ SETXYZ 2500 2500 0 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [500  500  0]
+
+   TRACEINSTRUCTION [ SETXYZ -2500 -2500 0 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [-499.999999 -499.999999 0]
+
+END
+
+TO SETXYZTEST.PERSPECTIVE
+   ; Set the mode to PERSPECTIVE so that we can set the position
+   ; outside the drawing surface.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+
+   TRACEINSTRUCTION [ SETXYZ 2000 3000 4000 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 2000 3000 4000 ]
+
+   TRACEINSTRUCTION [ SETXYZ -1e3  -1e5 1e2 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -1000 -100000 100 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETXYZTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(SETXYZ 0 0)]
+   RUNTOOMANYINPUTSTEST   [(SETXYZ 0 0 0 "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ "1a   2   3  ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ [1]   2   3  ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ {1}   2   3  ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ  1   "2a  3  ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ  1   [2]  3  ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ  1   {2}  3  ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ  1    2  "3a ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ  1    2  [3] ]
+   RUNDOESNTLIKEINPUTTEST [ SETXYZ  1    2  {3} ]
+
+   ; None of the bad input should have changed the position.
+   SIMPLEREPORTTEST [ POSXYZ ] [ 51 52 53 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETXYZTEST.BADINPUT.RECOVERABLE
+
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 1 2 3 ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   RUNRECOVERABLEERRORTEST [
+      SETXYZ [] [] []   ; inputs can't be the empty list
+   ] [
+      "1a     ; first input must be number
+      [1]     ; first input can't be a list
+      {1}     ; first input can't be an array
+      "10a    ; first input must be number (again)
+      [10]    ; first input can't be a list (again)
+      {10}    ; first input can't be an array (again)
+      100     ; legal first input
+      "2a     ; second input must be number
+      [2]     ; second input can't be a list
+      {2}     ; second input can't be an array
+      "20a    ; second input must be number (again)
+      [20]    ; second input can't be a list (again)
+      {20}    ; second input can't be an array (again)
+      200     ; legal second input
+      "3a     ; third input must be number
+      [3]     ; third input can't be a list
+      {3}     ; third input can't be an array
+      "30a    ; third input must be number (again)
+      [30]    ; third input can't be a list (again)
+      {30}    ; third input can't be an array (again)
+      300     ; legal third input
+   ] []
+
+   SIMPLEREPORTTEST [ POSXYZ ] [ 100 200 300 ]
+
+
+   ; Test that SETXYZ accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "1 ". "0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETXYZ [] [] [] ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 1 1 1 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+
+TO SETXTEST.WRAP
+
+   TRACEINSTRUCTION [ WRAP ]
+
+   ; Set a known position.
+   TRACEINSTRUCTION [ SETPOSXYZ [0 0 0] ]
+
+   TRACEINSTRUCTION [ SETX 0 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+   TRACEINSTRUCTION [ SETX -5.5 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -5.5 0 0 ]
+
+   TRACEINSTRUCTION [ SETX 0.1 ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 0.1 0 0 ]
+
+   ; Strings that are converted to numbers.
+   TRACEINSTRUCTION [ SETX "10 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 10 0 0 ]
+
+   ; Wrapping works.
+   TRACEINSTRUCTION [ SETX 1500 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [500 0 0]
+
+   TRACEINSTRUCTION [ SETX -2500 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [-500 0 0]
+
+END
+
+TO SETXTEST.PERSPECTIVE
+   ; Set the mode to PERSPECTIVE so that we can set the position
+   ; outside the drawing surface.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [100 200 300] ]
+
+   TRACEINSTRUCTION [ SETX 2000 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 2000 200 300 ]
+
+   TRACEINSTRUCTION [ SETX -1e3 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ -1000 200 300 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETXTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(SETX)]
+   RUNTOOMANYINPUTSTEST   [(SETX 0 "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [ SETX {10} ]
+   RUNDOESNTLIKEINPUTTEST [ SETX []   ]
+   RUNDOESNTLIKEINPUTTEST [ SETX [10] ]
+   RUNDOESNTLIKEINPUTTEST [ SETX "1a  ]
+
+   ; None of the bad input should have changed the position.
+   SIMPLEREPORTTEST [ POSXYZ ] [ 51 52 53 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETXTEST.BADINPUT.RECOVERABLE
+
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 1 2 3 ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      SETX []  ; empty list is not legal
+   ] (LIST
+      [ 1 ]    ; can't be a list
+      {10}     ; must be a number (not an array)
+      "10x     ; must be a number (not a string)
+      []       ; can't be the empty list (again)
+      [ 2 ]    ; can't be a list (again)
+      {10}     ; can't be an array (again)
+      "10x     ; must be a number (again)
+      10       ; legal
+   ) []
+
+   SIMPLEREPORTTEST [ POSXYZ ] [ 10 2 3 ]
+
+
+   ; Test that SETX accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD 5 ". 0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETX [] ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 5 2 3 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETYTEST.WRAP
+
+   TRACEINSTRUCTION [ WRAP ]
+
+   ; Set a known position.
+   TRACEINSTRUCTION [ SETPOSXYZ [0 0 0] ]
+
+   TRACEINSTRUCTION [ SETY 0 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+   TRACEINSTRUCTION [ SETY -5.5 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 -5.5 0 ]
+
+   TRACEINSTRUCTION [ SETY 0.1 ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 0 0.1 0 ]
+
+   ; Strings that are converted to numbers.
+   TRACEINSTRUCTION [ SETY "10 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 10 0 ]
+
+   ; Wrapping works.
+   TRACEINSTRUCTION [ SETY 1500 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 500 0 ]
+
+   TRACEINSTRUCTION [ SETY -2500 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [0 -500 0]
+
+END
+
+TO SETYTEST.PERSPECTIVE
+   ; Set the mode to PERSPECTIVE so that we can set the position
+   ; outside the drawing surface.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [100 200 300] ]
+
+   TRACEINSTRUCTION [ SETY 2000 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 2000 300 ]
+
+   TRACEINSTRUCTION [ SETY -1e3 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 -1000 300 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETYTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(SETY)]
+   RUNTOOMANYINPUTSTEST   [(SETY 0 "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [ SETY {10} ]
+   RUNDOESNTLIKEINPUTTEST [ SETY []   ]
+   RUNDOESNTLIKEINPUTTEST [ SETY [10] ]
+   RUNDOESNTLIKEINPUTTEST [ SETY "1a  ]
+
+   ; None of the bad input should have changed the position.
+   SIMPLEREPORTTEST [ POSXYZ ] [ 51 52 53 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETYTEST.BADINPUT.RECOVERABLE
+
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 1 2 3 ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      SETY []  ; empty list is not legal
+   ] (LIST
+      [ 1 ]    ; can't be a list
+      {10}     ; must be a number (not an array)
+      "10x     ; must be a number (not a string)
+      []       ; can't be the empty list (again)
+      [ 2 ]    ; can't be a list (again)
+      {10}     ; can't be an array (again)
+      "10x     ; must be a number (again)
+      10       ; legal
+   ) []
+
+   SIMPLEREPORTTEST [ POSXYZ ] [ 1 10 3 ]
+
+
+   ; Test that SETX accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD 5 ". 0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETY [] ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 1 5 3 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETZTEST.WRAP
+
+   TRACEINSTRUCTION [ WRAP ]
+
+   ; Set a known position.
+   TRACEINSTRUCTION [ SETPOSXYZ [0 0 0] ]
+
+   TRACEINSTRUCTION [ SETZ 0 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+   ; SETZ does nothing outside of PERSPECTIVE mode.
+   TRACEINSTRUCTION [ SETZ -5.5 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+   ; Strings that are converted to numbers.
+   TRACEINSTRUCTION [ SETZ "10 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 0 0 0 ]
+
+END
+
+TO SETZTEST.PERSPECTIVE
+   ; Set the mode to PERSPECTIVE (SETZ only works in PERSPECTIVE mode)
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [100 200 300] ]
+
+   TRACEINSTRUCTION [ SETZ 2000 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 200 2000 ]
+
+   TRACEINSTRUCTION [ SETZ -1e3 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 200 -1000 ]
+
+   TRACEINSTRUCTION [ SETZ -5.5 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 200 -5.5 ]
+
+   ; Strings are converted to numbers
+   TRACEINSTRUCTION [ SETZ "5000 ]
+   SIMPLEREPORTTEST [ POSXYZ ]  [ 100 200 5000 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETZTEST.BADINPUT
+
+   ; Set the position to known value so that we can be sure it doesn't change.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+
+   ; bad number of inputs
+   RUNNOTENOUGHINPUTSTEST [(SETZ)]
+   RUNTOOMANYINPUTSTEST   [(SETZ 0 "toomany)]
+
+   ; bad inputs
+   RUNDOESNTLIKEINPUTTEST [ SETZ {10} ]
+   RUNDOESNTLIKEINPUTTEST [ SETZ []   ]
+   RUNDOESNTLIKEINPUTTEST [ SETZ [10] ]
+   RUNDOESNTLIKEINPUTTEST [ SETZ "1a  ]
+
+   ; None of the bad input should have changed the position.
+   SIMPLEREPORTTEST [ POSXYZ ] [ 51 52 53 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO SETZTEST.BADINPUT.RECOVERABLE
+
+   ; Set the position to known value.
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 1 2 3 ] ]
+
+   ; Confirm that the recoverable errors are really recoverable.
+   ; The first input is bad, as are all but the final replacement
+   RUNRECOVERABLEERRORTEST [
+      SETZ []  ; empty list is not legal
+   ] (LIST
+      [ 1 ]    ; can't be a list
+      {10}     ; must be a number (not an array)
+      "10x     ; must be a number (not a string)
+      []       ; can't be the empty list (again)
+      [ 2 ]    ; can't be a list (again)
+      {10}     ; can't be an array (again)
+      "10x     ; must be a number (again)
+      10       ; legal
+   ) []
+
+   SIMPLEREPORTTEST [ POSXYZ ] [ 1 2 10 ]
+
+
+   ; Test that SETX accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "- 5 ". 0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ SETZ [] ]
+   SIMPLEREPORTTEST [ POSXYZ ] [ 1 2 -5 ]
+
+   ; Back to the default mode.
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO XCORTEST.SMOKETEST
+
+   TRACEINSTRUCTION [ HOME ]
+   SIMPLEREPORTTEST [ XCOR ] 0
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+   SIMPLEREPORTTEST [ XCOR ] 51
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ -0.1 -0.2 -0.3 ] ]
+   SIMPLEREPORTTEST [ XCOR ] -0.1
+
+END
+
+TO XCORTEST.BADINPUT
+   ; bad number of inputs
+   RUNTOOMANYINPUTSTEST [(XCOR "toomany)]
+END
+
+
+TO YCORTEST.SMOKETEST
+
+   TRACEINSTRUCTION [ HOME ]
+   SIMPLEREPORTTEST [ YCOR ] 0
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+   SIMPLEREPORTTEST [ YCOR ] 52
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ -0.1 -0.2 -0.3 ] ]
+   SIMPLEREPORTTEST [ YCOR ] -0.2
+
+END
+
+TO YCORTEST.BADINPUT
+   ; bad number of inputs
+   RUNTOOMANYINPUTSTEST [(YCOR "toomany)]
+END
+
+
+TO ZCORTEST.SMOKETEST
+
+   TRACEINSTRUCTION [ HOME ]
+   SIMPLEREPORTTEST [ ZCOR ] 0
+
+   TRACEINSTRUCTION [ PERSPECTIVE ]
+   TRACEINSTRUCTION [ SETPOSXYZ [ 51 52 53 ] ]
+   SIMPLEREPORTTEST [ ZCOR ] 53
+
+   TRACEINSTRUCTION [ SETPOSXYZ [ -0.1 -0.2 -0.3 ] ]
+   SIMPLEREPORTTEST [ ZCOR ] -0.299999
+
+   TRACEINSTRUCTION [ WRAP ]
+
+END
+
+TO ZCORTEST.BADINPUT
+   ; bad number of inputs
+   RUNTOOMANYINPUTSTEST [(ZCOR "toomany)]
+END
+
+
+TO XYZTEST
+   SETXYTEST.WRAP
+   SETXYTEST.PERSPECTIVE
+   SETXYTEST.BADINPUT
+   SETXYTEST.BADINPUT.RECOVERABLE
+
+   SETXYZTEST.WRAP
+   SETXYZTEST.PERSPECTIVE
+   SETXYZTEST.BADINPUT
+   SETXYZTEST.BADINPUT.RECOVERABLE
+
+   SETXTEST.WRAP
+   SETXTEST.PERSPECTIVE
+   SETXTEST.BADINPUT
+   SETXTEST.BADINPUT.RECOVERABLE
+
+   SETYTEST.WRAP
+   SETYTEST.PERSPECTIVE
+   SETYTEST.BADINPUT
+   SETYTEST.BADINPUT.RECOVERABLE
+
+   SETZTEST.WRAP
+   SETZTEST.PERSPECTIVE
+   SETZTEST.BADINPUT
+   SETZTEST.BADINPUT.RECOVERABLE
+
+   XCORTEST.SMOKETEST
+   XCORTEST.BADINPUT
+
+   YCORTEST.SMOKETEST
+   YCORTEST.BADINPUT
+
+   ZCORTEST.SMOKETEST
+   ZCORTEST.BADINPUT
+END
+

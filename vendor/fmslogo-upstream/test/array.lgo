@@ -1,0 +1,236 @@
+LOAD "testlib.lgo
+
+TO ARRAYORIGINTEST
+
+   LOCALMAKE "myarray (ARRAY 3 0)
+
+   ; elements should all be the empty list
+   SIMPLEREPORTTEST [COUNT :myarray ] 3
+   SIMPLEREPORTTEST [ITEM 0 :myarray] []
+   SIMPLEREPORTTEST [ITEM 1 :myarray] []
+   SIMPLEREPORTTEST [ITEM 2 :myarray] []
+
+   ; fill in the items
+   SETITEM 0 :myarray 0
+   SETITEM 1 :myarray 1
+   SETITEM 2 :myarray 2
+
+   SIMPLEREPORTTEST [ITEM 0 :myarray] 0
+   SIMPLEREPORTTEST [ITEM 1 :myarray] 1
+   SIMPLEREPORTTEST [ITEM 2 :myarray] 2
+
+   .SETITEM 0 :myarray [0]
+   .SETITEM 1 :myarray [1]
+   .SETITEM 2 :myarray [2]
+
+   SIMPLEREPORTTEST [ITEM 0 :myarray] [0]
+   SIMPLEREPORTTEST [ITEM 1 :myarray] [1]
+   SIMPLEREPORTTEST [ITEM 2 :myarray] [2]
+
+   MAKE "myarray (ARRAY 3 -100)
+   SIMPLEREPORTTEST [COUNT :myarray ] 3
+
+   SETITEM -100 :myarray 0
+   SETITEM -99  :myarray 1
+   SETITEM -98  :myarray 2
+
+   SIMPLEREPORTTEST [ITEM -100 :myarray] 0
+   SIMPLEREPORTTEST [ITEM -99  :myarray] 1
+   SIMPLEREPORTTEST [ITEM -98  :myarray] 2
+
+   ; positive origin
+   TRACEINSTRUCTION [ MAKE "myarray {1 2 3 4}@2 ]
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM 2 :myarray] 1
+   SIMPLEREPORTTEST [ITEM 3 :myarray] 2
+   SIMPLEREPORTTEST [ITEM 4 :myarray] 3
+   SIMPLEREPORTTEST [ITEM 5 :myarray] 4
+
+   ; negative origin
+   TRACEINSTRUCTION [ MAKE "myarray {1 2 3 4}@-2 ]
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM -2 :myarray] 1
+   SIMPLEREPORTTEST [ITEM -1 :myarray] 2
+   SIMPLEREPORTTEST [ITEM  0 :myarray] 3
+   SIMPLEREPORTTEST [ITEM  1 :myarray] 4
+
+   ; zero origin
+   TRACEINSTRUCTION [ MAKE "myarray {1 2 3 4}@0 ]
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM  0 :myarray] 1
+   SIMPLEREPORTTEST [ITEM  1 :myarray] 2
+   SIMPLEREPORTTEST [ITEM  2 :myarray] 3
+   SIMPLEREPORTTEST [ITEM  3 :myarray] 4
+
+   ; no origin implies 0 (possibly a bug)
+   TRACEINSTRUCTION [ MAKE "myarray {1 2 3 4}@ ]
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM  0 :myarray] 1
+   SIMPLEREPORTTEST [ITEM  1 :myarray] 2
+   SIMPLEREPORTTEST [ITEM  2 :myarray] 3
+   SIMPLEREPORTTEST [ITEM  3 :myarray] 4
+
+   ; large negative origin
+   TRACEINSTRUCTION [ MAKE "myarray {1 2 3 4}@-100 ]
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM  -100 :myarray] 1
+   SIMPLEREPORTTEST [ITEM  -99  :myarray] 2
+   SIMPLEREPORTTEST [ITEM  -98  :myarray] 3
+   SIMPLEREPORTTEST [ITEM  -97  :myarray] 4
+
+   ; an explicitly positive origin is ignored (origin=1)
+   TRACEINSTRUCTION [ MAKE "myarray {1 2 3 4}@+12345 ]
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM  12345 :myarray]  1
+   SIMPLEREPORTTEST [ITEM  12346  :myarray] 2
+   SIMPLEREPORTTEST [ITEM  12347  :myarray] 3
+   SIMPLEREPORTTEST [ITEM  12348  :myarray] 4
+
+   ; an explicitly positive origin is ignored (origin=1)
+   TRACEINSTRUCTION [ MAKE "myarray {1 2 3 4}@+12345 ]
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM  12345 :myarray]  1
+   SIMPLEREPORTTEST [ITEM  12346  :myarray] 2
+   SIMPLEREPORTTEST [ITEM  12347  :myarray] 3
+   SIMPLEREPORTTEST [ITEM  12348  :myarray] 4
+
+   SIMPLEREPORTTEST [IGNORE {1}@10"after] "after
+
+   ; bad input to origin
+   (RUNIDONTKNOWHOWTOTEST
+        [ MAKE "myarray {1 2 3 4}@1e10]
+        "|I don't know how to e10|)
+
+   (RUNEXPECTERRORTEST
+        [ MAKE "myarray {1 2 3 4}@1.23 SHOW 1 ]
+        9
+        "|You don't say what to do with 0.23|)
+
+END
+
+
+TO ARRAYSMOKETEST
+
+   LOCALMAKE "myarray ARRAY 4
+
+   ; elements should all be the empty list
+   SIMPLEREPORTTEST [COUNT :myarray ] 4
+   SIMPLEREPORTTEST [ITEM 1 :myarray] []
+   SIMPLEREPORTTEST [ITEM 2 :myarray] []
+   SIMPLEREPORTTEST [ITEM 3 :myarray] []
+   SIMPLEREPORTTEST [ITEM 4 :myarray] []
+
+   ; fill in the items of different types
+   SETITEM 4 :myarray {array}
+   SETITEM 3 :myarray [list]
+   SETITEM 2 :myarray "hi
+   SETITEM 1 :myarray 42
+
+   SIMPLEREPORTTEST [ITEM 1 :myarray] 42
+   SIMPLEREPORTTEST [ITEM 2 :myarray] "hi
+   SIMPLEREPORTTEST [ITEM 3 :myarray] [list]
+
+   .SETITEM 1 :myarray 1
+   .SETITEM 2 :myarray 2
+   .SETITEM 3 :myarray 3
+   .SETITEM 4 :myarray 4
+
+   SIMPLEREPORTTEST [ITEM 1 :myarray] 1
+   SIMPLEREPORTTEST [ITEM 2 :myarray] 2
+   SIMPLEREPORTTEST [ITEM 3 :myarray] 3
+   SIMPLEREPORTTEST [ITEM 4 :myarray] 4
+
+   ; create an array from a literal
+   LOCALMAKE "newarray {1 2 3 4}
+   SIMPLEREPORTTEST [COUNT :newarray ] 4
+   SIMPLEREPORTTEST [ITEM 1 :newarray] 1
+   SIMPLEREPORTTEST [ITEM 2 :newarray] 2
+   SIMPLEREPORTTEST [ITEM 3 :newarray] 3
+   SIMPLEREPORTTEST [ITEM 4 :newarray] 4
+END
+
+TO ARRAYBADINPUTTEST
+
+   RUNDOESNTLIKEINPUTTEST [ARRAY -1]
+   RUNDOESNTLIKEINPUTTEST [ARRAY 1.23]
+   RUNDOESNTLIKEINPUTTEST [ARRAY "two]
+   RUNDOESNTLIKEINPUTTEST [ARRAY {}]
+   RUNDOESNTLIKEINPUTTEST [ARRAY []]
+
+   RUNDOESNTLIKEINPUTTEST [(ARRAY 5  "origin)]
+   RUNDOESNTLIKEINPUTTEST [(ARRAY 5  1.23)]
+   RUNDOESNTLIKEINPUTTEST [(ARRAY 5  {5})]
+   RUNDOESNTLIKEINPUTTEST [(ARRAY 5  [5])]
+
+   IF ISWINDOWS [
+     RUNOUTOFMEMORYTEST [ ARRAY 1073741823 ] ; does not overflow
+     RUNOUTOFMEMORYTEST [ ARRAY 1073741824 ] ; overflows to 0 in size
+     RUNOUTOFMEMORYTEST [ ARRAY 1073741825 ] ; overflows to 4 in size
+   ]
+
+   ; The output of ARRAY can't be compared equally to anything,
+   ; so we assign it to a variable and test that.
+   LOCAL "array
+   RUNRECOVERABLEERRORTEST [
+      MAKE "array (ARRAY [] [])   ; both inputs must be integers
+   ][
+      "abc            ; first input not a number
+      1.2             ; first input not an integer
+      [1]             ; first input can't be a list
+      {1}             ; first input can't be an array
+      []              ; first input can't be the empty list (again)
+      "10x            ; first input not a number (again)
+      1.2             ; first input not an integer (again)
+      [1]             ; first input can't be a list (again)
+      {1}             ; first input can't be an array (again)
+      3               ; legal first input
+      "abc            ; second input not a number
+      1.2             ; second input not an integer
+      [1]             ; second input can't be a list
+      {1}             ; second input can't be an array
+      []              ; second input can't be the empty list (again)
+      "abc            ; second input not a number (again)
+      1.2             ; second input not an integer (again)
+      [1]             ; second input can't be a list (again)
+      {1}             ; second input can't be an array (again)
+      4               ; legal second input
+   ] ~
+   [] ; ARRAY output doesn't compare equally to anything
+
+   ; Confirm that ARRAY accepted the legal replacement inputs
+   SIMPLEREPORTTEST [ COUNT :array ] 3   ; size
+   SIMPLEREPORTTEST [ FIRST :array ] 4   ; origin
+   SIMPLEREPORTTEST [ ITEM 4 :array ] [] ; first item
+   SIMPLEREPORTTEST [ ITEM 5 :array ] [] ; second item
+
+   ; Test that ARRAY accepts ownership of any node :erract provides.
+   LOCAL "erract
+   TRACEINSTRUCTION [ MAKE "erract [ (WORD "2 ". "0) ] ]
+   TRACEINSTRUCTIONNOCATCH [ MAKE "array (ARRAY {} {}) ]
+   SIMPLEREPORTTEST [ COUNT :array ] 2   ; size
+   SIMPLEREPORTTEST [ FIRST :array ] 2   ; origin
+   SIMPLEREPORTTEST [ ITEM 2 :array ] [] ; first item
+   SIMPLEREPORTTEST [ ITEM 3 :array ] [] ; second item
+
+END
+
+TO BUG32TEST
+   REPORTTESTINFO [Creating an empty array (regression test for bug #32)]
+   LOCALMAKE "myarray ARRAY 0
+END
+
+
+TO ARRAYGCCRASHTEST
+   IGNORE MAKEDEEPARRAY 100000 ; create a deeply nested array
+   REPORTTESTPASSED [|Bug #468 is fixed; garbage collecting a deeply nested array didn't crash.|]
+END
+
+TO ARRAYTEST
+
+   ARRAYSMOKETEST
+   ARRAYORIGINTEST
+   ARRAYBADINPUTTEST
+   BUG32TEST
+
+   ARRAYGCCRASHTEST
+END

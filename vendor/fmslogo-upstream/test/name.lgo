@@ -1,0 +1,56 @@
+LOAD "testlib.lgo
+
+TO NAMETEST.SMOKETEST
+
+   LOCAL [MyName]
+
+   ; assign an empty list
+   TRACEINSTRUCTION [ NAME [] "MyName ]
+   SIMPLEREPORTTEST [ :MyName ] []
+
+   ; names are case-insensitive
+   TRACEINSTRUCTION [ NAME "value "myname ]
+   SIMPLEREPORTTEST [ :MyName ] "value
+   TRACEINSTRUCTION [ NAME 123 "MYNAME ]
+   SIMPLEREPORTTEST [ :MyName ] 123
+
+   ; if the name doesn't exist in the current scope, a global variable is created.
+   FAILIFNOTFALSE   [ NAME? "NameTest.SmokeTest.Variable ]
+   TRACEINSTRUCTION [ NAME {a b c} "NameTest.SmokeTest.Variable ]
+   FAILIFNOTTRUE    [ NAME? "NameTest.SmokeTest.Variable ]
+   FAILIFNOTTRUE    [ ARRAY? :NameTest.SmokeTest.Variable ]
+   SIMPLEREPORTTEST [ ITEM 1 :NameTest.SmokeTest.Variable ] "a
+   SIMPLEREPORTTEST [ ITEM 2 :NameTest.SmokeTest.Variable ] "b
+   SIMPLEREPORTTEST [ ITEM 3 :NameTest.SmokeTest.Variable ] "c
+   SIMPLEREPORTTEST [ COUNT :NameTest.SmokeTest.Variable  ] 3
+
+   ; clean up
+   TRACEINSTRUCTION [ ERASE [[] [NameTest.SmokeTest.Variable] ] ]
+
+END
+
+
+TO NAMETEST.BUG598
+   ; NAME should work when given a variable with the same name as its parameter.
+   LOCAL [name.value.input name.variable.input ]
+   TRACEINSTRUCTION [ NAME "name.value.input "name.variable.input ]
+   SIMPLEREPORTTEST [ :name.variable.input ] "name.value.input
+END
+
+TO NAMETEST.BADINPUT
+   LOCAL "myname
+
+   RUNNOTENOUGHINPUTSTEST [(NAME "value)]
+   RUNTOOMANYINPUTSTEST   [(NAME "value "myname "toomany)]
+   RUNDOESNTLIKEINPUTTEST [NAME "value [1 2 3] ]
+   RUNDOESNTLIKEINPUTTEST [NAME "value {1 2 3} ]
+END
+
+
+TO NAMETEST
+
+   NAMETEST.SMOKETEST
+   NAMETEST.BUG598
+   NAMETEST.BADINPUT
+
+END
