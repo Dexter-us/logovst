@@ -34,18 +34,25 @@ jobs:
         run: |
           cmake -S native -B "$env:RUNNER_TEMP\logo-vst3-build" `
             -G "Visual Studio 17 2022" -A x64 `
-            -DLOGO_MIDI_BUILD_TESTS=OFF `
+          -DLOGO_MIDI_BUILD_TESTS=ON `
             -DLOGO_MIDI_BUILD_VST3=ON `
             "-DVST3_SDK_ROOT=$env:RUNNER_TEMP\vst3sdk" `
             -DSMTG_RUN_VST_VALIDATOR=ON `
             -DSMTG_CREATE_PLUGIN_LINK=OFF
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Build and validate plugin
+      - name: Build CLI and validate plugin
         shell: pwsh
         run: |
           cmake --build "$env:RUNNER_TEMP\logo-vst3-build" `
-            --config Release --target logo-midi-vst3 --parallel 2
+            --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run native tests
+        shell: pwsh
+        run: |
+          ctest --test-dir "$env:RUNNER_TEMP\logo-vst3-build" `
+            -C Release --output-on-failure
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Check vendor and package VST3 bundle
@@ -76,10 +83,54 @@ jobs:
             throw "The downloadable VST3 archive was not created"
           }
 
+      - name: Package Windows command-line app
+        shell: pwsh
+        run: |
+          $cli = Join-Path $env:RUNNER_TEMP `
+            "logo-vst3-build\Release\logo-midi.exe"
+          if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) {
+            throw "The Windows command-line executable was not created at $cli"
+          }
+
+          $stage = Join-Path $env:RUNNER_TEMP "cli-artifact"
+          $examples = Join-Path $stage "examples"
+          New-Item -ItemType Directory -Path $examples -Force | Out-Null
+          Copy-Item -LiteralPath $cli -Destination $stage
+          Copy-Item -LiteralPath "native\examples\turtle-square.lgo" `
+            -Destination $examples
+          Copy-Item -LiteralPath "native\examples\scale.lgo" `
+            -Destination $examples
+          @'
+          Logo MIDI command-line app (Windows x64)
+
+          Render a Logo turtle script to SVG:
+            logo-midi.exe --graphics examples\turtle-square.lgo --output square.svg
+
+          Render the included music script to MIDI:
+            logo-midi.exe examples\scale.lgo --output scale.mid
+
+          See https://github.com/Dexter-us/logovst for source and license details.
+          '@ | Set-Content -LiteralPath (Join-Path $stage "README.txt")
+
+          $zip = Join-Path $env:RUNNER_TEMP "logo-midi-cli-windows-x64.zip"
+          Compress-Archive -Path (Join-Path $stage "*") `
+            -DestinationPath $zip -CompressionLevel Optimal -Force
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) {
+            throw "The downloadable CLI archive was not created"
+          }
+
       - name: Upload downloadable VST3
         uses: actions/upload-artifact@v4
         with:
           name: logo-midi-vst3-windows-x64
           path: ${{ runner.temp }}/logo-midi-vst3-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload downloadable command-line app
+        uses: actions/upload-artifact@v4
+        with:
+          name: logo-midi-cli-windows-x64
+          path: ${{ runner.temp }}/logo-midi-cli-windows-x64.zip
           if-no-files-found: error
           retention-days: 14

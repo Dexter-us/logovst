@@ -20,6 +20,18 @@ workflow**, or it runs when relevant project files change. The editor still
 needs to be opened and exercised in a Windows DAW to verify host-specific GUI
 behavior.
 
+## Download the Windows command-line app
+
+The same successful Windows x64 workflow also uploads a
+`logo-midi-cli-windows-x64` artifact. Extract it and run the included example:
+
+```text
+logo-midi.exe --graphics examples\turtle-square.lgo --output square.svg
+```
+
+The app can also render the included music example to a MIDI file. Both
+downloads are available in the successful workflow run's **Artifacts** section.
+
 ## Licensing
 
 The FMSLogo source remains under its original terms; retain

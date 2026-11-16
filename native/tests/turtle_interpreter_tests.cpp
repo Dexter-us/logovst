@@ -88,6 +88,34 @@ int main() {
   assert(std::abs(procedure_graphics.state().position.x) < 1e-9);
   assert(std::abs(procedure_graphics.state().position.y) < 1e-9);
 
+  TurtleGraphicsEngine parameter_graphics;
+  logo_midi::execute_turtle_script(
+      "TO STEP :DISTANCE\n"
+      "  FD :DISTANCE\n"
+      "END\n"
+      "TO REPEATSTEP :SIZE :COUNT\n"
+      "  REPEAT :COUNT [ STEP :SIZE ]\n"
+      "END\n"
+      "REPEATSTEP 5 3\n",
+      parameter_graphics);
+  assert(std::abs(parameter_graphics.state().position.y - 15.0) < 1e-9);
+  assert(parameter_graphics.canvas().strokes.size() == 3);
+
+  TurtleGraphicsEngine color_parameter_graphics;
+  logo_midi::execute_turtle_script(
+      "TO COLORLINE :DISTANCE :RED :GREEN :BLUE\n"
+      "  SETPC [:RED :GREEN :BLUE]\n"
+      "  FD :DISTANCE\n"
+      "END\n"
+      "COLORLINE 12 46 190 210\n",
+      color_parameter_graphics);
+  assert(color_parameter_graphics.canvas().strokes.size() == 1);
+  const auto parameter_color =
+      color_parameter_graphics.canvas().strokes.front().color;
+  assert(parameter_color.red == 46);
+  assert(parameter_color.green == 190);
+  assert(parameter_color.blue == 210);
+
   TurtleGraphicsEngine malformed_graphics;
   const std::vector<std::string> malformed_scripts = {
       "REPEAT 2 [\nFD 5\n",
@@ -99,10 +127,19 @@ int main() {
       "REPEAT 2 [\nTO INSIDE\nEND\n]\n",
       "REPEAT 1.5 [ FD 1 ]\n",
       "TO 1SHAPE\nEND\n",
-      "TO SHAPE\nEND\nTO SHAPE\nEND\n"};
+      "TO SHAPE\nEND\nTO SHAPE\nEND\n",
+      "TO BAD SIZE\nEND\n",
+      "TO BAD :SIZE :size\nEND\n"};
   for (const auto& malformed : malformed_scripts) {
     expect_script_error(malformed, malformed_graphics);
   }
+
+  expect_script_error("TO MOVE :DISTANCE\nFD :DISTANCE\nEND\nMOVE\n",
+                      malformed_graphics);
+  expect_script_error("TO MOVE :DISTANCE\nFD :DISTANCE\nEND\nMOVE 1 2\n",
+                      malformed_graphics);
+  expect_script_error("TO MOVE\nFD :DISTANCE\nEND\nMOVE\n",
+                      malformed_graphics);
 
   expect_script_error("REPEAT 4097 [ FD 1 ]\n", malformed_graphics);
   expect_script_error("REPEAT 4096 [ FD 1 ]\n", malformed_graphics);

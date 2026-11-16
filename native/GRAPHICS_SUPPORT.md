@@ -8,7 +8,7 @@ and exports the scene as SVG.
 
 The VST editor and `logo-midi --graphics` CLI mode accept case-insensitive
 Logo commands, ignore blank lines and semicolon comments, and support
-parameterless `TO`/`END` procedures and multiline `REPEAT` blocks. Scripts are
+parameterized `TO`/`END` procedures and multiline `REPEAT` blocks. Scripts are
 limited to 64 KiB, 4096 executed commands, 4096 repetitions per loop, 256
 procedures, and 64 nested loops/procedure calls. A failed script does not
 partially change the scene.
@@ -35,21 +35,24 @@ REPEAT 4 [
 ]
 ```
 
-Procedures can be defined with `TO` and `END`, then called by name. Definitions
-may appear before or after their calls. This subset supports parameterless
-procedures; nested loops and procedure calls share a 64-level limit, and the
-overall command limit also bounds repeated or recursive work.
+Procedures can be defined with `TO` and `END`, then called by name. Parameters
+are declared with a leading colon and referenced the same way in the body.
+Calls pass one value per parameter; values can be forwarded to nested procedures
+and used anywhere a supported command expects an argument. Definitions may
+appear before or after their calls. Expressions and interpolation inside quoted
+strings are not supported. Nested loops and procedure calls share a 64-level
+limit, and the overall command limit also bounds repeated or recursive work.
 
 ```logo
-TO SQUARE
-  REPEAT 4 [ FD 90 RT 90 ]
+TO SQUARE :SIZE
+  REPEAT 4 [ FD :SIZE RT 90 ]
 END
-SQUARE
+SQUARE 90
+SQUARE 45
 ```
 
-This is a documented subset, not a full FMSLogo interpreter. User-defined
-procedure parameters, expressions, and the music-command language are not yet
-connected to this editor.
+This is a documented subset, not a full FMSLogo interpreter. Expressions and
+the music-command language are not yet connected to this editor.
 
 ## Batch 1 — 2D turtle state and strokes
 
@@ -123,7 +126,8 @@ should be documented as unsupported:
 ## Compatibility tracking
 
 - The VST editor uses Steinberg VSTGUI.
-- The command-line graphics mode exports SVG from the same turtle scene model.
+- The Windows x64 command-line build exports SVG from the same turtle scene
+  model as the VST editor.
 - Supported movement, pen, boundary, polygon, label, ellipse-arc, and pixel
   commands are sent to the shared scene model and rendered in the editor.
 - `PIXEL` currently reports approximate vector-scene sampling; it cannot sample

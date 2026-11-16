@@ -27,7 +27,7 @@ void print_usage() {
       << "  NOTE pitch beats | CHORD [pitch ...] beats | REST beats\n"
       << "  CC controller value | PROGRAM 0..127\n\n"
       << "Graphics mode runs the supported Logo turtle commands, REPEAT blocks,\n"
-      << "and parameterless TO/END procedures, then writes a standalone SVG.\n";
+      << "and parameterized TO/END procedures, then writes a standalone SVG.\n";
 }
 
 double number(const std::string& text, const std::string& line,

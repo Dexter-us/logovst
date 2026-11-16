@@ -14,7 +14,7 @@ struct TurtleScriptResult {
 };
 
 // Executes the supported Logo turtle subset, including bounded multiline
-// REPEAT blocks and parameterless TO/END procedures. A failed script leaves
+// REPEAT blocks and parameterized TO/END procedures. A failed script leaves
 // the caller's graphics state unchanged.
 TurtleScriptResult execute_turtle_script(std::string_view script,
                                          TurtleGraphicsEngine& graphics);

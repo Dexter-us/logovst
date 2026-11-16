@@ -186,6 +186,11 @@ struct Command {
   std::size_t line_number = 0;
 };
 
+struct Procedure {
+  std::vector<std::string> parameters;
+  std::vector<Command> body;
+};
+
 bool is_supported_command(const std::string& command) {
   static const std::vector<std::string> commands = {
       "FORWARD", "FD", "BACK", "BK", "LEFT", "LT", "RIGHT", "RT",
@@ -235,8 +240,9 @@ std::vector<Token> make_tokens(const std::vector<SourceLine>& lines) {
 class ScriptParser {
  public:
   ScriptParser(std::vector<Token> tokens,
-               const std::vector<std::string>& procedure_names)
-      : tokens_(std::move(tokens)), procedure_names_(procedure_names) {}
+               const std::unordered_map<std::string, std::size_t>&
+                   procedure_arities)
+      : tokens_(std::move(tokens)), procedure_arities_(procedure_arities) {}
 
   std::vector<Command> parse() {
     auto commands = parse_sequence(false);
@@ -249,8 +255,7 @@ class ScriptParser {
 
  private:
   bool is_procedure(const std::string& name) const {
-    return std::find(procedure_names_.begin(), procedure_names_.end(), name) !=
-           procedure_names_.end();
+    return procedure_arities_.find(name) != procedure_arities_.end();
   }
 
   bool is_command_start(const std::string& name) const {
@@ -269,6 +274,17 @@ class ScriptParser {
     if (position_ >= tokens_.size() || tokens_[position_].newline ||
         (tokens_[position_].text == "]" && !allow_closing_bracket)) {
       script_error(line_number, command + " has too few arguments.");
+    }
+    return tokens_[position_++].text;
+  }
+
+  std::string take_procedure_argument(std::size_t line_number,
+                                      const std::string& procedure_name) {
+    if (position_ >= tokens_.size() || tokens_[position_].newline ||
+        tokens_[position_].text == "]" ||
+        is_command_start(uppercase(tokens_[position_].text))) {
+      script_error(line_number, "procedure `" + procedure_name +
+                                    "` has too few arguments.");
     }
     return tokens_[position_++].text;
   }
@@ -294,11 +310,13 @@ class ScriptParser {
       Command command{name, {}, {}, line_number};
       if (name == "REPEAT") {
         const auto count_token = take_argument(line_number, name);
-        const double count_value = parse_number(count_token, line_number);
-        if (count_value < 0 || count_value > kMaximumRepeatCount ||
-            count_value != std::trunc(count_value)) {
-          script_error(line_number,
-                       "REPEAT count must be an integer from 0 to 4096.");
+        if (count_token.empty() || count_token.front() != ':') {
+          const double count_value = parse_number(count_token, line_number);
+          if (count_value < 0 || count_value > kMaximumRepeatCount ||
+              count_value != std::trunc(count_value)) {
+            script_error(line_number,
+                         "REPEAT count must be an integer from 0 to 4096.");
+          }
         }
         if (position_ >= tokens_.size() || tokens_[position_].text != "[") {
           script_error(line_number, "REPEAT expects a command list in `[ ]`.");
@@ -322,7 +340,20 @@ class ScriptParser {
           script_error(line_number, name + " requires text.");
         }
       } else if (is_procedure(name)) {
-        // Procedures in this subset take no parameters.
+        const auto argument_count = procedure_arities_.at(name);
+        command.arguments.reserve(argument_count);
+        for (std::size_t index = 0; index < argument_count; ++index) {
+          command.arguments.push_back(
+              take_procedure_argument(line_number, name));
+        }
+        if (position_ < tokens_.size() && !tokens_[position_].newline &&
+            tokens_[position_].text != "]" &&
+            !is_command_start(uppercase(tokens_[position_].text))) {
+          script_error(line_number, "procedure `" + name + "` expects " +
+                                        std::to_string(argument_count) +
+                                        " argument(s); unexpected extra input `" +
+                                        tokens_[position_].text + "`.");
+        }
       } else if (name == "ELLIPSEARC") {
         for (int i = 0; i < 3; ++i) {
           command.arguments.push_back(take_argument(line_number, name));
@@ -368,7 +399,7 @@ class ScriptParser {
   }
 
   std::vector<Token> tokens_;
-  const std::vector<std::string>& procedure_names_;
+  const std::unordered_map<std::string, std::size_t>& procedure_arities_;
   std::size_t position_ = 0;
 };
 
@@ -389,13 +420,15 @@ std::vector<SourceLine> read_source_lines(std::string_view script) {
 
 struct ParsedScripts {
   std::vector<Command> main;
-  std::unordered_map<std::string, std::vector<Command>> procedures;
+  std::unordered_map<std::string, Procedure> procedures;
 };
 
 ParsedScripts parse_source(
     const std::vector<SourceLine>& lines) {
   std::vector<SourceLine> main_lines;
   std::unordered_map<std::string, std::vector<SourceLine>> procedure_sources;
+  std::unordered_map<std::string, std::vector<std::string>>
+      procedure_parameters;
   std::string current_procedure;
   std::size_t procedure_start_line = 0;
   std::size_t main_repeat_depth = 0;
@@ -413,9 +446,9 @@ ParsedScripts parse_source(
           script_error(line.line_number,
                        "procedure definitions must be outside REPEAT blocks.");
         }
-        if (line_tokens.size() != 2) {
+        if (line_tokens.size() < 2) {
           script_error(line.line_number,
-                       "TO expects one procedure name and no parameters.");
+                       "TO expects a procedure name followed by optional `:parameter` names.");
         }
         current_procedure = uppercase(line_tokens[1]);
         if (!is_valid_procedure_name(current_procedure)) {
@@ -435,9 +468,27 @@ ParsedScripts parse_source(
           script_error(line.line_number, "procedure `" + current_procedure +
                                              "` is already defined.");
         }
+        std::vector<std::string> parameters;
+        for (std::size_t index = 2; index < line_tokens.size(); ++index) {
+          const auto& parameter_token = line_tokens[index];
+          if (parameter_token.size() < 2 || parameter_token.front() != ':' ||
+              !is_valid_procedure_name(parameter_token.substr(1))) {
+            script_error(line.line_number,
+                         "invalid parameter name `" + parameter_token +
+                             "`; parameters must start with `:`.");
+          }
+          const auto parameter_name = uppercase(parameter_token.substr(1));
+          if (std::find(parameters.begin(), parameters.end(), parameter_name) !=
+              parameters.end()) {
+            script_error(line.line_number, "parameter `:" + parameter_name +
+                                               "` is declared more than once.");
+          }
+          parameters.push_back(parameter_name);
+        }
         procedure_start_line = line.line_number;
         procedure_sources.emplace(current_procedure,
                                    std::vector<SourceLine>{});
+        procedure_parameters.emplace(current_procedure, std::move(parameters));
       } else {
         main_lines.push_back(line);
         bool in_quotes = false;
@@ -473,18 +524,21 @@ ParsedScripts parse_source(
                  "procedure `" + current_procedure + "` is missing END.");
   }
 
-  std::vector<std::string> procedure_names;
-  procedure_names.reserve(procedure_sources.size());
+  std::unordered_map<std::string, std::size_t> procedure_arities;
+  procedure_arities.reserve(procedure_sources.size());
   for (const auto& procedure : procedure_sources) {
-    procedure_names.push_back(procedure.first);
+    procedure_arities.emplace(procedure.first,
+                               procedure_parameters.at(procedure.first).size());
   }
   ParsedScripts parsed;
   for (const auto& procedure : procedure_sources) {
-    parsed.procedures.emplace(
-        procedure.first,
-        ScriptParser(make_tokens(procedure.second), procedure_names).parse());
+    parsed.procedures.emplace(procedure.first,
+                              Procedure{procedure_parameters.at(procedure.first),
+                                        ScriptParser(make_tokens(procedure.second),
+                                                     procedure_arities)
+                                            .parse()});
   }
-  parsed.main = ScriptParser(make_tokens(main_lines), procedure_names).parse();
+  parsed.main = ScriptParser(make_tokens(main_lines), procedure_arities).parse();
   return parsed;
 }
 
@@ -499,9 +553,13 @@ TurtleScriptResult execute_turtle_script(std::string_view script,
   TurtleGraphicsEngine candidate = graphics;
   TurtleScriptResult result;
   const auto parsed = parse_source(read_source_lines(script));
-  std::function<void(const std::vector<Command>&, std::size_t)> execute_commands;
+  using ParameterValues = std::unordered_map<std::string, std::string>;
+  std::function<void(const std::vector<Command>&, std::size_t,
+                     const ParameterValues&)>
+      execute_commands;
   execute_commands = [&](const std::vector<Command>& commands,
-                         std::size_t nesting_depth) {
+                         std::size_t nesting_depth,
+                         const ParameterValues& parameters) {
     for (const auto& instruction : commands) {
       if (result.commands_executed >= kMaximumCommands) {
         script_error(instruction.line_number,
@@ -509,7 +567,20 @@ TurtleScriptResult execute_turtle_script(std::string_view script,
       }
       ++result.commands_executed;
       const auto& command = instruction.name;
-      const auto& tokens = instruction.arguments;
+      std::vector<std::string> tokens;
+      tokens.reserve(instruction.arguments.size());
+      for (const auto& token : instruction.arguments) {
+        if (!token.empty() && token.front() == ':') {
+          const auto parameter = parameters.find(uppercase(token.substr(1)));
+          if (parameter == parameters.end()) {
+            script_error(instruction.line_number,
+                         "unknown procedure parameter `" + token + "`.");
+          }
+          tokens.push_back(parameter->second);
+        } else {
+          tokens.push_back(token);
+        }
+      }
       std::string argument_text;
       for (const auto& token : tokens) {
         if (!argument_text.empty()) {
@@ -524,10 +595,16 @@ TurtleScriptResult execute_turtle_script(std::string_view script,
           script_error(instruction.line_number,
                        "maximum REPEAT/procedure nesting depth is 64.");
         }
-        const auto count = static_cast<std::size_t>(
-            parse_number(tokens.front(), instruction.line_number));
+        const double count_value =
+            parse_number(tokens.front(), instruction.line_number);
+        if (count_value < 0 || count_value > kMaximumRepeatCount ||
+            count_value != std::trunc(count_value)) {
+          script_error(instruction.line_number,
+                       "REPEAT count must be an integer from 0 to 4096.");
+        }
+        const auto count = static_cast<std::size_t>(count_value);
         for (std::size_t iteration = 0; iteration < count; ++iteration) {
-          execute_commands(instruction.body, nesting_depth + 1);
+          execute_commands(instruction.body, nesting_depth + 1, parameters);
         }
         continue;
       }
@@ -537,7 +614,16 @@ TurtleScriptResult execute_turtle_script(std::string_view script,
           script_error(instruction.line_number,
                        "maximum REPEAT/procedure nesting depth is 64.");
         }
-        execute_commands(procedure->second, nesting_depth + 1);
+        require_argument_count(tokens, procedure->second.parameters.size(),
+                               instruction.line_number, command);
+        ParameterValues nested_parameters;
+        for (std::size_t index = 0;
+             index < procedure->second.parameters.size(); ++index) {
+          nested_parameters.emplace(procedure->second.parameters[index],
+                                    tokens[index]);
+        }
+        execute_commands(procedure->second.body, nesting_depth + 1,
+                         nested_parameters);
         continue;
       }
 
@@ -663,7 +749,7 @@ TurtleScriptResult execute_turtle_script(std::string_view script,
     }
     }
   };
-  execute_commands(parsed.main, 0);
+  execute_commands(parsed.main, 0, {});
 
   graphics = std::move(candidate);
   return result;
