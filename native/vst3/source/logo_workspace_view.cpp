@@ -120,6 +120,12 @@ void LogoWorkspaceView::onTextEditorDestroyed(
 }
 
 void LogoWorkspaceView::valueChanged(VSTGUI::CControl* control) {
+  // CTextButton's default kick style reports both activation and reset.
+  // Handle only the activation so Load does not open two modal dialogs.
+  if (control == nullptr || control->getValue() != control->getMax()) {
+    return;
+  }
+
   if (control == run_button_) {
     run_program();
   } else if (control == load_button_) {
