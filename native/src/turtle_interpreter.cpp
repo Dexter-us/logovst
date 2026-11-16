@@ -183,6 +183,7 @@ struct Command {
   std::string name;
   std::vector<std::string> arguments;
   std::vector<Command> body;
+  std::vector<Command> alternate_body;
   std::size_t line_number = 0;
 };
 
@@ -201,8 +202,57 @@ bool is_supported_command(const std::string& command) {
       "PENREVERSE", "WRAP", "FENCE", "WINDOW", "CLEAN", "CLEARSCREEN",
       "CS", "POLYSTART", "POLYEND", "FILL", "ELLIPSEARC", "LABEL",
       "LABELSIZE", "SETLABELSIZE", "SETLABELFONT", "SETPIXEL", "PIXEL",
-      "REPEAT", "TO", "END"};
+      "REPEAT", "IF", "IFELSE", "TO", "END"};
   return std::find(commands.begin(), commands.end(), command) != commands.end();
+}
+
+bool is_comparison_operator(const std::string& operation) {
+  return operation == "=" || operation == "<>" || operation == "!=" ||
+         operation == "<" || operation == "<=" || operation == ">" ||
+         operation == ">=";
+}
+
+void validate_condition_shape(const std::vector<std::string>& condition,
+                              std::size_t line_number) {
+  if (condition.size() == 1 &&
+      (condition.front().front() == ':' ||
+       uppercase(condition.front()) == "TRUE" ||
+       uppercase(condition.front()) == "FALSE")) {
+    return;
+  }
+  if (condition.size() == 3 && is_comparison_operator(condition[1])) {
+    return;
+  }
+  script_error(line_number,
+               "condition must be TRUE, FALSE, a boolean parameter, or a "
+               "numeric comparison such as `:SIZE > 10`.");
+}
+
+bool evaluate_condition(const std::vector<std::string>& condition,
+                        std::size_t line_number) {
+  if (condition.size() == 1) {
+    const auto value = uppercase(condition.front());
+    if (value == "TRUE") {
+      return true;
+    }
+    if (value == "FALSE") {
+      return false;
+    }
+    script_error(line_number, "condition value must be TRUE or FALSE.");
+  }
+  if (condition.size() != 3 ||
+      !is_comparison_operator(condition[1])) {
+    script_error(line_number, "invalid numeric comparison.");
+  }
+  const auto left = parse_number(condition[0], line_number);
+  const auto right = parse_number(condition[2], line_number);
+  const auto& operation = condition[1];
+  if (operation == "=") return left == right;
+  if (operation == "<>" || operation == "!=") return left != right;
+  if (operation == "<") return left < right;
+  if (operation == "<=") return left <= right;
+  if (operation == ">") return left > right;
+  return left >= right;
 }
 
 bool is_valid_procedure_name(const std::string& name) {
@@ -289,8 +339,24 @@ class ScriptParser {
     return tokens_[position_++].text;
   }
 
-  std::vector<Command> parse_sequence(bool inside_repeat,
-                                      std::size_t repeat_depth = 0) {
+  std::vector<Command> parse_bracketed_block(
+      std::size_t line_number, const std::string& block_name,
+      std::size_t block_depth) {
+    if (position_ >= tokens_.size() || tokens_[position_].text != "[") {
+      script_error(line_number,
+                   block_name + " expects a command list in `[ ]`.");
+    }
+    if (block_depth >= kMaximumNestingDepth) {
+      script_error(line_number,
+                   "control-flow block nesting exceeds the 64-level limit.");
+    }
+    ++position_;
+    return parse_sequence(true, block_depth + 1, block_name);
+  }
+
+  std::vector<Command> parse_sequence(bool inside_block,
+                                      std::size_t block_depth = 0,
+                                      const std::string& block_name = {}) {
     std::vector<Command> commands;
     while (position_ < tokens_.size()) {
       skip_newlines();
@@ -298,7 +364,7 @@ class ScriptParser {
         break;
       }
       if (tokens_[position_].text == "]") {
-        if (!inside_repeat) {
+        if (!inside_block) {
           script_error(tokens_[position_].line_number, "unexpected `]`.");
         }
         ++position_;
@@ -307,7 +373,7 @@ class ScriptParser {
 
       const auto line_number = tokens_[position_].line_number;
       const auto name = uppercase(tokens_[position_++].text);
-      Command command{name, {}, {}, line_number};
+      Command command{name, {}, {}, {}, line_number};
       if (name == "REPEAT") {
         const auto count_token = take_argument(line_number, name);
         if (count_token.empty() || count_token.front() != ':') {
@@ -318,15 +384,29 @@ class ScriptParser {
                          "REPEAT count must be an integer from 0 to 4096.");
           }
         }
-        if (position_ >= tokens_.size() || tokens_[position_].text != "[") {
-          script_error(line_number, "REPEAT expects a command list in `[ ]`.");
-        }
-        if (repeat_depth >= kMaximumNestingDepth) {
-          script_error(line_number, "REPEAT nesting exceeds the 64-level limit.");
-        }
-        ++position_;
         command.arguments.push_back(count_token);
-        command.body = parse_sequence(true, repeat_depth + 1);
+        command.body =
+            parse_bracketed_block(line_number, name, block_depth);
+        commands.push_back(std::move(command));
+        continue;
+      }
+
+      if (name == "IF" || name == "IFELSE") {
+        while (position_ < tokens_.size() && !tokens_[position_].newline &&
+               tokens_[position_].text != "[") {
+          if (tokens_[position_].text == "]") {
+            script_error(line_number, name + " has an unexpected `]`.");
+          }
+          command.arguments.push_back(tokens_[position_++].text);
+        }
+        validate_condition_shape(command.arguments, line_number);
+        command.body =
+            parse_bracketed_block(line_number, name, block_depth);
+        if (name == "IFELSE") {
+          skip_newlines();
+          command.alternate_body =
+              parse_bracketed_block(line_number, name, block_depth);
+        }
         commands.push_back(std::move(command));
         continue;
       }
@@ -390,10 +470,11 @@ class ScriptParser {
       }
       commands.push_back(std::move(command));
     }
-    if (inside_repeat) {
+    if (inside_block) {
       const auto line_number =
           tokens_.empty() ? 1 : tokens_.back().line_number;
-      script_error(line_number, "REPEAT is missing a closing `]`.");
+      script_error(line_number, block_name +
+                                    " is missing a closing `]`.");
     }
     return commands;
   }
@@ -605,6 +686,19 @@ TurtleScriptResult execute_turtle_script(std::string_view script,
         const auto count = static_cast<std::size_t>(count_value);
         for (std::size_t iteration = 0; iteration < count; ++iteration) {
           execute_commands(instruction.body, nesting_depth + 1, parameters);
+        }
+        continue;
+      }
+      if (command == "IF" || command == "IFELSE") {
+        if (nesting_depth >= kMaximumNestingDepth) {
+          script_error(instruction.line_number,
+                       "maximum control-flow/procedure nesting depth is 64.");
+        }
+        if (evaluate_condition(tokens, instruction.line_number)) {
+          execute_commands(instruction.body, nesting_depth + 1, parameters);
+        } else if (command == "IFELSE") {
+          execute_commands(instruction.alternate_body, nesting_depth + 1,
+                           parameters);
         }
         continue;
       }

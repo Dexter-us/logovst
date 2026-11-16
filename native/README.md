@@ -13,7 +13,8 @@ The host-independent MIDI timeline, Standard MIDI File renderer, turtle
 interpreter, and SVG exporter are built and tested. `logo-midi` has two modes:
 music scripts produce MIDI files, and Logo turtle scripts produce standalone
 SVG drawings. Both use the shared native C++ libraries; graphics scripts support
-the same turtle commands, loops, and parameterized procedures as the VST editor.
+the same turtle commands, loops, conditionals, and parameterized procedures as
+the VST editor.
 
 ```text
 logo-midi examples/scale.lgo --output scale.mid
@@ -49,10 +50,16 @@ internal tempo or DAW tempo sync. DAW-synced playback requires a valid playing
 transport from the host.
 
 The VST3 editor runs the supported native turtle subset, including multiline
-`REPEAT` blocks and parameterized procedures, but does **not** embed the full
-FMSLogo evaluator. The separate FMSLogo-based Windows CLI target evaluates
-original Logo scripts; the CMake `logo-midi` prototype exports its supported
-turtle subset as SVG.
+`REPEAT` blocks, `IF`/`IFELSE`, and parameterized procedures, but does **not**
+embed the full FMSLogo evaluator. The separate FMSLogo-based Windows CLI target
+evaluates original Logo scripts; the CMake `logo-midi` prototype exports its
+supported turtle subset as SVG.
+
+The editor's Load and Save buttons use native `.lgo` file dialogs. When an
+`examples` folder is available from the DAW's working directory, it is used as
+the initial location; otherwise the dialog can browse to the folder beside the
+extracted Windows package. Scripts are saved as portable files outside the DAW
+session and are loaded into the editor before pressing Run.
 
 Build with CMake 3.25+ and a local Steinberg VST3 SDK checkout (3.8.1 was used
 for verification):

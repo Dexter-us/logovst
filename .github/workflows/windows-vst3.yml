@@ -1,4 +1,4 @@
-name: Windows x64 VST3
+name: Windows x64 package
 
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
         run: |
           cmake -S native -B "$env:RUNNER_TEMP\logo-vst3-build" `
             -G "Visual Studio 17 2022" -A x64 `
-          -DLOGO_MIDI_BUILD_TESTS=ON `
+            -DLOGO_MIDI_BUILD_TESTS=ON `
             -DLOGO_MIDI_BUILD_VST3=ON `
             "-DVST3_SDK_ROOT=$env:RUNNER_TEMP\vst3sdk" `
             -DSMTG_RUN_VST_VALIDATOR=ON `
@@ -55,7 +55,7 @@ jobs:
             -C Release --output-on-failure
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Check vendor and package VST3 bundle
+      - name: Check vendor and package Windows apps
         shell: pwsh
         run: |
           $bundle = Join-Path $env:RUNNER_TEMP `
@@ -73,64 +73,50 @@ jobs:
             throw "The VST3 bundle does not identify Dexter U.S. as vendor"
           }
 
-          $stage = Join-Path $env:RUNNER_TEMP "vst3-artifact"
+          $stage = Join-Path $env:RUNNER_TEMP "logo-midi-package"
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
           Copy-Item -LiteralPath $bundle -Destination $stage -Recurse
-          $zip = Join-Path $env:RUNNER_TEMP "logo-midi-vst3-windows-x64.zip"
-          Compress-Archive -Path (Join-Path $stage "logo-midi-vst3.vst3") `
-            -DestinationPath $zip -CompressionLevel Optimal -Force
-          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) {
-            throw "The downloadable VST3 archive was not created"
-          }
-
-      - name: Package Windows command-line app
-        shell: pwsh
-        run: |
           $cli = Join-Path $env:RUNNER_TEMP `
             "logo-vst3-build\Release\logo-midi.exe"
           if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) {
             throw "The Windows command-line executable was not created at $cli"
           }
-
-          $stage = Join-Path $env:RUNNER_TEMP "cli-artifact"
+          Copy-Item -LiteralPath $cli -Destination $stage
           $examples = Join-Path $stage "examples"
           New-Item -ItemType Directory -Path $examples -Force | Out-Null
-          Copy-Item -LiteralPath $cli -Destination $stage
-          Copy-Item -LiteralPath "native\examples\turtle-square.lgo" `
-            -Destination $examples
-          Copy-Item -LiteralPath "native\examples\scale.lgo" `
-            -Destination $examples
+          Copy-Item -Path "native\examples\*" -Destination $examples -Recurse
+          Copy-Item -LiteralPath "vendor\fmslogo-upstream\LICENSE.TXT" `
+            -Destination (Join-Path $stage "LICENSE-FMSLOGO.TXT")
           @'
-          Logo MIDI command-line app (Windows x64)
+          Logo MIDI Windows x64 package
 
-          Render a Logo turtle script to SVG:
+          Contents:
+            logo-midi.exe             Command-line app
+            logo-midi-vst3.vst3       VST3 plugin bundle
+            examples\                 Portable Logo scripts
+
+          Render a drawing:
             logo-midi.exe --graphics examples\turtle-square.lgo --output square.svg
 
-          Render the included music script to MIDI:
+          Render MIDI:
             logo-midi.exe examples\scale.lgo --output scale.mid
 
-          See https://github.com/Dexter-us/logovst for source and license details.
+          Copy logo-midi-vst3.vst3 to your VST3 plug-in folder to use it in a DAW.
+          Keep examples\ beside the extracted files for convenient script access.
+          Source and license: https://github.com/Dexter-us/logovst
           '@ | Set-Content -LiteralPath (Join-Path $stage "README.txt")
 
-          $zip = Join-Path $env:RUNNER_TEMP "logo-midi-cli-windows-x64.zip"
+          $zip = Join-Path $env:RUNNER_TEMP "logo-midi-windows-x64.zip"
           Compress-Archive -Path (Join-Path $stage "*") `
             -DestinationPath $zip -CompressionLevel Optimal -Force
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) {
-            throw "The downloadable CLI archive was not created"
+            throw "The combined Windows archive was not created"
           }
 
-      - name: Upload downloadable VST3
+      - name: Upload combined Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: logo-midi-vst3-windows-x64
-          path: ${{ runner.temp }}/logo-midi-vst3-windows-x64.zip
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload downloadable command-line app
-        uses: actions/upload-artifact@v4
-        with:
-          name: logo-midi-cli-windows-x64
-          path: ${{ runner.temp }}/logo-midi-cli-windows-x64.zip
+          name: logo-midi-windows-x64
+          path: ${{ runner.temp }}/logo-midi-windows-x64.zip
           if-no-files-found: error
           retention-days: 14

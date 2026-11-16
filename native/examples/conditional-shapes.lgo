@@ -1,0 +1,21 @@
+; IFELSE selects a color based on each square's size.
+TO SQUARE :SIZE
+  IFELSE :SIZE > 60 [
+    SETPC [46 190 210]
+  ] [
+    SETPC [246 190 82]
+  ]
+  REPEAT 4 [
+    FD :SIZE
+    RT 90
+  ]
+END
+
+CS
+PENSIZE 3
+SQUARE 90
+PU
+SETXY 120 0
+PD
+SQUARE 40
+LABEL "IFELSE chooses the color"

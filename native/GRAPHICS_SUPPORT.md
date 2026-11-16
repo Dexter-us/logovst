@@ -8,10 +8,10 @@ and exports the scene as SVG.
 
 The VST editor and `logo-midi --graphics` CLI mode accept case-insensitive
 Logo commands, ignore blank lines and semicolon comments, and support
-parameterized `TO`/`END` procedures and multiline `REPEAT` blocks. Scripts are
-limited to 64 KiB, 4096 executed commands, 4096 repetitions per loop, 256
-procedures, and 64 nested loops/procedure calls. A failed script does not
-partially change the scene.
+parameterized `TO`/`END` procedures, multiline `REPEAT` blocks, and `IF`/
+`IFELSE` conditionals. Scripts are limited to 64 KiB, 4096 executed commands,
+4096 repetitions per loop, 256 procedures, and 64 nested loops, conditional
+blocks, or procedure calls. A failed script does not partially change the scene.
 
 Example:
 
@@ -50,6 +50,21 @@ END
 SQUARE 90
 SQUARE 45
 ```
+
+`IF` and `IFELSE` conditions accept `TRUE`, `FALSE`, or a numeric comparison
+using `=`, `<>`, `!=`, `<`, `<=`, `>`, or `>=`. Put spaces around the operator.
+Only the selected block runs, and conditionals can be nested:
+
+```logo
+IFELSE :SIZE > 60 [
+  SETPC [46 190 210]
+] [
+  SETPC [246 190 82]
+]
+```
+
+Malformed conditions and blocks report their source line and leave the previous
+drawing unchanged.
 
 This is a documented subset, not a full FMSLogo interpreter. Expressions and
 the music-command language are not yet connected to this editor.

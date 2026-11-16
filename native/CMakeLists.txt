@@ -63,6 +63,16 @@ if(LOGO_MIDI_BUILD_TESTS)
       -DLOGO_MIDI_EXECUTABLE=$<TARGET_FILE:logo-midi>
       -DGRAPHICS_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/examples/turtle-square.lgo
       -DTEST_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-graphics-test.svg
+      "-DEXPECTED_LABEL=Hello Logo"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_graphics_smoke.cmake
+  )
+  add_test(
+    NAME logo_midi_cli_conditionals_tests
+    COMMAND ${CMAKE_COMMAND}
+      -DLOGO_MIDI_EXECUTABLE=$<TARGET_FILE:logo-midi>
+      -DGRAPHICS_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/examples/conditional-shapes.lgo
+      -DTEST_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-conditionals-test.svg
+      "-DEXPECTED_LABEL=IFELSE chooses the color"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_graphics_smoke.cmake
   )
 endif()

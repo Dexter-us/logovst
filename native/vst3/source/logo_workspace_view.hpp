@@ -33,6 +33,7 @@ class LogoWorkspaceView final : public VSTGUI::CViewContainer,
 
  private:
   void run_program();
+  void select_script_file(bool saving);
   void update_canvas();
 
   logo_midi::TurtleGraphicsEngine graphics_;
@@ -40,6 +41,8 @@ class LogoWorkspaceView final : public VSTGUI::CViewContainer,
   GraphicsCanvasView* canvas_view_ = nullptr;
   VSTGUI::CMultiLineTextLabel* status_label_ = nullptr;
   VSTGUI::CTextButton* run_button_ = nullptr;
+  VSTGUI::CTextButton* load_button_ = nullptr;
+  VSTGUI::CTextButton* save_button_ = nullptr;
 };
 
 }  // namespace LogoMidi

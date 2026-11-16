@@ -26,8 +26,8 @@ void print_usage() {
       << "  TEMPO 1..1000 | VELOCITY 1..127 | CHANNEL 1..16 | GATE 0..1\n"
       << "  NOTE pitch beats | CHORD [pitch ...] beats | REST beats\n"
       << "  CC controller value | PROGRAM 0..127\n\n"
-      << "Graphics mode runs the supported Logo turtle commands, REPEAT blocks,\n"
-      << "and parameterized TO/END procedures, then writes a standalone SVG.\n";
+      << "Graphics mode runs turtle commands, REPEAT, IF/IFELSE, and\n"
+      << "parameterized TO/END procedures, then writes a standalone SVG.\n";
 }
 
 double number(const std::string& text, const std::string& line,
