@@ -137,6 +137,48 @@ NODE *lmusicrest(NODE *args)
     return Unbound;
 }
 
+NODE *lmusicsteal(NODE *args)
+{
+    FLONUM beats = positive_flonum_arg(car(args));
+    if (NOT_THROWING)
+    {
+        try
+        {
+            logo_midi::MusicCommandSink *sink = active_sink();
+            if (sink != nullptr)
+            {
+                sink->steal(beats);
+            }
+        }
+        catch (const std::exception &)
+        {
+            return music_error();
+        }
+    }
+    return Unbound;
+}
+
+NODE *lmusicanticipate(NODE *args)
+{
+    FLONUM beats = positive_flonum_arg(car(args));
+    if (NOT_THROWING)
+    {
+        try
+        {
+            logo_midi::MusicCommandSink *sink = active_sink();
+            if (sink != nullptr)
+            {
+                sink->anticipate(beats);
+            }
+        }
+        catch (const std::exception &)
+        {
+            return music_error();
+        }
+    }
+    return Unbound;
+}
+
 NODE *lmusiccc(NODE *args)
 {
     NODE *controller = ranged_integer_arg(args, 0, 127);

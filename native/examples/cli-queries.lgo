@@ -1,0 +1,5 @@
+CS
+SETPIXEL [12 34 56]
+PIXEL
+FD 10
+LABEL "CLI query output"

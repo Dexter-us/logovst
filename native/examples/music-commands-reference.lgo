@@ -1,0 +1,33 @@
+; Logo MIDI command reference
+; Load this file in the VST editor and press Run, or use the CLI renderer.
+; Durations are quarter-note beats unless noted.
+
+TEMPO 120
+CHANNEL 1
+VELOCITY 96
+GATE 0.8
+PROGRAM 0
+CC 1 32
+
+; NOTE pitch duration
+NOTE 60 0.5
+NOTE 62 0.5
+NOTE (60 + RANDOM 12) 0.5
+
+; STEAL beats lengthens the previous NOTE or CHORD.
+; ANTICIPATE beats moves the next NOTE or CHORD onset earlier.
+NOTE 64 1
+STEAL 0.15
+ANTICIPATE 0.1
+NOTE 65 1
+
+; CHORD [pitch pitch ...] duration
+CHORD [60 64 67] 1
+
+; REST duration (in beats); WAIT ticks (60 ticks = 1 second)
+REST 0.5
+WAIT 30
+
+; TEMPO changes the internal playback tempo from this point onward.
+TEMPO 90
+NOTE 67 1

@@ -1,0 +1,12 @@
+; STEAL extends the previous NOTE or CHORD by beats without moving the cursor.
+; ANTICIPATE starts the next NOTE or CHORD early without changing the cursor.
+TEMPO 120
+GATE 0.8
+
+NOTE 60 1
+STEAL 0.25
+NOTE 64 1
+ANTICIPATE 0.25
+NOTE 67 1
+CHORD [60 64 67] 1
+STEAL 0.25

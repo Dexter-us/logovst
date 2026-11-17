@@ -11,8 +11,10 @@ endif()
 
 add_library(logo_midi_engine
   src/graphics_engine.cpp
+  src/logo_music_interpreter.cpp
   src/music_api.cpp
   src/music_engine.cpp
+  src/music_script.cpp
   src/svg_renderer.cpp
   src/turtle_interpreter.cpp
 )
@@ -38,6 +40,12 @@ if(LOGO_MIDI_BUILD_TESTS)
   )
   target_link_libraries(logo_midi_engine_tests PRIVATE logo_midi_engine)
   add_test(NAME logo_midi_engine_tests COMMAND logo_midi_engine_tests)
+
+  add_executable(logo_midi_script_tests
+    tests/music_script_tests.cpp
+  )
+  target_link_libraries(logo_midi_script_tests PRIVATE logo_midi_engine)
+  add_test(NAME logo_midi_script_tests COMMAND logo_midi_script_tests)
 
   add_executable(logo_midi_graphics_tests
     tests/graphics_engine_tests.cpp
@@ -73,6 +81,37 @@ if(LOGO_MIDI_BUILD_TESTS)
       -DGRAPHICS_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/examples/conditional-shapes.lgo
       -DTEST_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-conditionals-test.svg
       "-DEXPECTED_LABEL=IFELSE chooses the color"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_graphics_smoke.cmake
+  )
+  add_test(
+    NAME logo_midi_cli_queries_and_canvas_size_tests
+    COMMAND ${CMAKE_COMMAND}
+      -DLOGO_MIDI_EXECUTABLE=$<TARGET_FILE:logo-midi>
+      -DGRAPHICS_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/examples/cli-queries.lgo
+      -DTEST_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-query-test.svg
+      -DCLI_CANVAS_SIZE=640x360
+      "-DEXPECTED_LABEL=CLI query output"
+      "-DEXPECTED_QUERY=PIXEL [12 34 56]"
+      -DEXPECTED_WIDTH=640
+      -DEXPECTED_HEIGHT=360
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_graphics_smoke.cmake
+  )
+  add_test(
+    NAME logo_midi_cli_music_tests
+    COMMAND ${CMAKE_COMMAND}
+      -DLOGO_MIDI_EXECUTABLE=$<TARGET_FILE:logo-midi>
+      -DMUSIC_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/examples/music-command-tour.lgo
+      -DTEST_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-music-test.mid
+      "-DEXPECTED_SUMMARY=across 5 beats at 60 BPM"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_music_smoke.cmake
+  )
+  add_test(
+    NAME logo_midi_cli_graphics_tour_tests
+    COMMAND ${CMAKE_COMMAND}
+      -DLOGO_MIDI_EXECUTABLE=$<TARGET_FILE:logo-midi>
+      -DGRAPHICS_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/examples/graphics-command-tour.lgo
+      -DTEST_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/cli-graphics-tour.svg
+      "-DEXPECTED_LABEL=Logo command tour"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_graphics_smoke.cmake
   )
 endif()

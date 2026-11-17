@@ -8,6 +8,8 @@ class MusicCommandSink {
 
   virtual void note(int pitch, double duration) = 0;
   virtual void chord(const int* pitches, int count, double duration) = 0;
+  virtual void steal(double beats) = 0;
+  virtual void anticipate(double beats) = 0;
   virtual void rest(double duration) = 0;
   virtual void control_change(int controller, int value) = 0;
   virtual void program_change(int program) = 0;

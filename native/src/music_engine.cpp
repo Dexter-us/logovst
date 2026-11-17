@@ -82,8 +82,16 @@ void MusicEngine::advance(double duration) {
 void MusicEngine::note(int pitch, double duration) {
   require_range(pitch, 0, 127, "Pitch");
   require_duration(duration);
-  add_event(beat_position_, 0x90, pitch, velocity_);
-  add_event(beat_position_ + duration * gate_, 0x80, pitch, 0);
+  const double onset = beat_position_ - pending_anticipation_;
+  if (onset < 0.0) {
+    throw std::invalid_argument(
+        "ANTICIPATE cannot move a note before the start of the timeline.");
+  }
+  last_note_off_events_.clear();
+  add_event(onset, 0x90, pitch, velocity_);
+  add_event(onset + duration * gate_, 0x80, pitch, 0);
+  last_note_off_events_.push_back(events_.size() - 1);
+  pending_anticipation_ = 0.0;
   advance(duration);
 }
 
@@ -95,12 +103,20 @@ void MusicEngine::chord(const std::vector<int>& pitches, double duration) {
   for (const int pitch : pitches) {
     require_range(pitch, 0, 127, "Pitch");
   }
+  const double onset = beat_position_ - pending_anticipation_;
+  if (onset < 0.0) {
+    throw std::invalid_argument(
+        "ANTICIPATE cannot move a chord before the start of the timeline.");
+  }
+  last_note_off_events_.clear();
   for (const int pitch : pitches) {
-    add_event(beat_position_, 0x90, pitch, velocity_);
+    add_event(onset, 0x90, pitch, velocity_);
   }
   for (const int pitch : pitches) {
-    add_event(beat_position_ + duration * gate_, 0x80, pitch, 0);
+    add_event(onset + duration * gate_, 0x80, pitch, 0);
+    last_note_off_events_.push_back(events_.size() - 1);
   }
+  pending_anticipation_ = 0.0;
   advance(duration);
 }
 
@@ -114,6 +130,58 @@ void MusicEngine::chord(const int* pitches, int count, double duration) {
 void MusicEngine::rest(double duration) {
   require_duration(duration);
   advance(duration);
+}
+
+void MusicEngine::steal(double beats) {
+  require_duration(beats);
+  if (last_note_off_events_.empty()) {
+    throw std::invalid_argument("STEAL must follow a NOTE or CHORD.");
+  }
+  for (const auto index : last_note_off_events_) {
+    events_.at(index).beat += beats;
+    if (!std::isfinite(events_.at(index).beat)) {
+      throw std::overflow_error("Note duration exceeded the supported range.");
+    }
+  }
+}
+
+void MusicEngine::anticipate(double beats) {
+  require_duration(beats);
+  if (beats > beat_position_) {
+    throw std::invalid_argument(
+        "ANTICIPATE cannot move a note before the start of the timeline.");
+  }
+  pending_anticipation_ = beats;
+}
+
+void MusicEngine::sort_events() {
+  const auto priority = [](const MidiEvent& event) {
+    const auto family = event.status & 0xf0;
+    return family == 0x80 || (family == 0x90 && event.data2 == 0) ? 0 : 1;
+  };
+  std::stable_sort(events_.begin(), events_.end(),
+                   [&priority](const MidiEvent& left, const MidiEvent& right) {
+                     if (left.beat != right.beat) {
+                       return left.beat < right.beat;
+                     }
+                     return priority(left) < priority(right);
+                   });
+}
+
+void MusicEngine::wait(double logo_ticks) {
+  if (!std::isfinite(logo_ticks) || logo_ticks < 0.0) {
+    throw std::invalid_argument(
+        "WAIT duration must be a finite, nonnegative number of ticks.");
+  }
+  if (logo_ticks == 0.0) {
+    return;
+  }
+
+  // FMSLogo WAIT units are 1/60 second. Convert the wall-clock duration to
+  // quarter-note beats at the current tempo so it remains timed in the MIDI.
+  const double wait_seconds = logo_ticks / 60.0;
+  const double wait_beats = wait_seconds * tempo_bpm_ / 60.0;
+  advance(wait_beats);
 }
 
 void MusicEngine::control_change(int controller, int value) {
@@ -150,6 +218,12 @@ void MusicEngine::set_tempo(double beats_per_minute) {
     throw std::invalid_argument("Tempo must be between 1 and 1000 BPM.");
   }
   tempo_bpm_ = beats_per_minute;
+  if (!tempo_changes_.empty() &&
+      tempo_changes_.back().beat == beat_position_) {
+    tempo_changes_.back().beats_per_minute = tempo_bpm_;
+  } else {
+    tempo_changes_.push_back({beat_position_, tempo_bpm_});
+  }
 }
 
 void MusicEngine::write_midi_file(const std::filesystem::path& path) const {
@@ -160,15 +234,18 @@ void MusicEngine::write_midi_file(const std::filesystem::path& path) const {
   };
 
   std::vector<EncodedEvent> encoded;
-  encoded.reserve(events_.size() + 2);
+  encoded.reserve(events_.size() + tempo_changes_.size() + 1);
 
-  const auto micros_per_quarter =
-      static_cast<std::uint32_t>(std::llround(60000000.0 / tempo_bpm_));
-  encoded.push_back(
-      {0, 0, {0xff, 0x51, 0x03,
-              static_cast<std::uint8_t>((micros_per_quarter >> 16) & 0xff),
-              static_cast<std::uint8_t>((micros_per_quarter >> 8) & 0xff),
-              static_cast<std::uint8_t>(micros_per_quarter & 0xff)}});
+  for (const auto& tempo_change : tempo_changes_) {
+    const auto micros_per_quarter = static_cast<std::uint32_t>(
+        std::llround(60000000.0 / tempo_change.beats_per_minute));
+    encoded.push_back(
+        {beat_to_tick(tempo_change.beat), 0,
+         {0xff, 0x51, 0x03,
+          static_cast<std::uint8_t>((micros_per_quarter >> 16) & 0xff),
+          static_cast<std::uint8_t>((micros_per_quarter >> 8) & 0xff),
+          static_cast<std::uint8_t>(micros_per_quarter & 0xff)}});
+  }
 
   for (const auto& event : events_) {
     const auto is_note_off =

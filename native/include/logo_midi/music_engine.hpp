@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <cstddef>
 #include <vector>
 
 namespace logo_midi {
@@ -15,6 +16,11 @@ struct MidiEvent {
   std::uint8_t data2 = 0;
 };
 
+struct TempoChange {
+  double beat = 0.0;
+  double beats_per_minute = 120.0;
+};
+
 class MusicEngine final : public MusicCommandSink {
  public:
   static constexpr std::uint16_t kTicksPerBeat = 480;
@@ -22,7 +28,10 @@ class MusicEngine final : public MusicCommandSink {
   void note(int pitch, double duration) override;
   void chord(const std::vector<int>& pitches, double duration);
   void chord(const int* pitches, int count, double duration) override;
+  void steal(double beats) override;
+  void anticipate(double beats) override;
   void rest(double duration) override;
+  void wait(double logo_ticks);
   void control_change(int controller, int value) override;
   void program_change(int program) override;
 
@@ -37,6 +46,10 @@ class MusicEngine final : public MusicCommandSink {
   int channel() const noexcept { return channel_; }
   double gate() const noexcept { return gate_; }
   const std::vector<MidiEvent>& events() const noexcept { return events_; }
+  const std::vector<TempoChange>& tempo_changes() const noexcept {
+    return tempo_changes_;
+  }
+  void sort_events();
 
   void write_midi_file(const std::filesystem::path& path) const;
 
@@ -48,11 +61,14 @@ class MusicEngine final : public MusicCommandSink {
   void advance(double duration);
 
   std::vector<MidiEvent> events_;
+  std::vector<TempoChange> tempo_changes_{{0.0, 120.0}};
   double beat_position_ = 0.0;
   double tempo_bpm_ = 120.0;
   double gate_ = 0.8;
+  double pending_anticipation_ = 0.0;
   int velocity_ = 96;
   int channel_ = 0;
+  std::vector<std::size_t> last_note_off_events_;
 };
 
 }  // namespace logo_midi

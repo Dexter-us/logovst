@@ -66,8 +66,12 @@ IFELSE :SIZE > 60 [
 Malformed conditions and blocks report their source line and leave the previous
 drawing unchanged.
 
-This is a documented subset, not a full FMSLogo interpreter. Expressions and
-the music-command language are not yet connected to this editor.
+This is a documented subset, not a full FMSLogo interpreter. General Logo
+expressions are not supported in graphics scripts. The separate music dialect
+supports number, boolean, word, and list values; list/word and numeric
+reporters; `TO`/`END` procedures with `OUTPUT`; and bounded `REPEAT`, `IF`,
+`IFELSE`, `WHILE`, `UNTIL`, and `FOREVER` blocks. It remains a music-focused
+subset and does not provide the complete FMSLogo primitive library or workspace.
 
 ## Batch 1 — 2D turtle state and strokes
 

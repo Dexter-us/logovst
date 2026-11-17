@@ -1,0 +1,20 @@
+; Run with: logo-midi native/examples/music-command-tour.lgo --output tour.mid
+; WAIT uses FMSLogo's 1/60-second ticks and becomes timed silence in the MIDI.
+TEMPO 120
+CHANNEL 1
+VELOCITY 96
+GATE 0.8
+PROGRAM 0
+CC 1 32
+
+NOTE 60 0.5
+STEAL 0.1
+ANTICIPATE 0.1
+NOTE 64 0.5
+WAIT 30
+CHORD [60 64 67] 1
+REST 0.5
+
+TEMPO 60
+WAIT 60
+NOTE 72 0.5

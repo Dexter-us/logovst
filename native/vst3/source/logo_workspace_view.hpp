@@ -18,12 +18,13 @@ struct ITextEditor;
 namespace LogoMidi {
 
 class GraphicsCanvasView;
+class Controller;
 
 class LogoWorkspaceView final : public VSTGUI::CViewContainer,
                                 public VSTGUI::IControlListener,
                                 public VSTGUI::TextEditorControllerAdapter {
  public:
-  explicit LogoWorkspaceView(const VSTGUI::CRect& size);
+  explicit LogoWorkspaceView(const VSTGUI::CRect& size, Controller* controller);
   ~LogoWorkspaceView() noexcept override;
 
   void valueChanged(VSTGUI::CControl* control) override;
@@ -37,6 +38,7 @@ class LogoWorkspaceView final : public VSTGUI::CViewContainer,
   void update_canvas();
 
   logo_midi::TurtleGraphicsEngine graphics_;
+  Controller* controller_ = nullptr;
   const VSTGUI::ITextEditor* text_editor_ = nullptr;
   GraphicsCanvasView* canvas_view_ = nullptr;
   VSTGUI::CMultiLineTextLabel* status_label_ = nullptr;

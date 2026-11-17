@@ -1,0 +1,11 @@
+; Numeric Logo variables, expressions, and reporters in music scripts.
+RERANDOM 17
+MAKE "BASE 60
+MAKE "PITCH SUM :BASE RANDOM 12
+
+NOTE :PITCH 0.5
+NOTE (60 + RANDOM 12) 0.5
+NOTE (MAX 36 (MIN 84 (SUM :BASE 7))) 0.5
+NOTE (ROUND (SQRT 81) + :BASE) 0.5
+NOTE (THING "PITCH) 0.5
+NOTE (LESS? :PITCH 72) 0.5

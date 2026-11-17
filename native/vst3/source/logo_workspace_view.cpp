@@ -1,6 +1,8 @@
 #include "logo_workspace_view.hpp"
 
+#include "controller.hpp"
 #include "graphics_canvas_view.hpp"
+#include "logo_midi/music_script.hpp"
 #include "logo_midi/turtle_interpreter.hpp"
 
 #include "vstgui/lib/ccolor.h"
@@ -39,8 +41,9 @@ constexpr char kStarterProgram[] =
 
 }  // namespace
 
-LogoWorkspaceView::LogoWorkspaceView(const VSTGUI::CRect& size)
-    : CViewContainer(size) {
+LogoWorkspaceView::LogoWorkspaceView(const VSTGUI::CRect& size,
+                                     Controller* controller)
+    : CViewContainer(size), controller_(controller) {
   setBackgroundColor({16, 24, 39, 255});
   setTransparency(false);
   graphics_.set_viewport(kCanvasWidth, kCanvasHeight);
@@ -243,11 +246,15 @@ void LogoWorkspaceView::run_program() {
     return;
   }
 
+  const auto script = text_editor_->getPlainText();
   auto next_graphics = graphics_;
   try {
     const auto result = logo_midi::execute_turtle_script(
-        text_editor_->getPlainText(), next_graphics);
+        script, next_graphics);
     graphics_ = std::move(next_graphics);
+    if (controller_ != nullptr) {
+      controller_->clearMusicScript();
+    }
     update_canvas();
     std::string status =
         "Ran " + std::to_string(result.commands_executed) + " command(s).";
@@ -255,6 +262,23 @@ void LogoWorkspaceView::run_program() {
       status += "\n" + result.output;
     }
     status_label_->setText(status.c_str());
+    return;
+  } catch (const std::exception&) {
+    // Music scripts share the editor and Run button but do not affect canvas state.
+  }
+
+  try {
+    const auto music = logo_midi::compile_music_script(script);
+    if (controller_ == nullptr) {
+      throw std::runtime_error("The VST MIDI output is unavailable.");
+    }
+    if (controller_->sendMusicScript(script) != Steinberg::kResultOk) {
+      throw std::runtime_error("Could not send the music script to the DAW.");
+    }
+    status_label_->setText(
+        ("Sent " + std::to_string(music.events().size()) +
+         " MIDI event(s) to the DAW. Start playback to hear the loop.")
+            .c_str());
   } catch (const std::exception& error) {
     status_label_->setText(error.what());
   }
