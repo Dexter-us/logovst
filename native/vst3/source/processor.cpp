@@ -49,7 +49,6 @@ Processor::Processor() {
   setControllerClass(kControllerUid);
   processContextRequirements.flags =
       Steinberg::Vst::IProcessContextRequirements::kNeedProjectTimeMusic |
-      Steinberg::Vst::IProcessContextRequirements::kNeedProjectTimeSamples |
       Steinberg::Vst::IProcessContextRequirements::kNeedTempo |
       Steinberg::Vst::IProcessContextRequirements::kNeedTransportState;
   scheduled_events_.reserve(32768);
@@ -317,12 +316,11 @@ Steinberg::tresult PLUGIN_API Processor::process(
     return flushScheduledEvents(data.outputEvents);
   }
 
-  const bool project_samples_valid =
-      context != nullptr &&
-      (context->state & ProcessContext::kProjectTimeSamplesValid) != 0;
+  // ProcessContext::projectTimeSamples is always valid when a context exists.
+  const bool has_process_context = context != nullptr;
   const auto absolute_sample =
-      project_samples_valid ? context->projectTimeSamples : fallback_samples_;
-  if (!project_samples_valid) {
+      has_process_context ? context->projectTimeSamples : fallback_samples_;
+  if (!has_process_context) {
     fallback_samples_ += data.numSamples;
   }
   const double start_seconds =
